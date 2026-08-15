@@ -1,0 +1,41 @@
+# LiteSpeed + Security Configuration
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # REST API routes
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^api/(.*)$ index.php?route=api/$1 [QSA,L]
+
+    # Default to index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php?route=$1 [QSA,L]
+</IfModule>
+
+# Security headers
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; object-src 'none';"
+</IfModule>
+
+# Protect sensitive directories
+<FilesMatch "\.(env|ini|log|sh|php)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Deny access to storage
+RedirectMatch 403 ^/storage/.*$
+RedirectMatch 403 ^/docs/.*$
+RedirectMatch 403 ^/tests/.*$
+
+# PHP settings for 8.3 performance
+php_value memory_limit 256M
+php_value upload_max_filesize 5M
+php_value post_max_size 8M
+php_value max_execution_time 30
+php_value max_input_time 60
