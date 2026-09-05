@@ -91,7 +91,7 @@ if (isset($notifications_response['success']) && $notifications_response['succes
 
 $page_title = $building['name'] ?? 'پروفایل ساختمان';
 $header_sub = 'مدیریت ساختمان';
-$back_url = 'index.php';
+$back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';
 $unread_nav = $unread_nav ?? 0;
 require_once 'includes/dash_head.php';
@@ -138,11 +138,7 @@ require_once 'includes/dash_head.php';
                 </div>
             </div>
             <div class="building-image-wrapper">
-                <?php if (!empty($building['custom_logo_path'])): ?>
-                    <img src="<?= htmlspecialchars($building['custom_logo_path']) ?>" alt="<?= htmlspecialchars($building['name'] ?? '') ?>">
-                <?php else: ?>
-                    <img src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=300&q=80" alt="ساختمان پیش‌فرض">
-                <?php endif; ?>
+                <img src="<?= htmlspecialchars(building_cover($building ?? [])) ?>" alt="<?= htmlspecialchars($building['name'] ?? 'ساختمان') ?>">
             </div>
         </section>
 
@@ -357,7 +353,26 @@ require_once 'includes/dash_head.php';
             </div>
         </section>
 
-        <!-- اطلاعات اجمالی -->
+        <div class="card p-4 mt-3">
+                <div class="flex flex-wrap gap-2 text-[11px]">
+                    <?php if (!empty($building['total_units'])): ?>
+                        <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700"><?= fa_digits($building['total_units']) ?> واحد</span>
+                    <?php endif; ?>
+                    <?php if (!empty($building['total_floors'])): ?>
+                        <span class="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700"><?= fa_digits($building['total_floors']) ?> طبقه</span>
+                    <?php endif; ?>
+                    <?php if (!empty($building['has_blocks'])): ?>
+                        <span class="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700"><?= fa_digits(count($blocks)) ?> بلوک</span>
+                    <?php endif; ?>
+                    <?php if (!empty($building['parking_spots'])): ?>
+                        <span class="px-2.5 py-1 rounded-full bg-sky-50 text-sky-700"><?= fa_digits($building['parking_spots']) ?> ظرفیت پارکینگ</span>
+                    <?php endif; ?>
+                    <?php if (!empty($building['monthly_charge_enabled']) && !empty($building['monthly_charge'])): ?>
+                        <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">شارژ ماهیانه: <?= fa_number($building['monthly_charge']) ?> تومان</span>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <!-- اطلاعات اجمالی -->
         <section class="quick-access-section">
             <div class="section-header-row">
                 <span class="section-title">اطلاعات اجمالی</span>

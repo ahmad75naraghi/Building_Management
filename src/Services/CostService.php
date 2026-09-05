@@ -10,7 +10,9 @@ use App\Exceptions\ValidationException;
 use App\Models\Cost;
 use App\Models\CostPayment;
 use App\Models\PenaltySetting;
+use App\Repositories\BuildingRepository;
 use App\Repositories\CostRepository;
+use App\Core\Database;
 use App\Repositories\CostPaymentRepository;
 use App\Repositories\PenaltySettingRepository;
 use App\Utilities\FileStorage;
@@ -54,6 +56,79 @@ final class CostService
         $id = $this->costRepo->create($cost);
         $cost->id = $id;
         return $cost;
+    }
+
+    /**
+     * ثبت شارژ ماهیانه ثابت ساختمان برای ماه جاری.
+     * اگر شارژ این ماه قبلاً ثبت شده باشد، همان رکورد برگردانده می‌شود.
+     *
+     * @throws AppException اگر شارژ ثابت تنظیم نشده باشد
+     */
+    public function createMonthlyCharge(int $buildingId, int $userId): Cost
+    {
+        $building = (new BuildingRepository())->findById($buildingId);
+        if (!$building) {
+            throw new AppException('ساختمان یافت نشد.');
+        }
+        if (!$building->monthly_charge_enabled || $building->monthly_charge <= 0) {
+            throw new AppException('شارژ ثابت ماهیانه برای این ساختمان تنظیم نشده است. ابتدا مبلغ شارژ ثابت را ذخیره کنید.');
+        }
+
+        $monthKey = date('Y-m');
+        $marker = 'auto:monthly:' . $monthKey;
+
+        $db = Database::getConnection();
+        $stmt = $db->prepare("SELECT id FROM costs WHERE building_id = ? AND description = ? LIMIT 1");
+        $stmt->execute([$buildingId, $marker]);
+        $existingId = $stmt->fetchColumn();
+        if ($existingId) {
+            $existing = $this->costRepo->findById((int) $existingId);
+            if ($existing) {
+                return $existing;
+            }
+        }
+
+        $cost = new Cost();
+        $cost->building_id = $buildingId;
+        $cost->title = 'شارژ ماهیانه ' . $monthKey;
+        $cost->description = $marker;
+        $cost->amount = (float) $building->monthly_charge;
+        $cost->cost_type = 'periodic';
+        $cost->target_audience = 'all';
+        $cost->division_method = 'fixed_share';
+        $cost->division_details = null;
+        $cost->due_date = date('Y-m-t');
+        $cost->status = 'pending';
+        $cost->is_recurring = true;
+        $cost->recurring_interval = 'monthly';
+        $cost->created_by = $userId;
+
+        $id = $this->costRepo->create($cost);
+        $cost->id = $id;
+        return $cost;
+    }
+
+    /**
+     * اطمینان از وجود شارژ ماه جاری (فراخوانی خودکار هنگام مشاهده مالی).
+     * خطاها نادیده گرفته می‌شوند تا نمایش صفحه متوقف نشود.
+     */
+    public function ensureMonthlyCharge(int $buildingId, int $userId): void
+    {
+        try {
+            $building = (new BuildingRepository())->findById($buildingId);
+            if (!$building || !$building->monthly_charge_enabled || $building->monthly_charge <= 0) {
+                return;
+            }
+            $monthKey = date('Y-m');
+            $db = Database::getConnection();
+            $stmt = $db->prepare("SELECT id FROM costs WHERE building_id = ? AND description = ? LIMIT 1");
+            $stmt->execute([$buildingId, 'auto:monthly:' . $monthKey]);
+            if (!$stmt->fetchColumn()) {
+                $this->createMonthlyCharge($buildingId, $userId);
+            }
+        } catch (\Throwable $e) {
+            error_log('[CostService] ensureMonthlyCharge skipped: ' . $e->getMessage());
+        }
     }
 
     public function listPaymentsByBuilding(int $buildingId): array

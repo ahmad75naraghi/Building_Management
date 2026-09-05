@@ -59,6 +59,12 @@ require_once 'includes/page_head.php';
                 <div class="text-5xl mb-3">🏢</div>
                 <h3 class="font-bold text-gray-800 text-lg">دعوت به ساختمان</h3>
                 <?php if ($invitation): ?>
+                    <?php if (!empty($invitation['invited_name'])): ?>
+                        <p class="text-sm text-gray-500 mt-1">
+                            <span class="font-bold text-gray-800"><?= htmlspecialchars($invitation['invited_name']) ?></span>
+                            عزیز،
+                        </p>
+                    <?php endif; ?>
                     <p class="text-sm text-gray-500 mt-2">
                         شما به ساختمان
                         <span class="font-bold text-gray-800"><?= htmlspecialchars($invitation['building_name'] ?? '') ?></span>

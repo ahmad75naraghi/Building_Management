@@ -80,14 +80,10 @@ require_once 'includes/header.php';
                            value="<?= htmlspecialchars($user_name) ?>">
                 </div>
                 <div>
-                    <label for="email" class="form-label">ایمیل (قابل تغییر نیست)</label>
-                    <input type="email" id="email" dir="ltr" disabled class="form-input text-left opacity-70" value="<?= htmlspecialchars($user_email) ?>">
-                    <p class="text-[11px] text-gray-400 mt-1">ایمیل شناسه ورود شماست و برای امنیت قابل تغییر نیست.</p>
-                </div>
-                <div>
-                    <label for="phone" class="form-label">شماره موبایل</label>
-                    <input type="text" id="phone" name="phone" dir="ltr" class="form-input text-left" placeholder="0912xxxxxxx"
+                    <label for="phone" class="form-label">شماره موبایل (نام کاربری ورود) *</label>
+                    <input type="tel" id="phone" name="phone" dir="ltr" required inputmode="numeric" class="form-input text-left" placeholder="09123456789"
                            value="<?= htmlspecialchars($user_phone) ?>">
+                    <p class="text-[11px] text-gray-400 mt-1">با همین شماره وارد سیستم می‌شوید؛ باید یکتا و معتبر باشد.</p>
                 </div>
                 <div class="flex gap-3">
                     <button type="submit" class="btn-primary flex-1">

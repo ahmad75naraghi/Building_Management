@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Config\AppConfig;
-use App\Exceptions\AppException;
 use App\Exceptions\ValidationException;
 use App\Models\Building;
 use App\Repositories\BuildingRepository;
@@ -42,6 +40,15 @@ final class BuildingService
             'has_units' => true,
             'has_common_areas' => true,
         ];
+        $building->total_units = isset($data['total_units']) && $data['total_units'] !== '' ? (int) $data['total_units'] : null;
+        $building->total_floors = isset($data['total_floors']) && $data['total_floors'] !== '' ? (int) $data['total_floors'] : null;
+        $building->has_blocks = isset($data['has_blocks']) ? (bool) $data['has_blocks'] : true;
+        $building->default_image = $data['default_image'] ?? 'b1';
+        $building->parking_spots = isset($data['parking_spots']) ? max(0, (int) $data['parking_spots']) : 0;
+        $building->monthly_charge = isset($data['monthly_charge']) ? max(0, (float) $data['monthly_charge']) : 0.0;
+        $building->monthly_charge_enabled = isset($data['monthly_charge_enabled'])
+            ? (bool) $data['monthly_charge_enabled']
+            : ($building->monthly_charge > 0);
 
         $id = $this->repo->create($building);
         $building->id = $id;
@@ -50,13 +57,50 @@ final class BuildingService
         $this->hierarchyRepo->findOrCreateByBuildingId($id);
 
         // سازنده ساختمان به‌صورت خودکار مدیر (member) ساختمان می‌شود.
-        // همه ماژول‌ها (واحدها، دعوت‌نامه‌ها، اعضا، ...) عضویت فعال را چک می‌کنند.
         $db = \App\Core\Database::getConnection();
         $stmt = $db->prepare(
             "INSERT IGNORE INTO building_members (user_id, building_id, role, status, invited_by)
              VALUES (?, ?, 'manager', 'active', ?)"
         );
         $stmt->execute([$userId, $id, $userId]);
+
+        // ساخت خودکار بلوک‌ها از روی نام‌های واردشده در فرم
+        $blocks = $data['blocks'] ?? [];
+        if ($building->has_blocks && is_array($blocks)) {
+            $bstmt = $db->prepare("INSERT INTO blocks (building_id, name) VALUES (?, ?)");
+            foreach ($blocks as $bname) {
+                $bname = trim((string) $bname);
+                if ($bname !== '') {
+                    $bstmt->execute([$id, $bname]);
+                }
+            }
+        }
+
+        // ساخت خودکار مشاعات از روی فرم (نام + قابل رزرو بودن)
+        $commonAreas = $data['common_areas'] ?? [];
+        if (is_array($commonAreas)) {
+            $cstmt = $db->prepare(
+                "INSERT INTO common_areas (building_id, name, type, bookable) VALUES (?, ?, ?, ?)"
+            );
+            foreach ($commonAreas as $ca) {
+                if (is_string($ca)) {
+                    $ca = ['name' => $ca];
+                }
+                $caname = trim((string) ($ca['name'] ?? ''));
+                if ($caname === '') {
+                    continue;
+                }
+                $cstmt->execute([$id, $caname, $ca['type'] ?? 'general', (int) !empty($ca['bookable'])]);
+            }
+        }
+
+        // پارکینگ: یک مشاع از نوع پارکینگ با ظرفیت مشخص
+        if ($building->parking_spots > 0) {
+            $pstmt = $db->prepare(
+                "INSERT INTO common_areas (building_id, name, type, description, bookable) VALUES (?, ?, 'parking', ?, 0)"
+            );
+            $pstmt->execute([$id, 'پارکینگ', 'ظرفیت: ' . $building->parking_spots . ' خودرو']);
+        }
 
         return $building;
     }
@@ -67,7 +111,9 @@ final class BuildingService
         if (!$building) {
             return null;
         }
-        // Authorization check could be done here with a MemberRepository
+        if ($userId > 0) {
+            $building->my_role = $this->repo->findMemberRole($userId, $id);
+        }
         return $building;
     }
 
@@ -82,7 +128,7 @@ final class BuildingService
     }
 
     /**
-     * ویرایش ساختمان (نام، آدرس، نام سفارشی، رنگ تم و تنظیمات سلسله مراتب).
+     * ویرایش ساختمان (نام، آدرس، نام سفارشی، رنگ تم، مشخصات ساختمانی، شارژ ثابت و ...).
      * فیلدهای ارسال‌نشده روی مقادیر قبلی باقی می‌مانند.
      */
     public function updateBuilding(int $id, array $data): ?Building
@@ -96,6 +142,29 @@ final class BuildingService
         $building->address = $data['address'] ?? $building->address;
         $building->custom_name = $data['custom_name'] ?? $building->custom_name;
         $building->theme_color = $data['theme_color'] ?? $building->theme_color;
+        if (array_key_exists('total_units', $data)) {
+            $building->total_units = $data['total_units'] !== '' && $data['total_units'] !== null
+                ? (int) $data['total_units'] : null;
+        }
+        if (array_key_exists('total_floors', $data)) {
+            $building->total_floors = $data['total_floors'] !== '' && $data['total_floors'] !== null
+                ? (int) $data['total_floors'] : null;
+        }
+        if (array_key_exists('has_blocks', $data)) {
+            $building->has_blocks = (bool) $data['has_blocks'];
+        }
+        if (array_key_exists('default_image', $data)) {
+            $building->default_image = (string) $data['default_image'];
+        }
+        if (array_key_exists('parking_spots', $data)) {
+            $building->parking_spots = max(0, (int) $data['parking_spots']);
+        }
+        if (array_key_exists('monthly_charge', $data)) {
+            $building->monthly_charge = max(0, (float) $data['monthly_charge']);
+        }
+        if (array_key_exists('monthly_charge_enabled', $data)) {
+            $building->monthly_charge_enabled = (bool) $data['monthly_charge_enabled'];
+        }
 
         if (!empty($data['hierarchy_settings']) && is_array($data['hierarchy_settings'])) {
             $building->hierarchy_settings = $data['hierarchy_settings'];

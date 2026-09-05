@@ -7,38 +7,45 @@ if (isset($_SESSION['token']) && !empty($_SESSION['token'])) {
 }
 
 $error_message = '';
+$success_message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
-    $email = trim($_POST['email'] ?? '');
+    $phone = normalize_phone($_POST['phone'] ?? '');
     $password = trim($_POST['password'] ?? '');
     $password_confirmation = trim($_POST['password_confirmation'] ?? '');
 
-    if (empty($name) || empty($email) || empty($password)) {
-        $error_message = 'لطفاً تمامی فیلدها را پر کنید.';
+    if (empty($name) || empty($phone) || empty($password)) {
+        $error_message = 'لطفاً نام، شماره موبایل و رمز عبور را وارد کنید.';
+    } elseif (!is_valid_phone($phone)) {
+        $error_message = 'شماره موبایل معتبر نیست. مثال: 09123456789';
+    } elseif (mb_strlen($password) < 6) {
+        $error_message = 'رمز عبور باید حداقل ۶ کاراکتر باشد.';
     } elseif ($password !== $password_confirmation) {
         $error_message = 'تکرار رمز عبور با رمز عبور مطابقت ندارد.';
     } else {
         $registerData = [
             'name' => $name,
-            'email' => $email,
+            'phone' => $phone,
             'password' => $password,
             'password_confirmation' => $password_confirmation
         ];
-        
+
         $response = callAPI('POST', '/auth/register', $registerData);
 
         if (isset($response['success']) && $response['success'] === true) {
             $token = $response['token'] ?? ($response['data']['token'] ?? null);
             if ($token) {
                 $_SESSION['token'] = $token;
+                $_SESSION['user_name'] = $name;
+                // پیامک خوش‌آمد در سمت API ارسال می‌شود
                 header("Location: index.php");
                 exit;
             }
         } else {
             // استخراج هوشمندانه ارورهای ولیدیشن دیتابیس
             if (isset($response['errors']) && is_array($response['errors'])) {
-                $error_message = implode('<br>', array_map(function($e) { return implode(', ', $e); }, $response['errors']));
+                $error_message = implode('<br>', array_map(function($e) { return implode(', ', (array) $e); }, $response['errors']));
             } else {
                 $error_message = $response['message'] ?? 'خطای نامشخص در ثبت‌نام.';
             }
@@ -53,11 +60,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ثبت‌نام | مدیریت ساختمان</title>
-    
+
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.0.0/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
     <link rel="stylesheet" href="assets/css/style.css">
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <style>
         body {
             font-family: 'Vazirmatn', sans-serif;
@@ -92,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="antialiased text-gray-800">
 
     <div class="mobile-container relative overflow-hidden">
-        
+
         <!-- افکت گرافیکی پس‌زمینه -->
         <div class="absolute top-0 right-0 w-64 h-64 bg-green-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 -mr-20 -mt-20"></div>
         <div class="absolute bottom-0 left-0 w-64 h-64 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 -ml-20 -mb-20"></div>
@@ -106,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </svg>
                 </div>
                 <h1 class="text-2xl font-bold text-gray-900">ایجاد حساب کاربری</h1>
-                <p class="text-sm text-gray-500 mt-2">برای مدیریت ساختمان خود ثبت‌نام کنید</p>
+                <p class="text-sm text-gray-500 mt-2">با شماره موبایل ثبت‌نام کنید؛ پیامک تأیید برایتان ارسال می‌شود</p>
             </div>
 
             <!-- نمایش خطا -->
@@ -121,34 +128,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <!-- فرم ثبت‌نام -->
             <form id="registerForm" method="POST" action="" class="space-y-4">
-                
+
                 <div>
                     <label for="name" class="block text-sm font-medium text-gray-700 mb-1">نام و نام خانوادگی</label>
                     <input type="text" id="name" name="name" required
-                        class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-gray-900 focus:border-gray-900 outline-none transition-shadow bg-gray-50 focus:bg-white" 
+                        class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-gray-900 focus:border-gray-900 outline-none transition-shadow bg-gray-50 focus:bg-white"
                         placeholder="مثال: علی احمدی" value="<?= htmlspecialchars($_POST['name'] ?? '') ?>">
                 </div>
 
                 <div>
-                    <label for="email" class="block text-sm font-medium text-gray-700 mb-1">ایمیل</label>
+                    <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">شماره موبایل (نام کاربری شما)</label>
                     <div class="relative">
-                        <input type="email" id="email" name="email" dir="ltr" required
-                            class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-gray-900 focus:border-gray-900 outline-none transition-shadow text-left bg-gray-50 focus:bg-white" 
-                            placeholder="user@example.com" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
+                        <input type="tel" id="phone" name="phone" dir="ltr" required inputmode="numeric" pattern="09[0-9]{9}"
+                            class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-gray-900 focus:border-gray-900 outline-none transition-shadow text-left bg-gray-50 focus:bg-white"
+                            placeholder="09123456789" value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>">
                     </div>
+                    <p class="text-[11px] text-gray-400 mt-1">ورود بعدی شما با همین شماره انجام می‌شود.</p>
                 </div>
 
                 <div>
                     <label for="password" class="block text-sm font-medium text-gray-700 mb-1">رمز عبور</label>
                     <input type="password" id="password" name="password" dir="ltr" required minlength="6"
-                        class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-gray-900 focus:border-gray-900 outline-none transition-shadow text-left bg-gray-50 focus:bg-white" 
+                        class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-gray-900 focus:border-gray-900 outline-none transition-shadow text-left bg-gray-50 focus:bg-white"
                         placeholder="••••••••">
                 </div>
 
                 <div>
                     <label for="password_confirmation" class="block text-sm font-medium text-gray-700 mb-1">تکرار رمز عبور</label>
                     <input type="password" id="password_confirmation" name="password_confirmation" dir="ltr" required minlength="6"
-                        class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-gray-900 focus:border-gray-900 outline-none transition-shadow text-left bg-gray-50 focus:bg-white" 
+                        class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-gray-900 focus:border-gray-900 outline-none transition-shadow text-left bg-gray-50 focus:bg-white"
                         placeholder="••••••••">
                 </div>
 
@@ -160,31 +168,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </button>
                 </div>
             </form>
-            
+
             <div class="mt-8 text-center text-sm text-gray-600">
-                حساب کاربری دارید؟ 
+                حساب کاربری دارید؟
                 <a href="login.php" class="font-bold text-blue-600 hover:text-blue-700 transition">وارد شوید</a>
             </div>
-            
+
         </div>
     </div>
 
     <script>
+        function faToEn(s) {
+            return (s || '').replace(/[۰-۹]/g, function(d) { return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); });
+        }
         // لودینگ روی دکمه برای جلوگیری از ارسال دوگانه
         document.getElementById('registerForm').addEventListener('submit', function(e) {
             var pass = document.getElementById('password').value;
             var conf = document.getElementById('password_confirmation').value;
-            
+
             if (pass !== conf) {
                 e.preventDefault();
                 alert('تکرار رمز عبور مطابقت ندارد.');
                 return;
             }
 
+            var phoneInput = document.getElementById('phone');
+            var phone = faToEn(phoneInput.value).replace(/[^0-9]/g, '');
+            if (phone.length === 10 && phone.charAt(0) === '9') phone = '0' + phone;
+            phoneInput.value = phone;
+            if (!/^09[0-9]{9}$/.test(phone)) {
+                e.preventDefault();
+                alert('شماره موبایل معتبر نیست. مثال: 09123456789');
+                return;
+            }
+
             var btn = document.getElementById('submitBtn');
             var text = document.getElementById('btnText');
             var spinner = document.getElementById('spinner');
-            
+
             btn.classList.add('opacity-90', 'cursor-not-allowed');
             text.innerText = 'در حال ثبت اطلاعات...';
             spinner.style.display = 'block';
@@ -192,4 +213,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </script>
     <script src="assets/js/main.js"></script>
 </body>
-</html> 
+</html>

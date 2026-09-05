@@ -9,6 +9,7 @@ use App\Exceptions\AppException;
 use App\Exceptions\ValidationException;
 use App\Models\Invitation;
 use App\Repositories\InvitationRepository;
+use App\Utilities\PhoneHelper;
 use App\Utilities\Validator;
 
 final class InvitationService
@@ -17,13 +18,40 @@ final class InvitationService
     {
     }
 
-    public function createInvitation(array $data, int $invitedBy): Invitation
+    public static function roleLabel(string $role): string
+    {
+        return match ($role) {
+            'manager' => 'مدیر',
+            'owner' => 'مالک',
+            'tenant' => 'مستأجر',
+            'board' => 'هیئت مدیره',
+            'accountant' => 'حسابدار',
+            default => 'ساکن',
+        };
+    }
+
+    public static function inviteLink(string $token): string
+    {
+        return AppConfig::getAppUrl() . '/invite.php?token=' . urlencode($token);
+    }
+
+    /**
+     * ساخت دعوتنامه با نام + شماره موبایل + نقش + واحد، همراه با ارسال پیامک حاوی لینک.
+     *
+     * @return array{invitation: Invitation, sms_sent: bool}
+     */
+    public function createInvitation(array $data, int $invitedBy): array
     {
         $errors = Validator::validate($data, [
             'building_id' => 'required',
         ]);
-        if (empty($data['invited_email']) && empty($data['invited_phone'])) {
-            $errors['contact'] = 'Email or phone is required';
+        $name = trim((string) ($data['invited_name'] ?? ''));
+        if ($name === '') {
+            $errors['invited_name'] = 'نام و نام خانوادگی دعوت‌شونده الزامی است.';
+        }
+        $phone = PhoneHelper::normalize((string) ($data['invited_phone'] ?? ''));
+        if (!PhoneHelper::isValid($phone)) {
+            $errors['invited_phone'] = 'شماره موبایل معتبر نیست. مثال: 09123456789';
         }
         if (!empty($errors)) {
             throw new ValidationException(implode(', ', $errors));
@@ -31,8 +59,9 @@ final class InvitationService
 
         $invitation = new Invitation();
         $invitation->building_id = (int) $data['building_id'];
-        $invitation->invited_email = $data['invited_email'] ?? null;
-        $invitation->invited_phone = $data['invited_phone'] ?? null;
+        $invitation->invited_email = null;
+        $invitation->invited_phone = $phone;
+        $invitation->invited_name = $name;
         $invitation->role = $data['role'] ?? 'resident';
         $invitation->unit_id = !empty($data['unit_id']) ? (int) $data['unit_id'] : null;
         $invitation->token = bin2hex(random_bytes(32));
@@ -42,7 +71,50 @@ final class InvitationService
 
         $id = $this->repo->create($invitation);
         $invitation->id = $id;
-        return $invitation;
+
+        // ارسال پیامک حاوی لینک دعوت
+        $smsSent = false;
+        try {
+            $db = \App\Core\Database::getConnection();
+            $stmt = $db->prepare("SELECT name FROM buildings WHERE id = ? LIMIT 1");
+            $stmt->execute([$invitation->building_id]);
+            $buildingName = (string) ($stmt->fetchColumn() ?: 'ساختمان');
+            $smsSent = (new SmsService())->sendInviteSms(
+                $phone,
+                $name,
+                $buildingName,
+                self::roleLabel($invitation->role),
+                self::inviteLink($invitation->token)
+            );
+        } catch (\Throwable $e) {
+            error_log('[InvitationService] sms failed: ' . $e->getMessage());
+        }
+
+        return ['invitation' => $invitation, 'sms_sent' => $smsSent];
+    }
+
+    /**
+     * ارسال مجدد پیامک دعوت برای یک دعوتنامه در انتظار.
+     */
+    public function resendSms(int $invitationId, int $buildingId): bool
+    {
+        $db = \App\Core\Database::getConnection();
+        $stmt = $db->prepare("SELECT * FROM invitations WHERE id = ? AND building_id = ? LIMIT 1");
+        $stmt->execute([$invitationId, $buildingId]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$row || ($row['status'] ?? '') !== 'pending' || empty($row['invited_phone'])) {
+            throw new AppException('دعوتنامه معتبر برای ارسال مجدد یافت نشد.');
+        }
+        $bstmt = $db->prepare("SELECT name FROM buildings WHERE id = ? LIMIT 1");
+        $bstmt->execute([$buildingId]);
+        $buildingName = (string) ($bstmt->fetchColumn() ?: 'ساختمان');
+        return (new SmsService())->sendInviteSms(
+            (string) $row['invited_phone'],
+            (string) ($row['invited_name'] ?? 'کاربر گرامی'),
+            $buildingName,
+            self::roleLabel((string) ($row['role'] ?? 'resident')),
+            self::inviteLink((string) $row['token'])
+        );
     }
 
     public function acceptInvitation(string $token, int $userId): array
@@ -148,11 +220,13 @@ final class InvitationService
             'building_id' => $invitation->building_id,
             'building_name' => $buildingName ?: 'نامشخص',
             'role' => $invitation->role,
+            'role_label' => self::roleLabel($invitation->role),
             'unit' => $unit,
             'status' => $invitation->status,
             'expires_at' => $invitation->expires_at,
             'invited_email' => $invitation->invited_email,
             'invited_phone' => $invitation->invited_phone,
+            'invited_name' => $invitation->invited_name,
         ];
     }
 }

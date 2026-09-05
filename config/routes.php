@@ -50,6 +50,7 @@ final class Routes
         'GET /api/buildings/{building_id}/invitations' => ['App\Http\Controllers\BuildingController', 'indexInvitations'],
         'GET /api/buildings/{building_id}/members' => ['App\Http\Controllers\BuildingController', 'members'],
         'POST /api/invitations/accept' => ['App\Http\Controllers\BuildingController', 'acceptInvitation'],
+        'POST /api/invitations/{id}/resend' => ['App\Http\Controllers\BuildingController', 'resendInvitation'],
         'GET /api/invitations/info' => ['App\Http\Controllers\BuildingController', 'invitationInfo'],
 
         // Phase 4: Tickets & Notifications
@@ -67,6 +68,7 @@ final class Routes
         'GET /api/costs' => ['App\Http\Controllers\CostController', 'index'],
         'GET /api/costs/summary' => ['App\Http\Controllers\CostController', 'summary'],
         'POST /api/costs' => ['App\Http\Controllers\CostController', 'store'],
+        'POST /api/costs/monthly-charge' => ['App\Http\Controllers\CostController', 'monthlyCharge'],
         'GET /api/payments' => ['App\Http\Controllers\CostController', 'indexPayments'],
         'POST /api/payments/submit' => ['App\Http\Controllers\CostController', 'submitPayment'],
         'POST /api/payments/{payment_id}/upload-receipt' => ['App\Http\Controllers\CostController', 'uploadReceipt'],

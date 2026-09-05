@@ -12,6 +12,7 @@ $building_id = (int) ($_GET['id'] ?? 0);
 $alert_message = '';
 $alert_type = 'error';
 $building = null;
+$images = building_default_images();
 
 // دریافت اطلاعات ساختمان
 if ($building_id > 0) {
@@ -43,25 +44,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'name' => $name,
             'address' => $address,
             'custom_name' => trim($_POST['custom_name'] ?? ''),
-            'theme_color' => trim($_POST['theme_color'] ?? ''),
+            'theme_color' => trim($_POST['theme_color'] ?? '#1a73e8'),
+            'total_units' => trim($_POST['total_units'] ?? '') !== '' ? (int) $_POST['total_units'] : null,
+            'total_floors' => trim($_POST['total_floors'] ?? '') !== '' ? (int) $_POST['total_floors'] : null,
+            'has_blocks' => isset($_POST['has_blocks']) && $_POST['has_blocks'] === '1',
+            'default_image' => in_array(($_POST['default_image'] ?? 'b1'), ['b1', 'b2', 'b3', 'b4'], true) ? $_POST['default_image'] : 'b1',
+            'parking_spots' => max(0, (int) ($_POST['parking_spots'] ?? 0)),
+            'monthly_charge' => max(0, (float) ($_POST['monthly_charge'] ?? 0)),
+            'monthly_charge_enabled' => !empty($_POST['monthly_charge_enabled']),
         ];
         $response = callAPI('PUT', '/buildings/' . $building_id, $payload);
         if (isset($response['success']) && $response['success'] === true) {
             $alert_message = 'اطلاعات ساختمان با موفقیت به‌روزرسانی شد.';
             $alert_type = 'success';
-            $building['name'] = $name;
-            $building['address'] = $address;
-            $building['custom_name'] = $payload['custom_name'];
-            $building['theme_color'] = $payload['theme_color'];
+            $building = array_merge($building, $payload);
         } else {
             $alert_message = $response['message'] ?? 'خطا در ذخیره تغییرات.';
         }
     }
 }
 
+$has_blocks_checked = !empty($building['has_blocks']) ? 'checked' : '';
+$monthly_checked = !empty($building['monthly_charge_enabled']) ? 'checked' : '';
+$current_image = $building['default_image'] ?? 'b1';
+
 $page_title = 'ویرایش ساختمان';
 $header_sub = $building['name'] ?? 'ویرایش اطلاعات';
-$back_url = 'building_view.php?id=' . $building_id;
+$back_url = 'dashboard.php?building_id=' . $building_id;
 $active_nav = 'home';
 require_once 'includes/page_head.php';
 ?>
@@ -88,10 +97,66 @@ require_once 'includes/page_head.php';
                 <label for="custom_name" class="form-label">نام سفارشی (اختیاری)</label>
                 <input type="text" id="custom_name" name="custom_name" class="form-input" value="<?= htmlspecialchars($building['custom_name'] ?? '') ?>" placeholder="مثلاً: برج آسمان — بلوک A">
             </div>
-            <div>
-                <label for="theme_color" class="form-label">رنگ تم (اختیاری)</label>
-                <input type="color" id="theme_color" name="theme_color" class="form-input h-12 p-1" value="<?= htmlspecialchars($building['theme_color'] ?? '#1a73e8') ?>">
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label for="total_units" class="form-label">تعداد واحد</label>
+                    <input type="number" id="total_units" name="total_units" min="1" class="form-input" value="<?= htmlspecialchars((string) ($building['total_units'] ?? '')) ?>" placeholder="مثال: ۲۰">
+                </div>
+                <div>
+                    <label for="total_floors" class="form-label">تعداد طبقه</label>
+                    <input type="number" id="total_floors" name="total_floors" min="1" class="form-input" value="<?= htmlspecialchars((string) ($building['total_floors'] ?? '')) ?>" placeholder="مثال: ۵">
+                </div>
             </div>
+
+            <div class="card bg-gray-50 p-4">
+                <label class="flex items-center gap-2 text-sm font-bold text-gray-700">
+                    <input type="checkbox" name="has_blocks" value="1" class="rounded" <?= $has_blocks_checked ?>>
+                    ساختمان بلوک دارد
+                </label>
+                <p class="text-[11px] text-gray-400 mt-2">مدیریت بلوک‌ها، طبقات، واحدها و مشاعات از صفحه ساختمان:</p>
+                <div class="grid grid-cols-2 gap-2 mt-2 text-center text-xs font-bold">
+                    <a href="blocks.php?building_id=<?= $building_id ?>" class="bg-white border rounded-xl py-2.5 text-indigo-600">بلوک‌ها</a>
+                    <a href="floors.php?building_id=<?= $building_id ?>" class="bg-white border rounded-xl py-2.5 text-emerald-600">طبقات</a>
+                    <a href="units.php?building_id=<?= $building_id ?>" class="bg-white border rounded-xl py-2.5 text-amber-600">واحدها</a>
+                    <a href="common_areas.php?building_id=<?= $building_id ?>" class="bg-white border rounded-xl py-2.5 text-violet-600">مشاعات</a>
+                </div>
+            </div>
+
+            <div>
+                <label class="form-label">عکس ساختمان</label>
+                <div class="grid grid-cols-4 gap-2">
+                    <?php foreach ($images as $key => $src): ?>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="default_image" value="<?= $key ?>" class="hidden peer" <?= $current_image === $key ? 'checked' : '' ?>>
+                            <img src="<?= htmlspecialchars($src) ?>" alt="<?= $key ?>"
+                                 class="rounded-xl border-2 border-transparent peer-checked:border-blue-600 h-16 w-full object-cover">
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+                <div class="flex items-center gap-3 mt-3">
+                    <label for="theme_color" class="form-label" style="margin:0;">رنگ تم</label>
+                    <input type="color" id="theme_color" name="theme_color" class="form-input" style="width: 56px; height: 44px; padding: 4px;" value="<?= htmlspecialchars($building['theme_color'] ?? '#1a73e8') ?>">
+                </div>
+            </div>
+
+            <div>
+                <label for="parking_spots" class="form-label">ظرفیت پارکینگ (خودرو)</label>
+                <input type="number" id="parking_spots" name="parking_spots" min="0" class="form-input" value="<?= (int) ($building['parking_spots'] ?? 0) ?>">
+            </div>
+
+            <div class="card bg-emerald-50 border border-emerald-100 p-4">
+                <label class="flex items-center gap-2 text-sm font-bold text-gray-700">
+                    <input type="checkbox" name="monthly_charge_enabled" value="1" class="rounded" <?= $monthly_checked ?>>
+                    شارژ ثابت ماهیانه فعال باشد
+                </label>
+                <div class="mt-3">
+                    <label for="monthly_charge" class="form-label">مبلغ شارژ ثابت هر ماه (تومان)</label>
+                    <input type="number" id="monthly_charge" name="monthly_charge" min="0" step="1000" class="form-input" value="<?= htmlspecialchars((string) ($building['monthly_charge'] ?? 0)) ?>">
+                    <p class="text-[11px] text-gray-500 mt-1">هر ماه به‌صورت خودکار به بدهکاری واحدها اضافه می‌شود.</p>
+                </div>
+            </div>
+
             <div class="flex gap-3">
                 <button type="submit" class="btn-primary flex-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -99,7 +164,7 @@ require_once 'includes/page_head.php';
                     </svg>
                     ذخیره تغییرات
                 </button>
-                <a href="building_view.php?id=<?= $building_id ?>" class="btn-secondary flex-1 text-center">انصراف</a>
+                <a href="dashboard.php?building_id=<?= $building_id ?>" class="btn-secondary flex-1 text-center">انصراف</a>
             </div>
         </form>
     </div>

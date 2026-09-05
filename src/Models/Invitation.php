@@ -10,6 +10,7 @@ final class Invitation
     public int $building_id;
     public ?string $invited_email = null;
     public ?string $invited_phone = null;
+    public ?string $invited_name = null;
     public string $role = 'resident';
     public ?int $unit_id = null;
     public string $token;

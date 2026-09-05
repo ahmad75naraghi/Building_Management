@@ -248,4 +248,82 @@ function review_stars($rating)
     $empty = str_repeat('☆', max(0, 5 - $rating));
     return $full . $empty;
 }
+
+// ---------- هلپرهای شماره موبایل و کاور ساختمان ----------
+
+/**
+ * نرمال‌سازی شماره موبایل ایرانی (نام‌کاربری سیستم) در سمت فرانت.
+ */
+function normalize_phone($phone)
+{
+    $phone = (string) ($phone ?? '');
+    $fa = ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
+    $ar = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+    $en = ['0','1','2','3','4','5','6','7','8','9'];
+    $phone = str_replace($fa, $en, $phone);
+    $phone = str_replace($ar, $en, $phone);
+    $phone = preg_replace('/[^\d+]/', '', $phone);
+    $phone = ltrim($phone, '+');
+    if (strpos($phone, '0098') === 0) {
+        $phone = substr($phone, 2);
+    }
+    if (strpos($phone, '98') === 0 && strlen($phone) === 12) {
+        $phone = '0' . substr($phone, 2);
+    }
+    if (strlen($phone) === 10 && strpos($phone, '9') === 0) {
+        $phone = '0' . $phone;
+    }
+    return $phone;
+}
+
+function is_valid_phone($phone)
+{
+    return (bool) preg_match('/^09\d{9}$/', normalize_phone($phone));
+}
+
+/**
+ * لیست عکس‌های پیش‌فرض ساختمان (assets/img/buildings/b1..b4.jpg).
+ */
+function building_default_images()
+{
+    return [
+        'b1' => 'assets/img/buildings/b1.jpg',
+        'b2' => 'assets/img/buildings/b2.jpg',
+        'b3' => 'assets/img/buildings/b3.jpg',
+        'b4' => 'assets/img/buildings/b4.jpg',
+    ];
+}
+
+/**
+ * آدرس کاور ساختمان: عکس پیش‌فرض انتخاب‌شده، وگرنه لوگوی سفارشی، وگرنه b1.
+ */
+function building_cover($building)
+{
+    $images = building_default_images();
+    $key = $building['default_image'] ?? '';
+    if (!empty($key) && isset($images[$key]) && is_file(__DIR__ . '/../' . $images[$key])) {
+        return $images[$key];
+    }
+    if (!empty($building['custom_logo_path'])) {
+        return $building['custom_logo_path'];
+    }
+    return $images['b1'];
+}
+
+/**
+ * نقش کاربر در ساختمان به فارسی.
+ */
+function member_role_label($role)
+{
+    $map = [
+        'manager' => 'مدیر ساختمان',
+        'owner' => 'مالک',
+        'tenant' => 'مستأجر',
+        'resident' => 'ساکن',
+        'board' => 'هیئت مدیره',
+        'accountant' => 'حسابدار',
+    ];
+    return $map[$role] ?? 'عضو';
+}
+
 ?>
