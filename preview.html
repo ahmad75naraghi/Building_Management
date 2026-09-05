@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>پیش‌نمایش واحدها و اعضا | مدیریت ساختمان</title>
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+
+<body class="app-body">
+
+    <div class="app-container">
+
+        <!-- نوار اطلاع‌رسانی: این یک پیش‌نمایش ایستاست -->
+        <div style="background:#fff7e6;color:#8a5a00;border-bottom:1px solid #f2ddb3;padding:10px 16px;font-size:12px;line-height:1.8;">
+            ⚠️ <b>پیش‌نمایش ایستا با داده نمونه</b> — این فایل فقط ظاهر صفحات را نشان می‌دهد (PHP اجرا نمی‌شود).
+            برای اجرای کامل پروژه، دستورالعمل انتهای همین صفحه را ببینید.
+        </div>
+
+        <!-- هدر برنامه (مثل units.php واقعی) -->
+        <header class="app-header">
+            <a href="#" class="subpage-back-btn" aria-label="بازگشت" onclick="return false;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m15 18-6-6 6-6" />
+                </svg>
+            </a>
+            <div class="subpage-title-wrap">
+                <div class="subpage-title">مدیریت واحدها</div>
+                <div class="subpage-sub">مجتمع گلستان — ساختار مجتمع</div>
+            </div>
+            <a href="#" class="notification-bell" aria-label="اعلانات" onclick="return false;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+            </a>
+        </header>
+
+        <main class="p-5">
+
+            <!-- دکمه افزودن -->
+            <a href="#add-form" class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg shadow-blue-600/25 transition-all active:scale-[0.98]">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                <span>افزودن واحد جدید</span>
+            </a>
+
+            <!-- ================= لیست واحدها (مثل خروجی GET /units) ================= -->
+            <h2 class="section-title">واحدهای ساختمان (۴ واحد)</h2>
+
+            <div class="space-y-3">
+
+                <!-- سناریو ۱: مالک ساکن است (owner_occupied) -->
+                <div class="card p-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-2xl bg-yellow-50 text-yellow-600 flex items-center justify-center flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                            </svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <h3 class="font-bold text-gray-800">واحد ۱۰۱</h3>
+                                <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 flex-shrink-0">🏠 مالک ساکن</span>
+                            </div>
+                            <p class="text-sm text-gray-500 mt-0.5 truncate">
+                                <span class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full inline-block ml-1">مسکونی</span>
+                                متراژ: ۱۲۰ متر • طبقه ۱ • بلوک A
+                            </p>
+                            <div class="flex flex-wrap gap-1.5 mt-2">
+                                <span class="text-[11px] px-2 py-1 rounded-lg bg-blue-50 text-blue-700">مالک: علی رضایی</span>
+                                <span class="text-[11px] px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700">ساکن: علی رضایی</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                        <a href="#edit-form" class="flex-1 text-center text-xs bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold px-3 py-2 rounded-lg transition-colors">✏️ ویرایش</a>
+                        <a href="#" onclick="return false;" class="flex-1 text-center text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-lg transition-colors">🗑 حذف</a>
+                    </div>
+                </div>
+
+                <!-- سناریو ۲: مالک + مستاجر ساکن (tenant_occupied) -->
+                <div class="card p-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-2xl bg-yellow-50 text-yellow-600 flex items-center justify-center flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                            </svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <h3 class="font-bold text-gray-800">واحد ۱۰۲</h3>
+                                <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 flex-shrink-0">👥 مستأجر ساکن</span>
+                            </div>
+                            <p class="text-sm text-gray-500 mt-0.5 truncate">
+                                <span class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full inline-block ml-1">مسکونی</span>
+                                متراژ: ۹۵ متر • طبقه ۱ • بلوک A
+                            </p>
+                            <div class="flex flex-wrap gap-1.5 mt-2">
+                                <span class="text-[11px] px-2 py-1 rounded-lg bg-blue-50 text-blue-700">مالک: علی رضایی</span>
+                                <span class="text-[11px] px-2 py-1 rounded-lg bg-amber-50 text-amber-700">مستأجر: محمد کریمی</span>
+                                <span class="text-[11px] px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700">ساکن: محمد کریمی</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                        <a href="#edit-form" class="flex-1 text-center text-xs bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold px-3 py-2 rounded-lg transition-colors">✏️ ویرایش</a>
+                        <a href="#" onclick="return false;" class="flex-1 text-center text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-lg transition-colors">🗑 حذف</a>
+                    </div>
+                </div>
+
+                <!-- سناریو ۳: مالک غیرساکن، بدون مستاجر (vacant) -->
+                <div class="card p-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-2xl bg-yellow-50 text-yellow-600 flex items-center justify-center flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                            </svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <h3 class="font-bold text-gray-800">واحد ۱۰۳</h3>
+                                <span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 flex-shrink-0">🔒 خالی (مالک غیرساکن)</span>
+                            </div>
+                            <p class="text-sm text-gray-500 mt-0.5 truncate">
+                                <span class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full inline-block ml-1">مسکونی</span>
+                                متراژ: ۸۰ متر • طبقه ۱ • بلوک A
+                            </p>
+                            <div class="flex flex-wrap gap-1.5 mt-2">
+                                <span class="text-[11px] px-2 py-1 rounded-lg bg-blue-50 text-blue-700">مالک: مریم احمدی</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                        <a href="#edit-form" class="flex-1 text-center text-xs bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold px-3 py-2 rounded-lg transition-colors">✏️ ویرایش</a>
+                        <a href="#" onclick="return false;" class="flex-1 text-center text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-lg transition-colors">🗑 حذف</a>
+                    </div>
+                </div>
+
+                <!-- سناریو ۴: بدون مالک (no_owner) -->
+                <div class="card p-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-2xl bg-yellow-50 text-yellow-600 flex items-center justify-center flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                            </svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <h3 class="font-bold text-gray-800">واحد ۱-پ</h3>
+                                <span class="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-600 flex-shrink-0">❓ بدون مالک</span>
+                            </div>
+                            <p class="text-sm text-gray-500 mt-0.5 truncate">
+                                <span class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full inline-block ml-1">پارکینگ</span>
+                                متراژ: ۱۸ متر • طبقه ۰
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                        <a href="#edit-form" class="flex-1 text-center text-xs bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold px-3 py-2 rounded-lg transition-colors">✏️ ویرایش</a>
+                        <a href="#" onclick="return false;" class="flex-1 text-center text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-lg transition-colors">🗑 حذف</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= توضیح سه سناریو ================= -->
+            <div class="card p-4 mt-6">
+                <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2">🧩 سه سناریوی سکونت (در API با فیلد <code dir="ltr" class="text-xs bg-gray-100 px-1.5 py-0.5 rounded">occupancy_status</code>)</h3>
+                <div class="space-y-2 text-xs text-gray-600">
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 flex-shrink-0">owner_occupied</span>
+                        مالک ساکن است → <code dir="ltr">owner_user_id=X</code> + <code dir="ltr">owner_resident=1</code> + بدون مستأجر
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 flex-shrink-0">tenant_occupied</span>
+                        مالک غیرساکن + مستأجر ساکن → <code dir="ltr">owner_user_id=X</code> + <code dir="ltr">tenant_user_id=Y</code>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 flex-shrink-0">vacant</span>
+                        مالک دارد ولی کسی ساکن نیست → <code dir="ltr">owner_user_id=X</code> + <code dir="ltr">owner_resident=0</code>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= اعضا (مثل members.php) ================= -->
+            <h2 class="section-title">ساکنین و مدیران (۳ نفر)</h2>
+            <div class="space-y-3">
+                <div class="card p-4 flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 font-bold text-lg">ع</div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-bold text-gray-800 truncate">علی رضایی</h3>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 flex-shrink-0">مدیر</span>
+                        </div>
+                        <p class="text-sm text-gray-500 mt-0.5 truncate" dir="ltr">ali@example.com</p>
+                        <div class="flex flex-wrap gap-1.5 mt-1.5">
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">واحد ۱۰۱ — مالک ساکن</span>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">واحد ۱۰۲ — مالک</span>
+                        </div>
+                    </div>
+                    <span class="text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full flex-shrink-0">مدیر</span>
+                </div>
+
+                <div class="card p-4 flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 font-bold text-lg">م</div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-bold text-gray-800 truncate">محمد کریمی</h3>
+                        </div>
+                        <p class="text-sm text-gray-500 mt-0.5 truncate" dir="ltr">m.karimi@example.com</p>
+                        <div class="flex flex-wrap gap-1.5 mt-1.5">
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">واحد ۱۰۲ — مستأجر</span>
+                        </div>
+                    </div>
+                    <span class="text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full flex-shrink-0">مستأجر</span>
+                </div>
+
+                <div class="card p-4 flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 font-bold text-lg">م</div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-bold text-gray-800 truncate">مریم احمدی</h3>
+                        </div>
+                        <p class="text-sm text-gray-500 mt-0.5 truncate" dir="ltr">m.ahmadi@example.com</p>
+                        <div class="flex flex-wrap gap-1.5 mt-1.5">
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">واحد ۱۰۳ — مالک</span>
+                        </div>
+                    </div>
+                    <span class="text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full flex-shrink-0">ساکن</span>
+                </div>
+            </div>
+
+            <!-- ================= فرم افزودن/ویرایش واحد ================= -->
+            <div id="add-form" class="card p-5 mt-6">
+                <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                    ثبت واحد جدید
+                </h3>
+                <form class="space-y-4" onsubmit="return false;">
+                    <div>
+                        <label for="unit_number" class="form-label">شماره واحد *</label>
+                        <input type="text" id="unit_number" class="form-input" placeholder="مثال: ۱۰۱">
+                    </div>
+                    <div>
+                        <label for="type" class="form-label">نوع واحد</label>
+                        <select id="type" class="form-input">
+                            <option value="residential">مسکونی</option>
+                            <option value="commercial">تجاری</option>
+                            <option value="office">اداری</option>
+                            <option value="parking">پارکینگ</option>
+                            <option value="storage">انباری</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="area" class="form-label">متراژ (متر مربع)</label>
+                        <input type="number" id="area" class="form-input" placeholder="مثال: ۱۲۰">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label for="block_id" class="form-label">بلوک</label>
+                            <select id="block_id" class="form-input">
+                                <option value="">— بدون بلوک —</option>
+                                <option value="1" selected>A</option>
+                                <option value="2">B</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="floor_id" class="form-label">طبقه</label>
+                            <select id="floor_id" class="form-input">
+                                <option value="">— بدون طبقه —</option>
+                                <option value="1" selected>طبقه ۱</option>
+                                <option value="2">طبقه ۲</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="border-t border-gray-100 pt-4">
+                        <p class="text-xs font-bold text-gray-500 mb-3">👤 ساکنین و مالکیت واحد</p>
+                        <div class="grid grid-cols-1 gap-4">
+                            <div>
+                                <label for="owner_user_id" class="form-label">مالک واحد</label>
+                                <select id="owner_user_id" class="form-input">
+                                    <option value="">— بدون مالک —</option>
+                                    <option value="1" selected>علی رضایی (ali@example.com)</option>
+                                    <option value="2">محمد کریمی (m.karimi@example.com)</option>
+                                    <option value="3">مریم احمدی (m.ahmadi@example.com)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="tenant_user_id" class="form-label">مستأجر</label>
+                                <select id="tenant_user_id" class="form-input">
+                                    <option value="">— بدون مستأجر —</option>
+                                    <option value="1">علی رضایی (ali@example.com)</option>
+                                    <option value="2">محمد کریمی (m.karimi@example.com)</option>
+                                    <option value="3">مریم احمدی (m.ahmadi@example.com)</option>
+                                </select>
+                            </div>
+                            <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                                <input type="checkbox" id="owner_resident" class="h-4 w-4 accent-blue-600">
+                                مالک در این واحد ساکن است
+                                <span class="text-[10px] text-gray-400">(اگر مستأجر انتخاب شود، مستأجر ساکن محسوب می‌شود)</span>
+                            </label>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        ذخیره واحد
+                    </button>
+                </form>
+            </div>
+
+        </main>
+
+        <!-- ناوبری پایین (مثل footer.php) -->
+        <nav class="bottom-nav-bar">
+            <a href="#" class="nav-item-link" onclick="return false;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                </svg>
+                <span>پروفایل</span>
+            </a>
+            <a href="#" class="nav-item-link" onclick="return false;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                <span>پیام‌ها</span>
+            </a>
+            <div class="floating-action-button" style="cursor:pointer;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+            </div>
+            <div class="nav-item-link" style="cursor:pointer;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                <span>تقویم</span>
+            </div>
+            <a href="#" class="nav-item-link active" onclick="return false;">
+                <div class="active-pill-box">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                        <polyline points="9 22 9 12 15 12 15 22" />
+                    </svg>
+                    <span>داشبورد</span>
+                </div>
+            </a>
+        </nav>
+
+    </div>
+
+    <!-- دستورالعمل اجرا -->
+    <div style="max-width:480px;margin:24px auto 60px;padding:0 16px;">
+        <div class="card p-4" style="font-size:12px;line-height:2;color:#374151;">
+            <b style="font-size:13px;">🚀 اجرای کامل پروژه (خلاصه)</b><br>
+            ۱) XAMPP (نسخه PHP 8.3) را نصب و Apache + MySQL را روشن کنید.<br>
+            ۲) پوشه پروژه را در <code dir="ltr">htdocs/b</code> کپی کنید (مثل سرور واقعی).<br>
+            ۳) در phpMyAdmin دیتابیس <code dir="ltr">file_b</code> + کاربر <code dir="ltr">file_b</code> بسازید (یا با <code dir="ltr">DB_DSN</code>/<code dir="ltr">DB_PASSWORD</code> محیطی مقدار دهید).<br>
+            ۴) <code dir="ltr">php scripts/migrator.php</code> را در ریشه پروژه اجرا کنید (جدول‌ها + ستون‌های ۰۲۱ و ۰۲۲).<br>
+            ۵) صفحه <code dir="ltr">http://localhost/b/login.php</code> را باز کنید، ثبت‌نام کنید و از همه بخش‌ها استفاده کنید.<br>
+            جزئیات کامل در فایل README.md
+        </div>
+    </div>
+
+    <script src="assets/js/main.js"></script>
+</body>
+
+</html>

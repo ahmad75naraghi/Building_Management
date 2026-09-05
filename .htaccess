@@ -1,0 +1,11 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /b/
+
+    # اگر کاربر فایل‌های فرانت‌اند (مثل login.php) را باز کرد، کاری نداشته باش
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+
+    # اما اگر درخواست با api شروع شد، آن را به هسته بک‌اند بفرست
+    RewriteRule ^api/(.*)$ public/index.php [L,QSA]
+</IfModule>
