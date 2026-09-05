@@ -38,6 +38,22 @@ final class UserRepository
         return $this->mapRow($row);
     }
 
+    /**
+     * یافتن کاربر با شماره موبایل (نام‌کاربری اصلی سیستم).
+     */
+    public function findByPhone(string $phone): ?User
+    {
+        $phone = \App\Utilities\PhoneHelper::normalize($phone);
+        $db = Database::getConnection();
+        $stmt = $db->prepare("SELECT * FROM users WHERE phone = ? AND deleted_at IS NULL");
+        $stmt->execute([$phone]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+        return $this->mapRow($row);
+    }
+
     public function findById(int $id): ?User
     {
         $db = Database::getConnection();

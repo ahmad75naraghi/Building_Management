@@ -28,6 +28,19 @@ final class AppConfig
     public const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
     public const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
+    /**
+     * آدرس پایه اپلیکیشن (برای ساخت لینک دعوت در پیامک).
+     * با متغیر محیطی APP_URL قابل تنظیم است.
+     */
+    public static function getAppUrl(): string
+    {
+        $url = getenv('APP_URL');
+        if (is_string($url) && $url !== '') {
+            return rtrim($url, '/');
+        }
+        return 'https://file.falnic.com/b';
+    }
+
     public static function getStoragePath(string $type, int|string $id): string
     {
         $base = self::STORAGE_PATH . '/' . $type . '/' . $id;

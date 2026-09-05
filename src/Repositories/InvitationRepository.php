@@ -13,11 +13,8 @@ final class InvitationRepository
     public function create(Invitation $invitation): ?int
     {
         $db = Database::getConnection();
-        $stmt = $db->prepare("
-            INSERT INTO invitations (building_id, invited_email, invited_phone, role, unit_id, token, status, invited_by, expires_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([
+        $cols = ['building_id', 'invited_email', 'invited_phone', 'role', 'unit_id', 'token', 'status', 'invited_by', 'expires_at'];
+        $vals = [
             $invitation->building_id,
             $invitation->invited_email,
             $invitation->invited_phone,
@@ -27,8 +24,33 @@ final class InvitationRepository
             $invitation->status,
             $invitation->invited_by,
             $invitation->expires_at,
-        ]);
+        ];
+        if ($this->hasColumn('invited_name')) {
+            $cols[] = 'invited_name';
+            $vals[] = $invitation->invited_name;
+        }
+        $stmt = $db->prepare(
+            'INSERT INTO invitations (' . implode(', ', $cols) . ') VALUES ('
+                . implode(', ', array_fill(0, count($cols), '?')) . ')'
+        );
+        $stmt->execute($vals);
         return (int) $db->lastInsertId();
+    }
+
+    private function hasColumn(string $column): bool
+    {
+        static $cache = [];
+        if (array_key_exists($column, $cache)) {
+            return $cache[$column];
+        }
+        try {
+            $stmt = Database::getConnection()->prepare('SHOW COLUMNS FROM invitations LIKE ?');
+            $stmt->execute([$column]);
+            $cache[$column] = (bool) $stmt->fetch();
+        } catch (\Exception $e) {
+            $cache[$column] = false;
+        }
+        return $cache[$column];
     }
 
     public function findByToken(string $token): ?Invitation
@@ -62,6 +84,7 @@ final class InvitationRepository
         $i->building_id = (int) $row['building_id'];
         $i->invited_email = $row['invited_email'];
         $i->invited_phone = $row['invited_phone'];
+        $i->invited_name = $row['invited_name'] ?? null;
         $i->role = $row['role'];
         $i->unit_id = isset($row['unit_id']) && $row['unit_id'] !== null ? (int) $row['unit_id'] : null;
         $i->token = $row['token'];

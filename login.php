@@ -9,23 +9,29 @@ if (isset($_SESSION['token']) && !empty($_SESSION['token'])) {
 $error_message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim($_POST['email'] ?? '');
+    $phone = normalize_phone($_POST['phone'] ?? '');
     $password = trim($_POST['password'] ?? '');
 
-    if (empty($email) || empty($password)) {
-        $error_message = 'لطفاً ایمیل و رمز عبور را وارد کنید.';
+    if (empty($phone) || empty($password)) {
+        $error_message = 'لطفاً شماره موبایل و رمز عبور را وارد کنید.';
+    } elseif (!is_valid_phone($phone)) {
+        $error_message = 'شماره موبایل معتبر نیست. مثال: 09123456789';
     } else {
         $loginData = [
-            'email' => $email,
+            'phone' => $phone,
             'password' => $password
         ];
-        
+
         $response = callAPI('POST', '/auth/login', $loginData);
 
         if (isset($response['success']) && $response['success'] === true) {
             $token = $response['token'] ?? ($response['data']['token'] ?? null);
             if ($token) {
                 $_SESSION['token'] = $token;
+                $user = $response['data']['user'] ?? [];
+                if (!empty($user['name'])) {
+                    $_SESSION['user_name'] = $user['name'];
+                }
                 // بازگشت به صفحه مقصد (مثلاً پذیرش دعوتنامه) اگر امن و محلی باشد
                 $redirect = trim((string) ($_GET['redirect'] ?? ''));
                 if ($redirect !== ''
@@ -41,11 +47,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             // هندل کردن ارورهای دیتابیس یا شبکه
             if (isset($response['errors']) && is_array($response['errors'])) {
-                $error_message = implode('<br>', array_map(function($e) { return implode(', ', $e); }, $response['errors']));
+                $error_message = implode('<br>', array_map(function($e) { return implode(', ', (array) $e); }, $response['errors']));
             } elseif (isset($response['raw_error'])) {
                 $error_message = "<strong>خطای فایروال:</strong><br>کد: " . $response['http_code'] . "<br>متن: " . $response['raw_error'];
             } else {
-                $error_message = $response['message'] ?? 'ایمیل یا رمز عبور اشتباه است.';
+                $error_message = $response['message'] ?? 'شماره موبایل یا رمز عبور اشتباه است.';
             }
         }
     }
@@ -58,14 +64,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <!-- تنظیمات دقیق برای نسخه موبایل (جلوگیری از زوم ناخواسته) -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ورود | مدیریت ساختمان</title>
-    
+
     <!-- لود فونت زیبای وزیرمتن -->
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.0.0/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
     <link rel="stylesheet" href="assets/css/style.css">
-    
+
     <!-- استفاده از Tailwind CSS برای طراحی حرفه‌ای و سریع -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <style>
         body {
             font-family: 'Vazirmatn', sans-serif;
@@ -102,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="antialiased text-gray-800">
 
     <div class="mobile-container relative overflow-hidden">
-        
+
         <!-- افکت گرافیکی پس‌زمینه (دلخواه برای زیبایی) -->
         <div class="absolute top-0 right-0 w-64 h-64 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -mr-20 -mt-20"></div>
         <div class="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -ml-20 -mb-20"></div>
@@ -116,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </svg>
                 </div>
                 <h1 class="text-2xl font-bold text-gray-900">مدیریت ساختمان پرو</h1>
-                <p class="text-sm text-gray-500 mt-2">به پنل کاربری خود خوش آمدید</p>
+                <p class="text-sm text-gray-500 mt-2">با شماره موبایل خود وارد شوید</p>
             </div>
 
             <!-- نمایش خطا -->
@@ -132,14 +138,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <!-- فرم ورود -->
             <form id="loginForm" method="POST" action="" class="space-y-5">
                 <div>
-                    <label for="email" class="block text-sm font-medium text-gray-700 mb-1">ایمیل</label>
+                    <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">شماره موبایل (نام کاربری)</label>
                     <div class="relative">
-                        <input type="email" id="email" name="email" dir="ltr" required
-                            class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow text-left bg-gray-50 focus:bg-white" 
-                            placeholder="ahmad.falnic@gmail.com" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
+                        <input type="tel" id="phone" name="phone" dir="ltr" required inputmode="numeric" pattern="09[0-9]{9}"
+                            class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow text-left bg-gray-50 focus:bg-white"
+                            placeholder="09123456789" value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>">
                         <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                             <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                             </svg>
                         </div>
                     </div>
@@ -149,7 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label for="password" class="block text-sm font-medium text-gray-700 mb-1">رمز عبور</label>
                     <div class="relative">
                         <input type="password" id="password" name="password" dir="ltr" required
-                            class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow text-left bg-gray-50 focus:bg-white" 
+                            class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow text-left bg-gray-50 focus:bg-white"
                             placeholder="••••••••">
                         <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                             <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -165,7 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <label for="remember" class="mr-2 block text-sm text-gray-700">مرا به خاطر بسپار</label>
                     </div>
                     <div class="text-sm">
-                        <span class="text-gray-400">فراموشی رمز؟ برای بازیابی با مدیر ساختمان تماس بگیرید</span>
+                        <span class="text-gray-400">فراموشی رمز؟ با مدیر ساختمان تماس بگیرید</span>
                     </div>
                 </div>
 
@@ -175,7 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="spinner" id="spinner"></div>
                 </button>
             </form>
-            
+
             <p class="text-center text-sm text-gray-500 mt-6">
                 حساب کاربری ندارید؟
                 <a href="register.php" class="font-bold text-blue-600 hover:text-blue-700 transition">ثبت‌نام کنید</a>
@@ -188,11 +194,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <script>
         // اضافه کردن افکت لودینگ موقع زدن دکمه ورود
-        document.getElementById('loginForm').addEventListener('submit', function() {
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            var phone = document.getElementById('phone').value.replace(/[۰-۹]/g, function(d) {
+                return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d);
+            }).replace(/[^0-9]/g, '');
+            if (phone.length === 10 && phone.charAt(0) === '9') phone = '0' + phone;
+            document.getElementById('phone').value = phone;
+            if (!/^09[0-9]{9}$/.test(phone)) {
+                e.preventDefault();
+                alert('شماره موبایل معتبر نیست. مثال: 09123456789');
+                return;
+            }
             var btn = document.getElementById('submitBtn');
             var text = document.getElementById('btnText');
             var spinner = document.getElementById('spinner');
-            
+
             btn.classList.add('opacity-90', 'cursor-not-allowed');
             text.innerText = 'در حال ارتباط...';
             spinner.style.display = 'block';

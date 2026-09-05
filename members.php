@@ -12,25 +12,41 @@ $building_id = (int) ($_GET['building_id'] ?? $_SESSION['active_building_id'] ??
 $alert_message = '';
 $alert_type = 'error';
 
-// ارسال دعوت‌نامه
+// ارسال دعوت‌نامه (نام + شماره موبایل + نقش + واحد) همراه با پیامک لینک دعوت
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $invited_email = trim($_POST['invited_email'] ?? '');
-    $invited_phone = trim($_POST['invited_phone'] ?? '');
-    if ($invited_email === '' && $invited_phone === '') {
-        $alert_message = 'ایمیل یا شماره موبایل را وارد کنید.';
+    $action = $_POST['form_action'] ?? 'invite';
+    if ($action === 'resend_sms') {
+        $inv_id = (int) ($_POST['invitation_id'] ?? 0);
+        if ($inv_id > 0 && $building_id > 0) {
+            $response = callAPI('POST', '/invitations/' . $inv_id . '/resend', ['building_id' => $building_id]);
+            if (isset($response['success']) && $response['success'] === true) {
+                $alert_message = 'پیامک دعوت مجدداً ارسال شد.';
+                $alert_type = 'success';
+            } else {
+                $alert_message = $response['message'] ?? 'ارسال پیامک ناموفق بود.';
+            }
+        }
     } else {
-        $payload = [
-            'invited_email' => $invited_email,
-            'invited_phone' => $invited_phone,
-            'role' => $_POST['role'] ?? 'tenant',
-            'unit_id' => !empty($_POST['unit_id']) ? (int) $_POST['unit_id'] : null,
-        ];
-        $response = callAPI('POST', '/buildings/' . $building_id . '/invitations', $payload);
-        if (isset($response['success']) && $response['success'] === true) {
-            $alert_message = 'دعوت‌نامه با موفقیت ارسال شد.';
-            $alert_type = 'success';
+        $invited_name = trim($_POST['invited_name'] ?? '');
+        $invited_phone = normalize_phone($_POST['invited_phone'] ?? '');
+        if ($invited_name === '') {
+            $alert_message = 'نام و نام خانوادگی دعوت‌شونده را وارد کنید.';
+        } elseif (!is_valid_phone($invited_phone)) {
+            $alert_message = 'شماره موبایل معتبر نیست. مثال: 09123456789';
         } else {
-            $alert_message = $response['message'] ?? 'خطا در ارسال دعوت‌نامه.';
+            $payload = [
+                'invited_name' => $invited_name,
+                'invited_phone' => $invited_phone,
+                'role' => $_POST['role'] ?? 'tenant',
+                'unit_id' => !empty($_POST['unit_id']) ? (int) $_POST['unit_id'] : null,
+            ];
+            $response = callAPI('POST', '/buildings/' . $building_id . '/invitations', $payload);
+            if (isset($response['success']) && $response['success'] === true) {
+                $alert_message = $response['message'] ?? 'دعوت‌نامه با موفقیت ثبت و پیامک ارسال شد.';
+                $alert_type = 'success';
+            } else {
+                $alert_message = $response['message'] ?? 'خطا در ارسال دعوت‌نامه.';
+            }
         }
     }
 }
@@ -110,7 +126,11 @@ require_once 'includes/page_head.php';
                                 <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 flex-shrink-0">مدیر</span>
                             <?php endif; ?>
                         </div>
-                        <p class="text-sm text-gray-500 mt-0.5 truncate" dir="ltr"><?= htmlspecialchars($member['email'] ?? '') ?></p>
+                        <?php if (!empty($member['phone'])): ?>
+                            <p class="text-sm text-gray-500 mt-0.5 truncate" dir="ltr"><?= htmlspecialchars($member['phone']) ?></p>
+                        <?php elseif (!empty($member['email'])): ?>
+                            <p class="text-sm text-gray-500 mt-0.5 truncate" dir="ltr"><?= htmlspecialchars($member['email']) ?></p>
+                        <?php endif; ?>
                         <?php if (!empty($member['units'])): ?>
                             <div class="flex flex-wrap gap-1.5 mt-1.5">
                                 <?php foreach ($member['units'] as $mu): ?>
@@ -150,12 +170,15 @@ require_once 'includes/page_head.php';
             <?php foreach ($pending_invitations as $inv): ?>
                 <?php
                 $invite_link = 'invite.php?token=' . urlencode($inv['token'] ?? '');
-                $contact = $inv['invited_email'] ?? $inv['invited_phone'] ?? 'بدون ایمیل/موبایل';
+                $contact = $inv['invited_name'] ?? $inv['invited_phone'] ?? $inv['invited_email'] ?? 'بدون مشخصات';
                 ?>
                 <div class="card p-4">
                     <div class="flex items-start justify-between gap-3">
                         <div class="flex-1 min-w-0">
                             <h3 class="font-bold text-gray-800 text-sm"><?= htmlspecialchars($contact) ?></h3>
+                            <?php if (!empty($inv['invited_phone'])): ?>
+                                <p class="text-xs text-gray-500 mt-0.5" dir="ltr"><?= htmlspecialchars($inv['invited_phone']) ?></p>
+                            <?php endif; ?>
                             <p class="text-xs text-gray-500 mt-1">
                                 نقش: <?= htmlspecialchars($role_labels[$inv['role'] ?? ''] ?? ($inv['role'] ?? 'ساکن')) ?>
                                 <?php if (!empty($inv['expires_at'])): ?>
@@ -171,6 +194,13 @@ require_once 'includes/page_head.php';
                             <button type="button" onclick="copyInviteLink(this, '<?= htmlspecialchars($invite_link, ENT_QUOTES) ?>')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-3 py-2 rounded-lg transition-colors">
                                 کپی لینک
                             </button>
+                            <form method="POST" action="" style="display:contents;">
+                                <input type="hidden" name="form_action" value="resend_sms">
+                                <input type="hidden" name="invitation_id" value="<?= (int) ($inv['id'] ?? 0) ?>">
+                                <button type="submit" class="text-xs bg-green-50 hover:bg-green-100 text-green-700 font-bold px-3 py-2 rounded-lg transition-colors">
+                                    ارسال مجدد پیامک
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -209,13 +239,14 @@ require_once 'includes/page_head.php';
             ارسال دعوت‌نامه
         </h3>
         <form method="POST" action="" class="space-y-4">
+            <input type="hidden" name="form_action" value="invite">
             <div>
-                <label for="invited_email" class="form-label">ایمیل</label>
-                <input type="email" id="invited_email" name="invited_email" dir="ltr" class="form-input text-left" placeholder="member@example.com">
+                <label for="invited_name" class="form-label">نام و نام خانوادگی *</label>
+                <input type="text" id="invited_name" name="invited_name" required class="form-input" placeholder="مثال: رضا محمدی">
             </div>
             <div>
-                <label for="invited_phone" class="form-label">شماره موبایل</label>
-                <input type="text" id="invited_phone" name="invited_phone" dir="ltr" class="form-input text-left" placeholder="0912xxxxxxx">
+                <label for="invited_phone" class="form-label">شماره موبایل (برای ارسال پیامک لینک دعوت) *</label>
+                <input type="tel" id="invited_phone" name="invited_phone" dir="ltr" required inputmode="numeric" class="form-input text-left" placeholder="09123456789">
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>

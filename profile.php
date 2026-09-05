@@ -16,7 +16,7 @@ $user_phone = $me_response['data']['phone'] ?? '';
 $first_letter = mb_substr($user_name, 0, 1, 'UTF-8');
 
 $page_title = 'پروفایل من';
-$header_sub = $user_email ?: 'حساب کاربری';
+$header_sub = $user_phone ?: ($user_email ?: 'حساب کاربری');
 $back_url = 'index.php';
 $nav_active = 'profile';
 require_once 'includes/header.php';
@@ -34,9 +34,12 @@ require_once 'includes/header.php';
                 </div>
                 <div style="margin-top: 10px;">
                     <h2 style="font-size: 17px; font-weight: 800; color: var(--text-white);"><?= htmlspecialchars($user_name) ?></h2>
-                    <p style="font-size: 11px; color: var(--text-muted-white); margin-top: 3px;" dir="ltr"><?= htmlspecialchars($user_email) ?></p>
                     <?php if (!empty($user_phone)): ?>
-                        <p style="font-size: 11px; color: var(--text-muted-white); margin-top: 2px;" dir="ltr"><?= htmlspecialchars($user_phone) ?></p>
+                        <p style="font-size: 12px; color: var(--text-muted-white); margin-top: 3px;" dir="ltr"><?= htmlspecialchars($user_phone) ?></p>
+                        <p style="font-size: 10px; color: var(--text-muted-white); margin-top: 2px;">نام کاربری شما</p>
+                    <?php endif; ?>
+                    <?php if (!empty($user_email)): ?>
+                        <p style="font-size: 11px; color: var(--text-muted-white); margin-top: 2px;" dir="ltr"><?= htmlspecialchars($user_email) ?></p>
                     <?php endif; ?>
                 </div>
                 <span style="display: inline-block; margin-top: 10px; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); padding: 4px 14px; border-radius: 999px; font-size: 11px; font-weight: 700;">حساب فعال</span>

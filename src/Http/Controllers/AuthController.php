@@ -16,9 +16,13 @@ final class AuthController
     public function register(Request $request): Response
     {
         $data = $request->getJsonBody() ?? [];
+        // سازگاری: اگر فقط email آمد و شبیه موبایل است، همان به‌عنوان phone استفاده می‌شود
+        if (empty($data['phone']) && !empty($data['email']) && strpos((string) $data['email'], '@') === false) {
+            $data['phone'] = $data['email'];
+        }
         $errors = Validator::validate($data, [
             'name' => 'required',
-            'email' => 'required|email',
+            'phone' => 'required',
             'password' => 'required|min:6',
         ]);
         if (!empty($errors)) {
@@ -33,6 +37,7 @@ final class AuthController
             $user = $userService->register($data);
             $token = JwtHelper::generate([
                 'sub' => $user->id,
+                'phone' => $user->phone,
                 'email' => $user->email,
                 'name' => $user->name,
                 'role' => 'user',
@@ -56,10 +61,12 @@ final class AuthController
     public function login(Request $request): Response
     {
         $data = $request->getJsonBody() ?? [];
-        $errors = Validator::validate($data, [
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
+        // ورود با شماره موبایل (نام‌کاربری)؛ برای سازگاری email هم قبول است
+        $username = trim((string) ($data['phone'] ?? $data['email'] ?? $data['username'] ?? ''));
+        $errors = Validator::validate(
+            ['username' => $username, 'password' => $data['password'] ?? null],
+            ['username' => 'required', 'password' => 'required']
+        );
         if (!empty($errors)) {
             return (new Response())->setStatusCode(422)->setJson([
                 'success' => false,
@@ -68,16 +75,17 @@ final class AuthController
         }
 
         $userService = new UserService();
-        $user = $userService->authenticate($data['email'], $data['password']);
+        $user = $userService->authenticate($username, (string) ($data['password'] ?? ''));
         if (!$user) {
             return (new Response())->setStatusCode(401)->setJson([
                 'success' => false,
-                'message' => 'Invalid credentials',
+                'message' => 'شماره موبایل یا رمز عبور اشتباه است.',
             ]);
         }
 
         $token = JwtHelper::generate([
             'sub' => $user->id,
+            'phone' => $user->phone,
             'email' => $user->email,
             'name' => $user->name,
             'role' => 'user',

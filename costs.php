@@ -15,16 +15,30 @@ $alert_type = 'error';
 // ثبت هزینه جدید
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'create_cost') {
+        $charge_kind = $_POST['charge_kind'] ?? 'normal';
         $title = trim($_POST['title'] ?? '');
-        $amount = trim($_POST['amount'] ?? '');
-        if ($title === '' || $amount === '' || (float) $amount <= 0) {
-            $alert_message = 'عنوان و مبلغ هزینه را به‌درستی وارد کنید.';
+        $amount_raw = trim($_POST['amount'] ?? '');
+        if ($charge_kind === 'monthly' && $title === '') {
+            $title = 'شارژ ماهیانه ' . date('Y-m');
+        }
+        // اگر شارژ ماهیانه است و مبلغ وارد نشده، از شارژ ثابت ساختمان استفاده شود
+        if ($charge_kind === 'monthly' && ($amount_raw === '' || (float) $amount_raw <= 0)) {
+            $b_resp = callAPI('GET', '/buildings/' . $building_id);
+            $fixed = (float) ($b_resp['data']['monthly_charge'] ?? 0);
+            if ($fixed > 0) {
+                $amount_raw = (string) $fixed;
+            }
+        }
+        if ($title === '' || $amount_raw === '' || (float) $amount_raw <= 0) {
+            $alert_message = $charge_kind === 'monthly'
+                ? 'مبلغ شارژ ماهیانه مشخص نیست. مبلغ را وارد کنید یا ابتدا «شارژ ثابت ماهیانه» را در همین صفحه تنظیم کنید.'
+                : 'عنوان و مبلغ هزینه را به‌درستی وارد کنید.';
         } else {
             $payload = [
                 'building_id' => $building_id,
                 'title' => $title,
                 'description' => trim($_POST['description'] ?? ''),
-                'amount' => (float) $amount,
+                'amount' => (float) $amount_raw,
                 'cost_type' => $_POST['cost_type'] ?? 'periodic',
                 'division_method' => $_POST['division_method'] ?? 'fixed_share',
                 'due_date' => !empty($_POST['due_date']) ? $_POST['due_date'] : null,
@@ -80,6 +94,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } else {
             $alert_message = 'لطفاً فایل رسید را انتخاب کنید.';
         }
+    } elseif ($_POST['action'] === 'create_monthly') {
+        // ثبت یک‌کلیکه شارژ ماه جاری از روی شارژ ثابت (بدون نیاز به مبلغ)
+        $response = callAPI('POST', '/costs/monthly-charge', ['building_id' => $building_id]);
+        if (isset($response['success']) && $response['success'] === true) {
+            $alert_message = 'شارژ ماه جاری ثبت شد و به بدهکاری‌ها اضافه گردید.';
+            $alert_type = 'success';
+        } else {
+            $alert_message = $response['message'] ?? 'خطا در ثبت شارژ ماهیانه.';
+        }
+    } elseif ($_POST['action'] === 'save_monthly_setting') {
+        $monthly_amount = max(0, (float) ($_POST['monthly_charge'] ?? 0));
+        $monthly_enabled = !empty($_POST['monthly_charge_enabled']);
+        $response = callAPI('PUT', '/buildings/' . $building_id, [
+            'monthly_charge' => $monthly_amount,
+            'monthly_charge_enabled' => $monthly_enabled,
+        ]);
+        if (isset($response['success']) && $response['success'] === true) {
+            $alert_message = 'تنظیم شارژ ثابت ماهیانه ذخیره شد.' . ($monthly_enabled && $monthly_amount > 0 ? ' شارژ این ماه هم به‌صورت خودکار ساخته می‌شود.' : '');
+            $alert_type = 'success';
+        } else {
+            $alert_message = $response['message'] ?? 'خطا در ذخیره تنظیم شارژ ثابت.';
+        }
     } elseif ($_POST['action'] === 'create_penalty_setting') {
         $penalty_type = ($_POST['penalty_type'] ?? 'percentage') === 'fixed' ? 'fixed' : 'percentage';
         $penalty_value = trim($_POST['penalty_value'] ?? '');
@@ -110,8 +146,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 $financial = [];
 $costs = [];
 $payments = [];
+$building = [];
 $building_name = '';
 $current_user_id = 0;
+$is_manager = false;
 
 // شناسه کاربر جاری (برای نمایش «پرداخت‌های من» و آپلود رسید)
 $me_response = callAPI('GET', '/auth/me');
@@ -122,7 +160,8 @@ if (isset($me_response['success']) && $me_response['success'] === true) {
 if ($building_id > 0) {
     $building_response = callAPI('GET', '/buildings/' . $building_id);
     if (isset($building_response['success']) && $building_response['success'] === true) {
-        $building_name = $building_response['data']['name'] ?? '';
+        $building = $building_response['data'] ?? [];
+        $building_name = $building['name'] ?? '';
     }
     $summary_response = callAPI('GET', '/costs/summary', ['building_id' => $building_id]);
     if (isset($summary_response['success']) && $summary_response['success'] === true) {
@@ -135,6 +174,16 @@ if ($building_id > 0) {
     $payments_response = callAPI('GET', '/payments', ['building_id' => $building_id]);
     if (isset($payments_response['success']) && $payments_response['success'] === true) {
         $payments = $payments_response['data'] ?? [];
+    }
+    // نقش کاربر جاری (مدیر یا عضو) برای محدود کردن دسترسی‌های مدیریتی
+    $members_response = callAPI('GET', '/buildings/' . $building_id . '/members');
+    if (isset($members_response['success']) && $members_response['success'] === true) {
+        foreach (($members_response['data'] ?? []) as $m) {
+            if ((int) ($m['user_id'] ?? 0) === $current_user_id && ($m['role'] ?? '') === 'manager') {
+                $is_manager = true;
+                break;
+            }
+        }
     }
 }
 
@@ -178,7 +227,41 @@ require_once 'includes/page_head.php';
         </div>
     </div>
 
+        <?php if ($is_manager): ?>
+    <!-- شارژ ثابت ماهیانه -->
+    <div class="card p-5 mt-5 border border-emerald-200">
+        <h3 class="font-bold text-gray-800 mb-1 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H2m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            شارژ ثابت ماهیانه
+        </h3>
+        <p class="text-xs text-gray-500 mb-4">هر ماه به‌صورت خودکار ثبت و به بدهکاری واحدها اضافه می‌شود.</p>
+        <form method="POST" action="" class="flex items-end gap-2">
+            <input type="hidden" name="action" value="save_monthly_setting">
+            <div class="flex-1">
+                <label class="form-label text-[11px]">مبلغ ماهیانه (تومان)</label>
+                <input type="number" name="monthly_charge" min="0" step="1000" class="form-input text-sm" value="<?= htmlspecialchars((string) ($building['monthly_charge'] ?? 0)) ?>">
+            </div>
+            <label class="flex items-center gap-1.5 text-xs text-gray-600 pb-3 whitespace-nowrap">
+                <input type="checkbox" name="monthly_charge_enabled" value="1" class="rounded" <?= !empty($building['monthly_charge_enabled']) ? 'checked' : '' ?>>
+                فعال
+            </label>
+            <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-all active:scale-[0.98] flex-shrink-0">
+                ذخیره
+            </button>
+        </form>
+        <form method="POST" action="" class="mt-3">
+            <input type="hidden" name="action" value="create_monthly">
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-xl transition-all active:scale-[0.98]">
+                ثبت شارژ ماه جاری (<?= fa_digits(date('Y-m')) ?>)
+            </button>
+        </form>
+    </div>
+    <?php endif; ?>
+
     <!-- دکمه افزودن -->
+    <?php if ($is_manager): ?>
     <a href="#add-cost" class="mt-5 w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg shadow-blue-600/25 transition-all active:scale-[0.98]">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
@@ -187,6 +270,8 @@ require_once 'includes/page_head.php';
     </a>
 
     <!-- لیست هزینه‌ها -->
+    <?php endif; ?>
+
     <h2 class="section-title">لیست هزینه‌ها</h2>
     <?php if (empty($costs)): ?>
         <div class="card empty-state">
@@ -281,7 +366,7 @@ require_once 'includes/page_head.php';
                         </form>
                     <?php endif; ?>
 
-                    <?php if (($payment['status'] ?? '') !== 'confirmed'): ?>
+                    <?php if ($is_manager && ($payment['status'] ?? '') !== 'confirmed'): ?>
                         <form method="POST" action="" class="mt-3">
                             <input type="hidden" name="action" value="confirm_payment">
                             <input type="hidden" name="payment_id" value="<?= (int) $payment['id'] ?>">
@@ -296,6 +381,7 @@ require_once 'includes/page_head.php';
     <?php endif; ?>
 
     <!-- فرم ثبت هزینه -->
+    <?php if ($is_manager): ?>
     <div id="add-cost" class="card p-5 mt-6">
         <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -306,12 +392,20 @@ require_once 'includes/page_head.php';
         <form method="POST" action="" class="space-y-4">
             <input type="hidden" name="action" value="create_cost">
             <div>
+                <label for="charge_kind" class="form-label">نوع ثبت</label>
+                <select id="charge_kind" name="charge_kind" class="form-input" onchange="document.getElementById('amount').required = this.value !== 'monthly'">
+                    <option value="normal">هزینه عادی</option>
+                    <option value="monthly">شارژ ماهیانه (مبلغ خالی = شارژ ثابت ساختمان)</option>
+                </select>
+            </div>
+            <div>
                 <label for="title" class="form-label">عنوان هزینه *</label>
-                <input type="text" id="title" name="title" required class="form-input" placeholder="مثال: شارژ ماهیانه شهریور">
+                <input type="text" id="title""مثال: شارژ ماهیانه شهریور">
             </div>
             <div>
                 <label for="amount" class="form-label">مبلغ (تومان) *</label>
                 <input type="number" id="amount" name="amount" required min="1" step="1000" class="form-input" placeholder="مثال: 500000">
+                <p class="text-[11px] text-gray-400 mt-1">برای شارژ ماهیانه می‌توانید خالی بگذارید تا مبلغ شارژ ثابت لحاظ شود.</p>
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
@@ -354,8 +448,10 @@ require_once 'includes/page_head.php';
             </button>
         </form>
     </div>
+    <?php endif; ?>
 
     <!-- تنظیم جریمه دیرکرد -->
+    <?php if ($is_manager): ?>
     <div id="add-penalty" class="card p-5 mt-6">
         <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -390,6 +486,7 @@ require_once 'includes/page_head.php';
             </button>
         </form>
     </div>
+    <?php endif; ?>
 
 </main>
 

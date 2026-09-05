@@ -9,13 +9,14 @@ USE building_mgmt;
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    phone VARCHAR(50) DEFAULT NULL,
+    email VARCHAR(255) UNIQUE DEFAULT NULL,
+    phone VARCHAR(20) DEFAULT NULL,
     password_hash VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL DEFAULT NULL,
     INDEX idx_email (email),
+    UNIQUE INDEX idx_phone_unique (phone),
     INDEX idx_deleted (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -29,6 +30,13 @@ CREATE TABLE IF NOT EXISTS buildings (
     custom_logo_path VARCHAR(500) DEFAULT NULL,
     theme_color VARCHAR(20) DEFAULT '#1a73e8',
     hierarchy_settings JSON DEFAULT NULL,
+    total_units INT NULL DEFAULT NULL,
+    total_floors INT NULL DEFAULT NULL,
+    has_blocks TINYINT(1) NOT NULL DEFAULT 1,
+    default_image VARCHAR(50) NULL DEFAULT 'b1',
+    parking_spots INT NOT NULL DEFAULT 0,
+    monthly_charge DECIMAL(15,2) NOT NULL DEFAULT 0,
+    monthly_charge_enabled TINYINT(1) NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL DEFAULT NULL,
@@ -227,6 +235,7 @@ CREATE TABLE IF NOT EXISTS invitations (
     building_id INT NOT NULL,
     invited_email VARCHAR(255) DEFAULT NULL,
     invited_phone VARCHAR(50) DEFAULT NULL,
+    invited_name VARCHAR(255) NULL DEFAULT NULL,
     role VARCHAR(50) DEFAULT 'resident',
     unit_id INT DEFAULT NULL,
     token VARCHAR(255) UNIQUE NOT NULL,

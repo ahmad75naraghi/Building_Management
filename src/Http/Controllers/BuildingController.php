@@ -423,11 +423,15 @@ final class BuildingController
         $data['building_id'] = $buildingId;
         try {
             $invitationService = new InvitationService();
-            $invitation = $invitationService->createInvitation($data, (int) $userId);
+            $result = $invitationService->createInvitation($data, (int) $userId);
+            $invitation = $result['invitation'];
+            $payload = $invitation->toArray();
+            $payload['sms_sent'] = $result['sms_sent'];
+            $payload['invite_link'] = InvitationService::inviteLink($invitation->token);
             return (new Response())->setStatusCode(201)->setJson([
                 'success' => true,
-                'message' => 'Invitation created',
-                'data' => $invitation->toArray(),
+                'message' => $result['sms_sent'] ? 'دعوتنامه ساخته و پیامک ارسال شد.' : 'دعوتنامه ساخته شد ولی پیامک ارسال نشد؛ لینک را دستی ارسال کنید.',
+                'data' => $payload,
             ]);
         } catch (\Exception $e) {
             return (new Response())->setStatusCode(400)->setJson([
@@ -458,6 +462,42 @@ final class BuildingController
             return (new Response())->setJson([
                 'success' => true,
                 'data' => array_map(fn($inv) => $inv->toArray(), $invitations),
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * ارسال مجدد پیامک دعوت (مدیر ساختمان).
+     * POST /api/invitations/{id}/resend با building_id در بدنه
+     */
+    public function resendInvitation(Request $request): Response
+    {
+        $userId = (int) ($request->getAttribute('user_id') ?? 0);
+        $invitationId = (int) ($request->getAttribute('id') ?? 0);
+        $data = $request->getJsonBody() ?? [];
+        $buildingId = (int) ($data['building_id'] ?? 0);
+        if (!$userId || !$invitationId || !$buildingId) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false,
+                'message' => 'invitation id and building_id are required',
+            ]);
+        }
+        if (!$this->isBuildingMember($userId, $buildingId)) {
+            return (new Response())->setStatusCode(403)->setJson([
+                'success' => false,
+                'message' => 'You are not a member of this building',
+            ]);
+        }
+        try {
+            $sent = (new InvitationService())->resendSms($invitationId, $buildingId);
+            return (new Response())->setJson([
+                'success' => $sent,
+                'message' => $sent ? 'پیامک دعوت مجدداً ارسال شد.' : 'ارسال پیامک ناموفق بود.',
             ]);
         } catch (\Exception $e) {
             return (new Response())->setStatusCode(400)->setJson([
@@ -542,7 +582,7 @@ final class BuildingController
         }
         $db = \App\Core\Database::getConnection();
         $stmt = $db->prepare(
-            "SELECT bm.*, u.name, u.email
+            "SELECT bm.*, u.name, u.email, u.phone
              FROM building_members bm
              INNER JOIN users u ON bm.user_id = u.id
              WHERE bm.building_id = ?"

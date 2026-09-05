@@ -59,6 +59,7 @@ final class CostController
             ]);
         }
         try {
+            $this->service->ensureMonthlyCharge($buildingId, (int) $userId);
             $costs = $this->service->listCostsByBuilding($buildingId);
             return (new Response())->setJson([
                 'success' => true,
@@ -118,6 +119,7 @@ final class CostController
                 'message' => 'building_id query parameter is required',
             ]);
         }
+        $this->service->ensureMonthlyCharge($buildingId, (int) $userId);
         $summary = $this->service->getFinancialSummary($buildingId);
         return (new Response())->setJson([
             'success' => true,
@@ -206,6 +208,42 @@ final class CostController
             return (new Response())->setJson([
                 'success' => $updated,
                 'message' => $updated ? 'Payment confirmed' : 'Failed to confirm',
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * ثبت شارژ ماهیانه ثابت برای ماه جاری.
+     * POST /api/costs/monthly-charge با building_id در بدنه
+     */
+    public function monthlyCharge(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        if (!$userId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false,
+                'message' => 'Authentication required',
+            ]);
+        }
+        $data = $request->getJsonBody() ?? [];
+        $buildingId = (int) ($data['building_id'] ?? 0);
+        if ($buildingId <= 0) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false,
+                'message' => 'building_id is required',
+            ]);
+        }
+        try {
+            $cost = $this->service->createMonthlyCharge($buildingId, (int) $userId);
+            return (new Response())->setStatusCode(201)->setJson([
+                'success' => true,
+                'message' => 'شارژ ماهیانه ثبت شد.',
+                'data' => $cost->toArray(),
             ]);
         } catch (\Exception $e) {
             return (new Response())->setStatusCode(400)->setJson([
