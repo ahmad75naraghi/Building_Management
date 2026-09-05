@@ -40,20 +40,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        // ارقام فارسی را به انگلیسی تبدیل می‌کنیم تا مقادیر عددی از دست نروند
+        $total_units_raw = en_digits($_POST['total_units'] ?? '');
+        $total_floors_raw = en_digits($_POST['total_floors'] ?? '');
+        $parking_raw = en_digits($_POST['parking_spots'] ?? '0');
+        $monthly_raw = en_digits($_POST['monthly_charge'] ?? '0');
+
         $building_data = [
             'name' => $name,
             'address' => $address,
             'custom_name' => $custom_name !== '' ? $custom_name : null,
             'theme_color' => trim($_POST['theme_color'] ?? '#1a73e8'),
-            'total_units' => trim($_POST['total_units'] ?? '') !== '' ? (int) $_POST['total_units'] : null,
-            'total_floors' => trim($_POST['total_floors'] ?? '') !== '' ? (int) $_POST['total_floors'] : null,
+            'total_units' => $total_units_raw !== '' ? max(0, (int) $total_units_raw) : null,
+            'total_floors' => $total_floors_raw !== '' ? max(0, (int) $total_floors_raw) : null,
             'has_blocks' => $has_blocks,
             'blocks' => $blocks,
             'default_image' => in_array(($_POST['default_image'] ?? 'b1'), ['b1', 'b2', 'b3', 'b4'], true) ? $_POST['default_image'] : 'b1',
-            'parking_spots' => max(0, (int) ($_POST['parking_spots'] ?? 0)),
+            'parking_spots' => max(0, (int) $parking_raw),
             'common_areas' => $common_areas,
-            'monthly_charge' => max(0, (float) ($_POST['monthly_charge'] ?? 0)),
-            'monthly_charge_enabled' => !empty($_POST['monthly_charge_enabled']) && (float) ($_POST['monthly_charge'] ?? 0) > 0,
+            'monthly_charge' => max(0, (float) $monthly_raw),
+            'monthly_charge_enabled' => !empty($_POST['monthly_charge_enabled']) && (float) $monthly_raw > 0,
         ];
 
         $response = callAPI('POST', '/buildings', $building_data);
@@ -117,12 +123,12 @@ require_once 'includes/header.php';
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label for="total_units" class="form-label">تعداد واحد</label>
-                            <input type="number" id="total_units" name="total_units" min="1" class="form-input" placeholder="مثال: ۲۰"
+                            <input type="number" id="total_units" name="total_units" min="0" inputmode="numeric" class="form-input" placeholder="مثال: 20"
                                    value="<?= htmlspecialchars($_POST['total_units'] ?? '') ?>">
                         </div>
                         <div>
                             <label for="total_floors" class="form-label">تعداد طبقه</label>
-                            <input type="number" id="total_floors" name="total_floors" min="1" class="form-input" placeholder="مثال: ۵"
+                            <input type="number" id="total_floors" name="total_floors" min="0" inputmode="numeric" class="form-input" placeholder="مثال: 5"
                                    value="<?= htmlspecialchars($_POST['total_floors'] ?? '') ?>">
                         </div>
                     </div>
@@ -168,7 +174,7 @@ require_once 'includes/header.php';
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label for="parking_spots" class="form-label">ظرفیت پارکینگ (خودرو)</label>
-                            <input type="number" id="parking_spots" name="parking_spots" min="0" class="form-input" placeholder="مثال: ۱۰" value="0">
+                            <input type="number" id="parking_spots" name="parking_spots" min="0" inputmode="numeric" class="form-input" placeholder="مثال: 10" value="<?= htmlspecialchars($_POST['parking_spots'] ?? '0') ?>">
                         </div>
                     </div>
                     <div class="card bg-gray-50 p-4">
@@ -182,7 +188,7 @@ require_once 'includes/header.php';
                         <button type="button" onclick="addCaRow()" class="mt-2 text-xs bg-violet-50 hover:bg-violet-100 text-violet-700 font-bold px-3 py-2 rounded-lg transition-colors">
                             ＋ افزودن مشاع
                         </button>
-                        <p class="text-[11px] text-gray-400 mt-2">طبقات و واحدها را بعداً از صفحه ساختمان می‌سازید.</p>
+                        <p class="text-[11px] text-gray-400 mt-2">مشاعات دلخواه خود را اضافه کنید؛ بعداً هم قابل ویرایش است.</p>
                     </div>
 
                     <!-- شارژ ثابت ماهیانه -->

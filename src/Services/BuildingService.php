@@ -65,6 +65,7 @@ final class BuildingService
         $stmt->execute([$userId, $id, $userId]);
 
         // ساخت خودکار بلوک‌ها از روی نام‌های واردشده در فرم
+        $blockIds = [];
         $blocks = $data['blocks'] ?? [];
         if ($building->has_blocks && is_array($blocks)) {
             $bstmt = $db->prepare("INSERT INTO blocks (building_id, name) VALUES (?, ?)");
@@ -72,9 +73,18 @@ final class BuildingService
                 $bname = trim((string) $bname);
                 if ($bname !== '') {
                     $bstmt->execute([$id, $bname]);
+                    $blockIds[] = (int) $db->lastInsertId();
                 }
             }
         }
+
+        // ساخت خودکار طبقات و واحدها بر اساس «تعداد طبقه» و «تعداد واحد» واردشده در فرم
+        $this->scaffoldFloorsAndUnits(
+            $id,
+            $building->total_floors,
+            $building->total_units,
+            $blockIds
+        );
 
         // ساخت خودکار مشاعات از روی فرم (نام + قابل رزرو بودن)
         $commonAreas = $data['common_areas'] ?? [];
@@ -103,6 +113,68 @@ final class BuildingService
         }
 
         return $building;
+    }
+
+    /**
+     * ساخت خودکار طبقات و واحدها هنگام ثبت ساختمان.
+     *
+     * تا پیش از این، «تعداد طبقه» و «تعداد واحد» فقط به‌عنوان عدد روی ساختمان
+     * ذخیره می‌شد و هیچ رکورد واقعی در جدول‌های floors/units ساخته نمی‌شد؛
+     * به همین دلیل کاربر فکر می‌کرد این اطلاعات ثبت نشده است.
+     *
+     * @param list<int> $blockIds شناسه بلوک‌های ساخته‌شده (در صورت وجود)
+     */
+    private function scaffoldFloorsAndUnits(
+        int $buildingId,
+        ?int $totalFloors,
+        ?int $totalUnits,
+        array $blockIds = []
+    ): void {
+        $totalFloors = $totalFloors !== null ? max(0, $totalFloors) : 0;
+        $totalUnits = $totalUnits !== null ? max(0, $totalUnits) : 0;
+        if ($totalFloors === 0 && $totalUnits === 0) {
+            return;
+        }
+
+        $db = \App\Core\Database::getConnection();
+
+        // اگر طبقه اعلام نشده ولی واحد داریم، همه واحدها در یک طبقه قرار می‌گیرند
+        $floorCount = $totalFloors > 0 ? $totalFloors : 1;
+        // بلوک‌ها: اگر بلوکی نداریم، یک «بلوک مجازی» با شناسه null
+        $targets = !empty($blockIds) ? $blockIds : [null];
+
+        try {
+            $floorStmt = $db->prepare(
+                "INSERT INTO floors (building_id, block_id, floor_number, name) VALUES (?, ?, ?, ?)"
+            );
+            $unitStmt = $db->prepare(
+                "INSERT INTO units (building_id, block_id, floor_id, unit_number, type) VALUES (?, ?, ?, ?, 'residential')"
+            );
+
+            // تقسیم واحدها بین طبقات (به‌صورت متوازن؛ باقیمانده به طبقات اول)
+            $floorSlots = count($targets) * $floorCount;
+            $unitsPerFloor = $floorSlots > 0 ? intdiv($totalUnits, $floorSlots) : 0;
+            $remainder = $floorSlots > 0 ? $totalUnits % $floorSlots : 0;
+
+            $unitCounter = 0;
+            $slotIndex = 0;
+            foreach ($targets as $blockId) {
+                for ($n = 1; $n <= $floorCount; $n++) {
+                    $floorStmt->execute([$buildingId, $blockId, $n, 'طبقه ' . $n]);
+                    $floorId = (int) $db->lastInsertId();
+
+                    $unitsHere = $unitsPerFloor + ($slotIndex < $remainder ? 1 : 0);
+                    $slotIndex++;
+                    for ($u = 0; $u < $unitsHere; $u++) {
+                        $unitCounter++;
+                        $unitStmt->execute([$buildingId, $blockId, $floorId, (string) $unitCounter]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // ساخت ساختار نباید مانع ثبت ساختمان شود
+            error_log('[BuildingService] scaffoldFloorsAndUnits failed: ' . $e->getMessage());
+        }
     }
 
     public function getBuildingById(int $id, int $userId): ?Building

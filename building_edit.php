@@ -45,12 +45,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'address' => $address,
             'custom_name' => trim($_POST['custom_name'] ?? ''),
             'theme_color' => trim($_POST['theme_color'] ?? '#1a73e8'),
-            'total_units' => trim($_POST['total_units'] ?? '') !== '' ? (int) $_POST['total_units'] : null,
-            'total_floors' => trim($_POST['total_floors'] ?? '') !== '' ? (int) $_POST['total_floors'] : null,
+            'total_units' => en_digits($_POST['total_units'] ?? '') !== '' ? max(0, (int) en_digits($_POST['total_units'])) : null,
+            'total_floors' => en_digits($_POST['total_floors'] ?? '') !== '' ? max(0, (int) en_digits($_POST['total_floors'])) : null,
             'has_blocks' => isset($_POST['has_blocks']) && $_POST['has_blocks'] === '1',
             'default_image' => in_array(($_POST['default_image'] ?? 'b1'), ['b1', 'b2', 'b3', 'b4'], true) ? $_POST['default_image'] : 'b1',
-            'parking_spots' => max(0, (int) ($_POST['parking_spots'] ?? 0)),
-            'monthly_charge' => max(0, (float) ($_POST['monthly_charge'] ?? 0)),
+            'parking_spots' => max(0, (int) en_digits($_POST['parking_spots'] ?? 0)),
+            'monthly_charge' => max(0, (float) en_digits($_POST['monthly_charge'] ?? 0)),
             'monthly_charge_enabled' => !empty($_POST['monthly_charge_enabled']),
         ];
         $response = callAPI('PUT', '/buildings/' . $building_id, $payload);
@@ -101,11 +101,11 @@ require_once 'includes/page_head.php';
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label for="total_units" class="form-label">تعداد واحد</label>
-                    <input type="number" id="total_units" name="total_units" min="1" class="form-input" value="<?= htmlspecialchars((string) ($building['total_units'] ?? '')) ?>" placeholder="مثال: ۲۰">
+                    <input type="number" id="total_units" name="total_units" min="0" inputmode="numeric" class="form-input" value="<?= htmlspecialchars((string) ($building['total_units'] ?? '')) ?>" placeholder="مثال: 20">
                 </div>
                 <div>
                     <label for="total_floors" class="form-label">تعداد طبقه</label>
-                    <input type="number" id="total_floors" name="total_floors" min="1" class="form-input" value="<?= htmlspecialchars((string) ($building['total_floors'] ?? '')) ?>" placeholder="مثال: ۵">
+                    <input type="number" id="total_floors" name="total_floors" min="0" inputmode="numeric" class="form-input" value="<?= htmlspecialchars((string) ($building['total_floors'] ?? '')) ?>" placeholder="مثال: 5">
                 </div>
             </div>
 
