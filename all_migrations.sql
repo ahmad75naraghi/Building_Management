@@ -8,10 +8,10 @@ USE building_mgmt;
 -- 001_users
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
+    name VARCHAR(255) DEFAULT NULL,
     email VARCHAR(255) UNIQUE DEFAULT NULL,
     phone VARCHAR(20) DEFAULT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL DEFAULT NULL,
@@ -497,4 +497,18 @@ CREATE TABLE IF NOT EXISTS reviews (
     FOREIGN KEY (building_id) REFERENCES buildings(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (category_id) REFERENCES review_categories(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 026_otp_auth: کدهای یک‌بارمصرف ورود/ثبت‌نام با شماره موبایل
+CREATE TABLE IF NOT EXISTS otp_codes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    phone VARCHAR(20) NOT NULL,
+    code_hash VARCHAR(255) NOT NULL,
+    purpose VARCHAR(30) NOT NULL DEFAULT 'auth',
+    attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    consumed_at TIMESTAMP NULL DEFAULT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_otp_phone (phone),
+    INDEX idx_otp_expires (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

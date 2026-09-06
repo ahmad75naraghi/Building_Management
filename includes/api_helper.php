@@ -10,6 +10,19 @@ if (!is_string($apiBaseUrl) || $apiBaseUrl === '') {
 }
 define('API_BASE_URL', $apiBaseUrl);
 
+/**
+ * اگر کاربر جریان ثبت‌نام را نیمه‌کاره رها کرده (نام یا رمز ندارد)،
+ * او را به همان گام در صفحه ورود یکپارچه برمی‌گردانیم.
+ * صفحه auth.php و logout.php از این قاعده مستثنا هستند.
+ */
+if (!empty($_SESSION['auth_pending']) && !empty($_SESSION['token'])) {
+    $current = basename((string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    if (!in_array($current, ['auth.php', 'logout.php', 'login.php', 'register.php'], true)) {
+        header('Location: auth.php');
+        exit;
+    }
+}
+
 function callAPI($method, $endpoint, $data = false) {
     $curl = curl_init();
     

@@ -8,7 +8,7 @@ $alert_type = 'error';
 
 // اگر لاگین نیست، اول به ورود برود و برگردد
 if (!isset($_SESSION['token']) || empty($_SESSION['token'])) {
-    header("Location: login.php?redirect=" . urlencode('invite.php?token=' . urlencode($token)));
+    header("Location: auth.php?redirect=" . urlencode('invite.php?token=' . urlencode($token)));
     exit;
 }
 

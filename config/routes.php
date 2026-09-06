@@ -10,6 +10,11 @@ final class Routes
         // Auth
         'POST /api/auth/register' => ['App\Http\Controllers\AuthController', 'register'],
         'POST /api/auth/login' => ['App\Http\Controllers\AuthController', 'login'],
+        'POST /api/auth/check-phone' => ['App\Http\Controllers\AuthController', 'checkPhone'],
+        'POST /api/auth/send-otp' => ['App\Http\Controllers\AuthController', 'sendOtp'],
+        'POST /api/auth/verify-otp' => ['App\Http\Controllers\AuthController', 'verifyOtp'],
+        'POST /api/auth/complete-name' => ['App\Http\Controllers\AuthController', 'completeName'],
+        'POST /api/auth/set-password' => ['App\Http\Controllers\AuthController', 'setPassword'],
         'POST /api/auth/refresh' => ['App\Http\Controllers\AuthController', 'refresh'],
         'POST /api/auth/logout' => ['App\Http\Controllers\AuthController', 'logout'],
         'GET /api/auth/me' => ['App\Http\Controllers\AuthController', 'me'],

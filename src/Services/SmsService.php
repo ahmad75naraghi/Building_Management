@@ -87,6 +87,16 @@ final class SmsService
     }
 
     /**
+     * پیامک کد یک‌بارمصرف ورود/ثبت‌نام.
+     */
+    public function sendOtpSms(string $to, string $code): bool
+    {
+        $minutes = (int) ceil(\App\Services\OtpService::TTL_SECONDS / 60);
+        $text = "کد ورود شما به سامانه مدیریت ساختمان: {$code}\nاعتبار: {$minutes} دقیقه. این کد را در اختیار کسی قرار ندهید.";
+        return $this->sendByBaseNumber($to, $text, [$code]);
+    }
+
+    /**
      * پیامک دعوت به ساختمان همراه با لینک پذیرش.
      */
     public function sendInviteSms(string $to, string $invitedName, string $buildingName, string $roleLabel, string $inviteLink): bool

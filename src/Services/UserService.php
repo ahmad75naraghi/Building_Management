@@ -61,6 +61,121 @@ final class UserService
     }
 
     /**
+     * وضعیت یک شماره موبایل برای تصمیم‌گیری در صفحه ورود یکپارچه.
+     *
+     * @return array{exists:bool, has_password:bool, has_name:bool, next:string}
+     *   next یکی از: password (رمز بخواه) | otp (کد بفرست)
+     */
+    public function phoneStatus(string $phone): array
+    {
+        $phone = PhoneHelper::normalize($phone);
+        if (!PhoneHelper::isValid($phone)) {
+            throw new ValidationException('شماره موبایل معتبر نیست. مثال: 09123456789');
+        }
+
+        $user = $this->repo->findByPhone($phone);
+        $exists = $user !== null;
+        $hasPassword = $exists && !empty($user->password_hash);
+        $hasName = $exists && trim((string) $user->name) !== '';
+
+        return [
+            'exists' => $exists,
+            'has_password' => $hasPassword,
+            'has_name' => $hasName,
+            // کاربر ثبت‌نام‌کرده با رمز → رمز بپرس؛ در غیر این صورت کد یک‌بارمصرف
+            'next' => $hasPassword ? 'password' : 'otp',
+        ];
+    }
+
+    /**
+     * ورود/ثبت‌نام پس از تأیید موفق کد یک‌بارمصرف.
+     *
+     * اگر کاربر وجود نداشته باشد، یک رکورد بدون نام و بدون رمز ساخته می‌شود؛
+     * تکمیل نام و ست‌کردن رمز در گام‌های بعدی انجام می‌گیرد.
+     *
+     * @return array{user:User, is_new:bool, needs_name:bool, needs_password:bool}
+     */
+    public function loginOrCreateByPhone(string $phone): array
+    {
+        $phone = PhoneHelper::normalize($phone);
+        if (!PhoneHelper::isValid($phone)) {
+            throw new ValidationException('شماره موبایل معتبر نیست.');
+        }
+
+        $user = $this->repo->findByPhone($phone);
+        $isNew = false;
+
+        if (!$user) {
+            $user = new User();
+            $user->phone = $phone;
+            $user->name = null;
+            $user->password_hash = null;
+            $user->id = $this->repo->create($user);
+            $isNew = true;
+        }
+
+        return [
+            'user' => $user,
+            'is_new' => $isNew,
+            'needs_name' => trim((string) $user->name) === '',
+            'needs_password' => empty($user->password_hash),
+        ];
+    }
+
+    /**
+     * ثبت نام و نام خانوادگی برای کاربری که تازه با OTP وارد شده است.
+     */
+    public function completeName(int $userId, string $name): User
+    {
+        $name = trim($name);
+        if (mb_strlen($name) < 3) {
+            throw new ValidationException('نام و نام خانوادگی را کامل وارد کنید.');
+        }
+
+        $user = $this->repo->findById($userId);
+        if (!$user) {
+            throw new AppException('کاربر یافت نشد.');
+        }
+
+        $this->repo->updateProfile($userId, $name, $user->phone);
+        $user->name = $name;
+        return $user;
+    }
+
+    /**
+     * ست‌کردن رمز عبور برای کاربری که هنوز رمزی ندارد (پس از تأیید OTP).
+     * برای تغییر رمزِ کاربری که رمز دارد، از changePassword استفاده کنید.
+     */
+    public function setInitialPassword(int $userId, string $password, string $confirmation): User
+    {
+        $user = $this->repo->findById($userId);
+        if (!$user) {
+            throw new AppException('کاربر یافت نشد.');
+        }
+        if (!empty($user->password_hash)) {
+            throw new AppException('برای این حساب قبلاً رمز عبور تعیین شده است.');
+        }
+        if (mb_strlen($password) < 6) {
+            throw new ValidationException('رمز عبور باید حداقل ۶ کاراکتر باشد.');
+        }
+        if ($password !== $confirmation) {
+            throw new ValidationException('تکرار رمز عبور مطابقت ندارد.');
+        }
+
+        $this->repo->updatePassword($userId, password_hash($password, PASSWORD_DEFAULT));
+
+        // پیامک خوش‌آمد پس از تکمیل ثبت‌نام
+        try {
+            (new SmsService())->sendWelcomeSms((string) $user->phone, (string) ($user->name ?: 'کاربر'));
+        } catch (\Throwable $e) {
+            error_log('[UserService] welcome sms failed: ' . $e->getMessage());
+        }
+
+        $user->password_hash = 'set';
+        return $user;
+    }
+
+    /**
      * ورود با شماره موبایل و رمز عبور.
      * برای سازگاری، ایمیل هم پذیرفته می‌شود.
      */

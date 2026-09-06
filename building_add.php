@@ -4,7 +4,7 @@ require_once 'includes/api_helper.php';
 
 // اگر کاربر لاگین نیست، به صفحه ورود هدایت شود
 if (!isset($_SESSION['token']) || empty($_SESSION['token'])) {
-    header("Location: login.php");
+    header("Location: auth.php");
     exit;
 }
 
@@ -72,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             if (isset($response['http_code']) && $response['http_code'] == 401) {
                 session_destroy();
-                header("Location: login.php");
+                header("Location: auth.php");
                 exit;
             }
             $alert_message = $response['message'] ?? 'خطا در ثبت ساختمان. لطفاً دوباره تلاش کنید.';

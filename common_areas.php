@@ -3,7 +3,7 @@ require_once 'includes/api_helper.php';
 
 // بررسی لاگین
 if (!isset($_SESSION['token']) || empty($_SESSION['token'])) {
-    header("Location: login.php");
+    header("Location: auth.php");
     exit;
 }
 
