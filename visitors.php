@@ -145,6 +145,7 @@ require_once 'includes/header.php';
                         <div class="card-actions">
                             <?php if (!$exited): ?>
                                 <form method="POST" action="" style="display:inline;">
+                                    <?= csrf_field() ?>
                                     <input type="hidden" name="form_action" value="checkout">
                                     <input type="hidden" name="visitor_id" value="<?= $v_id ?>">
                                     <button type="submit" class="btn-chip btn-chip-success">ثبت خروج</button>
@@ -160,6 +161,7 @@ require_once 'includes/header.php';
                                 ویرایش
                             </button>
                             <form method="POST" action="" data-confirm="این مهمان حذف شود؟" style="display:inline;">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="delete">
                                 <input type="hidden" name="visitor_id" value="<?= $v_id ?>">
                                 <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
@@ -175,6 +177,7 @@ require_once 'includes/header.php';
 
 <?php modal_start('add-visitor', 'ثبت مهمان جدید', 'اطلاعات مهمان و زمان مراجعه'); ?>
     <form method="POST" action="" class="space-y-4" data-loading>
+        <?= csrf_field() ?>
         <input type="hidden" name="form_action" value="create">
         <?php include 'includes/_visitor_form_fields.php'; ?>
         <button type="submit" class="btn-primary">ثبت مهمان</button>
@@ -183,6 +186,7 @@ require_once 'includes/header.php';
 
 <?php modal_start('edit-visitor', 'ویرایش مهمان', 'اصلاح اطلاعات مهمان'); ?>
     <form method="POST" action="" class="space-y-4" data-loading>
+        <?= csrf_field() ?>
         <input type="hidden" name="form_action" value="update">
         <input type="hidden" name="visitor_id" value="">
         <?php include 'includes/_visitor_form_fields.php'; ?>

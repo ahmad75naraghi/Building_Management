@@ -74,6 +74,7 @@ require_once 'includes/header.php';
                 ویرایش مشخصات
             </h3>
             <form method="POST" action="" class="space-y-4">
+                <?= csrf_field() ?>
                 <input type="hidden" name="form_action" value="update_profile">
                 <div>
                     <label for="name" class="form-label">نام و نام خانوادگی *</label>

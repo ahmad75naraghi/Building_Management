@@ -196,6 +196,7 @@ require_once 'includes/header.php';
 
                             <?php if ($is_manager): ?>
                                 <form method="POST" action="" style="display:flex;gap:6px;align-items:center;flex:1;min-width:180px;">
+                                    <?= csrf_field() ?>
                                     <input type="hidden" name="form_action" value="update_status">
                                     <input type="hidden" name="booking_id" value="<?= $b_id ?>">
                                     <select name="status" class="form-input" style="padding:7px 10px;font-size:11.5px;flex:1;">
@@ -209,6 +210,7 @@ require_once 'includes/header.php';
                             <?php endif; ?>
 
                             <form method="POST" action="" data-confirm="این رزرو حذف شود؟" style="display:inline;">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="delete">
                                 <input type="hidden" name="booking_id" value="<?= $b_id ?>">
                                 <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
@@ -225,6 +227,7 @@ require_once 'includes/header.php';
 <?php if (!empty($common_areas)): ?>
     <?php modal_start('add-booking', 'ثبت رزرو جدید', 'فضای مشاع، تاریخ و ساعت'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="create">
             <?php include 'includes/_booking_form_fields.php'; ?>
             <button type="submit" class="btn-primary">ثبت رزرو</button>
@@ -233,6 +236,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('edit-booking', 'ویرایش رزرو', 'اصلاح تاریخ یا ساعت رزرو'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="update">
             <input type="hidden" name="booking_id" value="">
             <?php include 'includes/_booking_form_fields.php'; ?>

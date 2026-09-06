@@ -110,6 +110,7 @@ require_once 'includes/page_head.php';
     <div class="card p-4 mt-4">
         <h3 class="text-sm font-bold text-gray-700 mb-3">تغییر وضعیت تیکت</h3>
         <form method="POST" action="" class="flex gap-2">
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="update_status">
             <select name="status" class="form-input flex-1">
                 <option value="open" <?= ($ticket['status'] ?? '') === 'open' ? 'selected' : '' ?>>باز</option>
@@ -156,6 +157,7 @@ require_once 'includes/page_head.php';
     <div class="card p-5 mt-6">
         <h3 class="font-bold text-gray-800 mb-4">افزودن کامنت</h3>
         <form method="POST" action="" class="space-y-4">
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="add_comment">
             <div>
                 <textarea id="comment" name="comment" rows="3" required class="form-input" placeholder="پاسخ یا پیگیری خود را بنویسید..."></textarea>

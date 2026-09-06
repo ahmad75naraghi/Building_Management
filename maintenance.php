@@ -168,6 +168,7 @@ require_once 'includes/header.php';
 
                             <?php if ($is_manager): ?>
                                 <form method="POST" action="" style="display:flex;gap:6px;align-items:center;flex:1;min-width:180px;">
+                                    <?= csrf_field() ?>
                                     <input type="hidden" name="form_action" value="update_status">
                                     <input type="hidden" name="request_id" value="<?= $r_id ?>">
                                     <select name="status" class="form-input" style="padding:7px 10px;font-size:11.5px;flex:1;">
@@ -181,6 +182,7 @@ require_once 'includes/header.php';
                             <?php endif; ?>
 
                             <form method="POST" action="" data-confirm="این درخواست حذف شود؟" style="display:inline;">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="delete">
                                 <input type="hidden" name="request_id" value="<?= $r_id ?>">
                                 <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
@@ -196,6 +198,7 @@ require_once 'includes/header.php';
 
 <?php modal_start('add-maintenance', 'ثبت درخواست تعمیرات', 'مشکل را برای مدیر ساختمان گزارش کنید'); ?>
     <form method="POST" action="" class="space-y-4" data-loading>
+        <?= csrf_field() ?>
         <input type="hidden" name="form_action" value="create">
         <div>
             <label for="add_m_title" class="form-label">عنوان مشکل *</label>
@@ -211,6 +214,7 @@ require_once 'includes/header.php';
 
 <?php modal_start('edit-maintenance', 'ویرایش درخواست', 'اصلاح عنوان یا توضیحات'); ?>
     <form method="POST" action="" class="space-y-4" data-loading>
+        <?= csrf_field() ?>
         <input type="hidden" name="form_action" value="update">
         <input type="hidden" name="request_id" value="">
         <div>

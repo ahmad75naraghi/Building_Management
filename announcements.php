@@ -151,6 +151,7 @@ require_once 'includes/header.php';
                                 ویرایش
                             </button>
                             <form method="POST" action="" data-confirm="این اطلاعیه حذف شود؟" style="display:inline;">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="delete">
                                 <input type="hidden" name="item_id" value="<?= $a_id ?>">
                                 <button type="submit" class="btn-chip btn-chip-danger">
@@ -174,6 +175,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('add-announcement', 'ثبت اطلاعیه جدید', 'برای همه ساکنین ارسال می‌شود'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="create">
             <div>
                 <label for="add_title" class="form-label">عنوان *</label>
@@ -193,6 +195,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('edit-announcement', 'ویرایش اطلاعیه', 'تغییرات برای همه ساکنین دیده می‌شود'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="update">
             <input type="hidden" name="item_id" value="">
             <div>

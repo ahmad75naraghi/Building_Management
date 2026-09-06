@@ -141,6 +141,7 @@ require_once 'includes/header.php';
                                 ویرایش
                             </button>
                             <form method="POST" action="" data-confirm="این سند حذف شود؟" style="display:inline;">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="delete">
                                 <input type="hidden" name="item_id" value="<?= $d_id ?>">
                                 <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
@@ -157,6 +158,7 @@ require_once 'includes/header.php';
 <?php if ($is_manager): ?>
     <?php modal_start('add-document', 'افزودن سند جدید', 'عنوان، نوع و لینک فایل'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="create">
             <?php include 'includes/_document_form_fields.php'; ?>
             <button type="submit" class="btn-primary">ثبت سند</button>
@@ -165,6 +167,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('edit-document', 'ویرایش سند', 'اصلاح اطلاعات سند'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="update">
             <input type="hidden" name="item_id" value="">
             <?php include 'includes/_document_form_fields.php'; ?>

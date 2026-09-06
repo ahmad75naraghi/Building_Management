@@ -196,6 +196,7 @@ require_once 'includes/header.php';
                                 صورت‌جلسه
                             </button>
                             <form method="POST" action="" style="display:flex;gap:6px;align-items:center;flex:1;min-width:170px;">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="update_status">
                                 <input type="hidden" name="meeting_id" value="<?= $m_id ?>">
                                 <select name="status" class="form-input" style="padding:7px 10px;font-size:11.5px;flex:1;">
@@ -206,6 +207,7 @@ require_once 'includes/header.php';
                                 <button type="submit" class="btn-chip btn-chip-neutral">ثبت</button>
                             </form>
                             <form method="POST" action="" data-confirm="این جلسه حذف شود؟" style="display:inline;">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="delete">
                                 <input type="hidden" name="meeting_id" value="<?= $m_id ?>">
                                 <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
@@ -222,6 +224,7 @@ require_once 'includes/header.php';
 <?php if ($is_manager): ?>
     <?php modal_start('add-meeting', 'ثبت جلسه جدید', 'عنوان، زمان و محل برگزاری'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="create">
             <?php include 'includes/_meeting_form_fields.php'; ?>
             <button type="submit" class="btn-primary">ثبت جلسه</button>
@@ -230,6 +233,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('edit-meeting', 'ویرایش جلسه', 'اصلاح اطلاعات جلسه'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="update">
             <input type="hidden" name="meeting_id" value="">
             <?php include 'includes/_meeting_form_fields.php'; ?>
@@ -239,6 +243,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('add-minutes', 'ثبت صورت‌جلسه', 'خلاصه تصمیمات این جلسه'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="add_minutes">
             <input type="hidden" name="meeting_id" value="">
             <div>

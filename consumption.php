@@ -182,6 +182,7 @@ require_once 'includes/header.php';
                                 ویرایش
                             </button>
                             <form method="POST" action="" data-confirm="این قرائت حذف شود؟" style="display:inline;">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="delete">
                                 <input type="hidden" name="item_id" value="<?= $r_id ?>">
                                 <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
@@ -197,6 +198,7 @@ require_once 'includes/header.php';
 
 <?php modal_start('add-reading', 'ثبت قرائت کنتور', 'نوع مصرف، واحد و مقدار'); ?>
     <form method="POST" action="" class="space-y-4" data-loading>
+        <?= csrf_field() ?>
         <input type="hidden" name="form_action" value="create">
         <?php include 'includes/_consumption_form_fields.php'; ?>
         <button type="submit" class="btn-primary">ثبت قرائت</button>
@@ -205,6 +207,7 @@ require_once 'includes/header.php';
 
 <?php modal_start('edit-reading', 'ویرایش قرائت', 'اصلاح مقدار یا تاریخ قرائت'); ?>
     <form method="POST" action="" class="space-y-4" data-loading>
+        <?= csrf_field() ?>
         <input type="hidden" name="form_action" value="update">
         <input type="hidden" name="item_id" value="">
         <?php include 'includes/_consumption_form_fields.php'; ?>

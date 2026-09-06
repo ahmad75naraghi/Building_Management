@@ -93,6 +93,7 @@ require_once 'includes/page_head.php';
             <?php endif; ?>
 
             <form method="POST" action="" data-confirm="آیا این دعوت‌نامه را می‌پذیرید؟">
+                <?= csrf_field() ?>
                 <input type="hidden" name="form_action" value="accept_invite">
                 <input type="hidden" name="token" value="<?= htmlspecialchars($token) ?>">
                 <button type="submit" class="btn-primary w-full">

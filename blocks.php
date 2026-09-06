@@ -135,6 +135,7 @@ require_once 'includes/header.php';
                                 ویرایش
                             </button>
                             <form method="POST" action="?building_id=<?= $building_id ?>" data-confirm="این بلوک حذف شود؟ طبقات و واحدهای مرتبط بدون بلوک می‌شوند." style="display:inline;">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="delete">
                                 <input type="hidden" name="block_id" value="<?= $bl_id ?>">
                                 <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
@@ -151,6 +152,7 @@ require_once 'includes/header.php';
 <?php if ($is_manager): ?>
     <?php modal_start('add-block', 'ثبت بلوک جدید', 'نام و توضیح بلوک'); ?>
         <form method="POST" action="?building_id=<?= $building_id ?>" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="create">
             <div>
                 <label class="form-label">نام بلوک *</label>
@@ -166,6 +168,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('edit-block', 'ویرایش بلوک', 'اصلاح نام یا توضیح'); ?>
         <form method="POST" action="?building_id=<?= $building_id ?>" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="update">
             <input type="hidden" name="block_id" value="">
             <div>

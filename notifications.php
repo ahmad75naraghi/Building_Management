@@ -65,6 +65,7 @@ require_once 'includes/page_head.php';
                     </div>
                     <?php if (empty($notification['is_read'])): ?>
                         <form method="POST" action="" class="mt-3">
+                            <?= csrf_field() ?>
                             <input type="hidden" name="form_action" value="mark_read">
                             <input type="hidden" name="notification_id" value="<?= (int) $notification['id'] ?>">
                             <button type="submit" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-bold py-2.5 rounded-xl transition-all">

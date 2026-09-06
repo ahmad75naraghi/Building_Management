@@ -121,6 +121,7 @@ require_once 'includes/header.php';
 
 <?php modal_start('add-ticket', 'ثبت تیکت جدید', 'درخواست یا شکایت خود را ثبت کنید'); ?>
     <form method="POST" action="" class="space-y-4" data-loading>
+        <?= csrf_field() ?>
         <input type="hidden" name="form_action" value="create">
         <div>
             <label class="form-label">عنوان *</label>

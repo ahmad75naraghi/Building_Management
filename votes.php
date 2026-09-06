@@ -183,6 +183,7 @@ require_once 'includes/header.php';
                     <?php if ($can_vote): ?>
                         <!-- فرم رأی دادن -->
                         <form method="POST" action="" class="mt-3 space-y-2">
+                            <?= csrf_field() ?>
                             <input type="hidden" name="form_action" value="cast_vote">
                             <input type="hidden" name="vote_id" value="<?= (int) $vote['id'] ?>">
                             <?php foreach ($options as $opt): ?>
@@ -241,6 +242,7 @@ require_once 'includes/header.php';
                                 ویرایش
                             </button>
                             <form method="POST" action="" style="display:inline;">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="update_status">
                                 <input type="hidden" name="vote_id" value="<?= (int) $vote['id'] ?>">
                                 <input type="hidden" name="status" value="<?= $is_active ? 'closed' : 'active' ?>">
@@ -249,6 +251,7 @@ require_once 'includes/header.php';
                                 </button>
                             </form>
                             <form method="POST" action="" data-confirm="این رأی‌گیری برای همیشه حذف شود؟" style="display:inline;">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="delete">
                                 <input type="hidden" name="vote_id" value="<?= (int) $vote['id'] ?>">
                                 <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
@@ -266,6 +269,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('add-vote', 'ایجاد رأی‌گیری جدید', 'عنوان، گزینه‌ها و بازه زمانی'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="create">
             <div>
                 <label class="form-label">عنوان رأی‌گیری *</label>
@@ -302,6 +306,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('edit-vote', 'ویرایش رأی‌گیری', 'گزینه‌ها پس از ایجاد قابل تغییر نیستند'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="update">
             <input type="hidden" name="vote_id" value="">
             <div>

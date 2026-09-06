@@ -57,6 +57,7 @@ require_once 'includes/page_head.php';
         <?php endif; ?>
 
         <form method="POST" action="" class="space-y-4">
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="change_password">
             <div>
                 <label for="current_password" class="form-label">رمز عبور فعلی *</label>

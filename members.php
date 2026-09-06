@@ -202,6 +202,7 @@ require_once 'includes/header.php';
                                 کپی لینک
                             </button>
                             <form method="POST" action="" style="display:contents;">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="resend_sms">
                                 <input type="hidden" name="invitation_id" value="<?= (int) ($inv['id'] ?? 0) ?>">
                                 <button type="submit" class="text-xs bg-green-50 hover:bg-green-100 text-green-700 font-bold px-3 py-2 rounded-lg transition-colors">
@@ -242,6 +243,7 @@ require_once 'includes/header.php';
 <?php if ($is_manager): ?>
     <?php modal_start('invite-member', 'ارسال دعوت‌نامه', 'لینک دعوت با پیامک ارسال می‌شود'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="invite">
             <div>
                 <label class="form-label">نام و نام خانوادگی *</label>

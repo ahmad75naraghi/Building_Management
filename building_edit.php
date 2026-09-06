@@ -88,6 +88,7 @@ require_once 'includes/page_head.php';
             ویرایش اطلاعات ساختمان
         </h3>
         <form method="POST" action="" class="space-y-4">
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="update">
             <div>
                 <label for="name" class="form-label">نام ساختمان *</label>
@@ -213,6 +214,7 @@ require_once 'includes/page_head.php';
         <h3 class="font-bold text-red-600 mb-2">حذف ساختمان</h3>
         <p class="text-xs text-gray-500 mb-4">با حذف ساختمان، دسترسی شما به آن برای همیشه از بین می‌رود. این عملیات قابل بازگشت نیست.</p>
         <form method="POST" action="building_delete.php" data-confirm="آیا مطمئن هستید؟ این ساختمان و تمام داده‌های آن حذف می‌شود.">
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="delete">
             <input type="hidden" name="id" value="<?= $building_id ?>">
             <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2.5 rounded-xl transition-all active:scale-[0.98]">

@@ -167,6 +167,7 @@ require_once 'includes/header.php';
                                 </button>
                             <?php endif; ?>
                             <form method="POST" action="" data-confirm="این نظر حذف شود؟" style="display:inline;">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="delete">
                                 <input type="hidden" name="item_id" value="<?= $rv_id ?>">
                                 <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
@@ -182,6 +183,7 @@ require_once 'includes/header.php';
 
 <?php modal_start('add-review', 'ثبت نظر جدید', 'امتیاز و بازخورد شما درباره مدیریت'); ?>
     <form method="POST" action="" class="space-y-4" data-loading>
+        <?= csrf_field() ?>
         <input type="hidden" name="form_action" value="create">
         <?php $modal_uid = 'add'; include 'includes/_review_form_fields.php'; ?>
         <button type="submit" class="btn-primary">ثبت نظر</button>
@@ -190,6 +192,7 @@ require_once 'includes/header.php';
 
 <?php modal_start('edit-review', 'ویرایش نظر', 'اصلاح امتیاز یا متن نظر'); ?>
     <form method="POST" action="" class="space-y-4" data-loading>
+        <?= csrf_field() ?>
         <input type="hidden" name="form_action" value="update">
         <input type="hidden" name="item_id" value="">
         <?php $modal_uid = 'edit'; include 'includes/_review_form_fields.php'; ?>

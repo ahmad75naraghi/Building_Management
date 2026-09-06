@@ -296,6 +296,7 @@ $step_index = ['phone' => 1, 'password' => 2, 'otp' => 2, 'name' => 3, 'setpass'
         <?php /* ---------------- گام ۱: شماره موبایل ---------------- */ ?>
         <?php if ($step === 'phone'): ?>
             <form method="POST" action="" class="auth-form" id="authForm">
+                <?= csrf_field() ?>
                 <input type="hidden" name="form_action" value="check_phone">
                 <input type="hidden" name="redirect" value="<?= htmlspecialchars($redirect) ?>">
                 <div>
@@ -313,6 +314,7 @@ $step_index = ['phone' => 1, 'password' => 2, 'otp' => 2, 'name' => 3, 'setpass'
             <div class="auth-phone-badge">
                 <span dir="ltr"><?= fa_digits($phone) ?></span>
                 <form method="POST" action="" style="display:inline;">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="form_action" value="restart">
                     <input type="hidden" name="redirect" value="<?= htmlspecialchars($redirect) ?>">
                     <button type="submit" class="auth-link-btn">تغییر</button>
@@ -320,6 +322,7 @@ $step_index = ['phone' => 1, 'password' => 2, 'otp' => 2, 'name' => 3, 'setpass'
             </div>
 
             <form method="POST" action="" class="auth-form" id="authForm">
+                <?= csrf_field() ?>
                 <input type="hidden" name="form_action" value="login_password">
                 <input type="hidden" name="redirect" value="<?= htmlspecialchars($redirect) ?>">
                 <div>
@@ -331,6 +334,7 @@ $step_index = ['phone' => 1, 'password' => 2, 'otp' => 2, 'name' => 3, 'setpass'
             </form>
 
             <form method="POST" action="" class="auth-secondary">
+                <?= csrf_field() ?>
                 <input type="hidden" name="form_action" value="resend_otp">
                 <input type="hidden" name="redirect" value="<?= htmlspecialchars($redirect) ?>">
                 <button type="submit" class="auth-link-btn">رمز عبور را فراموش کرده‌ام — ورود با کد پیامکی</button>
@@ -341,6 +345,7 @@ $step_index = ['phone' => 1, 'password' => 2, 'otp' => 2, 'name' => 3, 'setpass'
             <div class="auth-phone-badge">
                 <span dir="ltr"><?= $masked_phone ?></span>
                 <form method="POST" action="" style="display:inline;">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="form_action" value="restart">
                     <input type="hidden" name="redirect" value="<?= htmlspecialchars($redirect) ?>">
                     <button type="submit" class="auth-link-btn">تغییر شماره</button>
@@ -348,6 +353,7 @@ $step_index = ['phone' => 1, 'password' => 2, 'otp' => 2, 'name' => 3, 'setpass'
             </div>
 
             <form method="POST" action="" class="auth-form" id="authForm">
+                <?= csrf_field() ?>
                 <input type="hidden" name="form_action" value="verify_otp">
                 <input type="hidden" name="redirect" value="<?= htmlspecialchars($redirect) ?>">
                 <div>
@@ -360,6 +366,7 @@ $step_index = ['phone' => 1, 'password' => 2, 'otp' => 2, 'name' => 3, 'setpass'
             </form>
 
             <form method="POST" action="" class="auth-secondary">
+                <?= csrf_field() ?>
                 <input type="hidden" name="form_action" value="resend_otp">
                 <input type="hidden" name="redirect" value="<?= htmlspecialchars($redirect) ?>">
                 <button type="submit" class="auth-link-btn" id="resendBtn" <?= $resend_in > 0 ? 'disabled' : '' ?>
@@ -371,6 +378,7 @@ $step_index = ['phone' => 1, 'password' => 2, 'otp' => 2, 'name' => 3, 'setpass'
         <?php /* ---------------- گام ۳: نام و نام خانوادگی ---------------- */ ?>
         <?php elseif ($step === 'name'): ?>
             <form method="POST" action="" class="auth-form" id="authForm">
+                <?= csrf_field() ?>
                 <input type="hidden" name="form_action" value="complete_name">
                 <input type="hidden" name="redirect" value="<?= htmlspecialchars($redirect) ?>">
                 <div>
@@ -385,6 +393,7 @@ $step_index = ['phone' => 1, 'password' => 2, 'otp' => 2, 'name' => 3, 'setpass'
         <?php /* ---------------- گام ۴: تعیین رمز عبور ---------------- */ ?>
         <?php elseif ($step === 'setpass'): ?>
             <form method="POST" action="" class="auth-form" id="authForm">
+                <?= csrf_field() ?>
                 <input type="hidden" name="form_action" value="set_password">
                 <input type="hidden" name="redirect" value="<?= htmlspecialchars($redirect) ?>">
                 <div>

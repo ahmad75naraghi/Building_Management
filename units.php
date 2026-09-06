@@ -235,6 +235,7 @@ require_once 'includes/header.php';
                                 ویرایش
                             </button>
                             <form method="POST" action="?building_id=<?= $building_id ?>" data-confirm="واحد حذف شود؟ این عمل قابل بازگشت نیست." style="display:inline;">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="delete">
                                 <input type="hidden" name="unit_id" value="<?= $u_id ?>">
                                 <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
@@ -252,6 +253,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('add-unit', 'افزودن واحد جدید', 'مشخصات واحد و ساکنین'); ?>
         <form method="POST" action="?building_id=<?= $building_id ?>" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="create">
             <?php include 'includes/_unit_form_fields.php'; ?>
             <button type="submit" class="btn-primary">ذخیره واحد</button>
@@ -260,6 +262,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('edit-unit', 'ویرایش واحد', 'مشخصات، ساکنین و شارژ'); ?>
         <form method="POST" action="?building_id=<?= $building_id ?>" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="update">
             <input type="hidden" name="unit_id" value="">
             <?php include 'includes/_unit_form_fields.php'; ?>

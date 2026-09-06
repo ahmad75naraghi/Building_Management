@@ -211,6 +211,7 @@ require_once 'includes/header.php';
                                 ویرایش
                             </button>
                             <form method="POST" action="" data-confirm="این مخاطب حذف شود؟" style="display:inline;">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="delete">
                                 <input type="hidden" name="item_id" value="<?= $c_id ?>">
                                 <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
@@ -227,6 +228,7 @@ require_once 'includes/header.php';
 <?php if ($is_manager): ?>
     <?php modal_start('add-contact', 'افزودن مخاطب اضطراری', 'نام، نقش و شماره تماس'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="create">
             <?php include 'includes/_contact_form_fields.php'; ?>
             <button type="submit" class="btn-primary">ثبت مخاطب</button>
@@ -235,6 +237,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('edit-contact', 'ویرایش مخاطب', 'اصلاح اطلاعات تماس'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="update">
             <input type="hidden" name="item_id" value="">
             <?php include 'includes/_contact_form_fields.php'; ?>
@@ -244,6 +247,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('send-alert', 'ارسال هشدار اضطراری', 'پیام برای همه ساکنین ارسال می‌شود'); ?>
         <form method="POST" action="" class="space-y-4" data-confirm="هشدار اضطراری برای همه ساکنین ارسال شود؟" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="send_alert">
             <div>
                 <label class="form-label">نوع هشدار</label>

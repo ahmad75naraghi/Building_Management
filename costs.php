@@ -302,6 +302,7 @@ require_once 'includes/header.php';
             <?php endif; ?>
 
             <form method="POST" action="" style="margin-top:12px;">
+                <?= csrf_field() ?>
                 <input type="hidden" name="form_action" value="create_monthly">
                 <button type="submit" class="btn-chip btn-chip-success" style="width:100%;justify-content:center;padding:10px;">
                     ثبت شارژ ماه جاری (<?= fa_digits(date('Y-m')) ?>)
@@ -394,6 +395,7 @@ require_once 'includes/header.php';
                                 ویرایش
                             </button>
                             <form method="POST" action="" data-confirm="این هزینه حذف شود؟" style="display:inline;">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="delete_cost">
                                 <input type="hidden" name="cost_id" value="<?= $c_id ?>">
                                 <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
@@ -442,6 +444,7 @@ require_once 'includes/header.php';
 
                     <?php if ((int) ($payment['user_id'] ?? 0) === $current_user_id && ($payment['status'] ?? '') !== 'confirmed'): ?>
                         <form method="POST" action="" enctype="multipart/form-data" class="card-actions" style="flex-wrap:wrap;gap:8px;">
+                            <?= csrf_field() ?>
                             <input type="hidden" name="form_action" value="upload_receipt">
                             <input type="hidden" name="payment_id" value="<?= $p_id ?>">
                             <input type="file" name="receipt" accept=".jpg,.jpeg,.png,.webp,.pdf" required
@@ -452,6 +455,7 @@ require_once 'includes/header.php';
 
                     <?php if ($is_manager && ($payment['status'] ?? '') !== 'confirmed'): ?>
                         <form method="POST" action="" class="card-actions">
+                            <?= csrf_field() ?>
                             <input type="hidden" name="form_action" value="confirm_payment">
                             <input type="hidden" name="payment_id" value="<?= $p_id ?>">
                             <button type="submit" class="btn-chip btn-chip-success" style="width:100%;justify-content:center;">تأیید پرداخت</button>
@@ -468,6 +472,7 @@ require_once 'includes/header.php';
 
 <?php modal_start('pay-cost', 'پرداخت شارژ', 'پس از ثبت، رسید را آپلود کنید'); ?>
     <form method="POST" action="" class="space-y-4" data-loading>
+        <?= csrf_field() ?>
         <input type="hidden" name="form_action" value="submit_payment">
         <input type="hidden" name="cost_id" value="">
         <div>
@@ -487,6 +492,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('charge-settings', 'تنظیم شارژ ماهیانه', 'ثابت، بر اساس نفرات، یا دلخواه'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="save_charge_settings">
 
             <div>
@@ -546,6 +552,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('add-cost', 'ثبت هزینه جدید', 'هزینه یا شارژ موردی'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="create_cost">
             <?php include 'includes/_cost_form_fields.php'; ?>
             <button type="submit" class="btn-primary">ثبت هزینه</button>
@@ -554,6 +561,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('edit-cost', 'ویرایش هزینه', 'تغییر عنوان، مبلغ و مهلت'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="update_cost">
             <input type="hidden" name="cost_id" value="">
             <?php include 'includes/_cost_form_fields.php'; ?>
@@ -563,6 +571,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('penalty-settings', 'جریمه دیرکرد', 'به‌ازای تأخیر از مهلت پرداخت'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="create_penalty_setting">
             <div>
                 <label for="penalty_type" class="form-label">نوع جریمه</label>

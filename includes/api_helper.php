@@ -13,6 +13,80 @@ if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
     session_start();
 }
 
+/**
+ * ==================== محافظت CSRF ====================
+ *
+ * هر درخواست POST باید توکن معتبر جلسه را همراه داشته باشد، وگرنه رد می‌شود.
+ * توکن یک‌بار برای هر جلسه ساخته می‌شود و با csrf_field() داخل فرم‌ها می‌آید.
+ *
+ * برای فرم‌های نوشته‌شده با دست، فقط کافی است csrf_field() را صدا بزنید:
+ *     <form method="POST"> <?= csrf_field() ?> ... </form>
+ */
+
+/** توکن CSRF جلسه جاری (در صورت نبود ساخته می‌شود) */
+function csrf_token()
+{
+    if (empty($_SESSION['csrf_token'])) {
+        try {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        } catch (Throwable $e) {
+            $_SESSION['csrf_token'] = hash('sha256', uniqid('csrf', true) . microtime(true));
+        }
+    }
+    return $_SESSION['csrf_token'];
+}
+
+/** ورودی مخفی آماده برای درج در فرم */
+function csrf_field()
+{
+    return '<input type="hidden" name="_csrf" value="' . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') . '">';
+}
+
+/** آیا توکن ارسالی با توکن جلسه یکی است؟ */
+function csrf_verify($token)
+{
+    $expected = $_SESSION['csrf_token'] ?? '';
+    return is_string($token) && $expected !== '' && hash_equals($expected, $token);
+}
+
+/**
+ * اعتبارسنجی خودکار همه درخواست‌های POST.
+ *
+ * صفحاتی که پیش از ساخته‌شدن جلسه اجرا می‌شوند (مثل خود auth.php در گام اول)
+ * هم پوشش داده می‌شوند، چون توکن به جلسه گره خورده نه به ورود کاربر.
+ */
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && PHP_SAPI !== 'cli') {
+    $__csrf_sent = $_POST['_csrf'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+
+    if (!csrf_verify($__csrf_sent)) {
+        Logger::warning('csrf', 'درخواست POST بدون توکن معتبر رد شد', [
+            'script' => basename((string) ($_SERVER['SCRIPT_NAME'] ?? '')),
+            'form_action' => $_POST['form_action'] ?? null,
+            'has_token' => $__csrf_sent !== '',
+        ]);
+
+        // توکن تازه بساز تا کاربر بتواند دوباره تلاش کند
+        unset($_SESSION['csrf_token']);
+        csrf_token();
+
+        http_response_code(419);
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8">'
+           . '<meta name="viewport" content="width=device-width, initial-scale=1">'
+           . '<title>نشست منقضی شد</title>'
+           . '<link rel="stylesheet" href="assets/css/style.css"></head><body>'
+           . '<div style="max-width:420px;margin:15vh auto;padding:24px;text-align:center;'
+           . 'font-family:Vazirmatn,Tahoma,sans-serif;line-height:2">'
+           . '<h2 style="margin-bottom:12px">نشست شما منقضی شده است</h2>'
+           . '<p style="color:#555;margin-bottom:20px">برای امنیت حساب شما این درخواست انجام نشد. '
+           . 'لطفاً به صفحه قبل برگردید و دوباره تلاش کنید.</p>'
+           . '<a href="javascript:history.back()" style="display:inline-block;padding:10px 22px;'
+           . 'background:#2563eb;color:#fff;border-radius:10px;text-decoration:none">بازگشت</a>'
+           . '</div></body></html>';
+        exit;
+    }
+}
+
 // آدرس دقیق API — در حالت عادی همان سرور اصلی است.
 // برای اجرای محلی می‌توانید بدون دست‌زدن به این فایل، متغیر محیطی API_BASE_URL را تنظیم کنید:
 //   API_BASE_URL=http://localhost:8000/b/api php -S localhost:8080
@@ -33,6 +107,25 @@ if (!empty($_SESSION['auth_pending']) && !empty($_SESSION['token'])) {
         header('Location: auth.php');
         exit;
     }
+}
+
+/**
+ * تنظیم بررسی گواهی SSL روی یک هندل cURL.
+ *
+ * پیش‌فرض: بررسی کامل گواهی (امن). غیرفعال‌سازی فقط با تنظیم صریح
+ * متغیر محیطی API_INSECURE_SSL=1 ممکن است و در محیط تولید نادیده گرفته می‌شود.
+ */
+function api_apply_ssl_options($curl)
+{
+    $insecure = getenv('API_INSECURE_SSL') === '1';
+
+    if ($insecure && \App\Config\AppConfig::isProduction()) {
+        Logger::warning('callAPI', 'API_INSECURE_SSL در محیط تولید نادیده گرفته شد');
+        $insecure = false;
+    }
+
+    curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, $insecure ? 0 : 2);
+    curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, $insecure ? 0 : true);
 }
 
 function callAPI($method, $endpoint, $data = false) {
@@ -74,9 +167,9 @@ function callAPI($method, $endpoint, $data = false) {
     curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
     
-    // غیرفعال کردن موقت سخت‌گیری SSL برای ارتباط درون‌سروری
-    curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 0);
-    curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, 0);
+    // بررسی گواهی SSL به‌صورت پیش‌فرض فعال است.
+    // فقط برای توسعه محلی با گواهی خودامضا می‌توان API_INSECURE_SSL=1 گذاشت.
+    api_apply_ssl_options($curl);
     
     $started = microtime(true);
     $result = curl_exec($curl);
@@ -176,9 +269,9 @@ function callAPIUpload($endpoint, $fields = [], $files = [])
     curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
 
-    // غیرفعال کردن موقت سخت‌گیری SSL برای ارتباط درون‌سروری
-    curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 0);
-    curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, 0);
+    // بررسی گواهی SSL به‌صورت پیش‌فرض فعال است.
+    // فقط برای توسعه محلی با گواهی خودامضا می‌توان API_INSECURE_SSL=1 گذاشت.
+    api_apply_ssl_options($curl);
 
     $result = curl_exec($curl);
     $http_status = curl_getinfo($curl, CURLINFO_HTTP_CODE);

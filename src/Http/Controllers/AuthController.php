@@ -10,6 +10,8 @@ use App\Utilities\JwtHelper;
 use App\Utilities\Validator;
 use App\Exceptions\ValidationException;
 use App\Services\OtpService;
+use App\Core\Logger;
+use App\Services\RateLimiter;
 use App\Services\UserService;
 
 final class AuthController
@@ -75,14 +77,40 @@ final class AuthController
             ]);
         }
 
+        // جلوگیری از حمله جست‌وجوی فراگیر روی رمز عبور
+        $limiter = new RateLimiter();
+        $rateKey = RateLimiter::loginKey($username);
+        if ($limiter->tooManyAttempts($rateKey, RateLimiter::LOGIN_MAX_ATTEMPTS, RateLimiter::LOGIN_DECAY_SECONDS)) {
+            $wait = $limiter->availableIn($rateKey, RateLimiter::LOGIN_DECAY_SECONDS);
+            Logger::warning('AuthController', 'ورود به دلیل تلاش‌های مکرر مسدود شد', [
+                'phone' => $username,
+                'retry_after' => $wait,
+            ]);
+            return (new Response())->setStatusCode(429)->setJson([
+                'success' => false,
+                'message' => 'تلاش‌های ناموفق زیاد بود. لطفاً ' . max(1, (int) ceil($wait / 60)) . ' دقیقه دیگر تلاش کنید.',
+                'data' => ['retry_after' => $wait],
+            ]);
+        }
+
         $userService = new UserService();
         $user = $userService->authenticate($username, (string) ($data['password'] ?? ''));
         if (!$user) {
+            $limiter->hit($rateKey, RateLimiter::LOGIN_DECAY_SECONDS);
+            $left = RateLimiter::LOGIN_MAX_ATTEMPTS
+                - $limiter->attempts($rateKey, RateLimiter::LOGIN_DECAY_SECONDS);
+            Logger::info('AuthController', 'ورود ناموفق با رمز عبور', [
+                'phone' => $username,
+                'attempts_left' => max(0, $left),
+            ]);
             return (new Response())->setStatusCode(401)->setJson([
                 'success' => false,
                 'message' => 'شماره موبایل یا رمز عبور اشتباه است.',
             ]);
         }
+
+        // ورود موفق: سابقه تلاش‌ها پاک می‌شود
+        $limiter->clear($rateKey);
 
         $token = JwtHelper::generate([
             'sub' => $user->id,
