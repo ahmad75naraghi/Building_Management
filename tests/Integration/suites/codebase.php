@@ -175,6 +175,21 @@ TestLog::run('ارجاع مودال‌ها به تعریفشان می‌خورد
     TestLog::assertSame('هر دکمه مودال، مودال متناظر دارد', [], $bad);
 });
 
+TestLog::run('مایگریتور به پوشه درست مایگریشن‌ها اشاره می‌کند', function () use ($root) {
+    $src = (string) file_get_contents($root . '/scripts/migrator.php');
+    // باید پوشه‌ای را بخواند که واقعاً وجود دارد
+    TestLog::assertTrue('به database/migrations اشاره می‌کند',
+        str_contains($src, "database/migrations"),
+        'مسیر اشتباه باعث می‌شود هیچ مایگریشنی اجرا نشود');
+    TestLog::assertTrue('مسیر اشتباه scripts/migrations استفاده نشده',
+        !preg_match('#__DIR__\s*\.\s*[\'"]/migrations#', $src));
+
+    // پوشه‌ای که واقعاً glob می‌شود باید موجود و ناخالی باشد
+    $dir = $root . '/database/migrations';
+    TestLog::assertTrue('پوشه مایگریشن‌ها موجود است', is_dir($dir));
+    TestLog::assertTrue('حداقل یک مایگریشن پیدا می‌شود', count(glob($dir . '/*.php') ?: []) > 0);
+});
+
 TestLog::run('مایگریشن‌ها شماره تکراری ندارند', function () use ($root) {
     $nums = [];
     foreach (glob($root . '/database/migrations/*.php') ?: [] as $f) {
