@@ -100,6 +100,7 @@ require_once 'includes/header.php';
                 <p class="text-xs text-gray-500 mb-4">فیلدهای ستاره‌دار اجباری هستند.</p>
 
                 <form method="POST" action="" class="space-y-4" data-loading>
+                    <input type="hidden" name="form_action" value="create">
                     <div>
                         <label for="name" class="form-label">نام ساختمان *</label>
                         <input type="text" id="name" name="name" required class="form-input"

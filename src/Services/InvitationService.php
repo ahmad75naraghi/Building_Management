@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Core\Logger;
 use App\Config\AppConfig;
 use App\Exceptions\AppException;
 use App\Exceptions\ValidationException;
@@ -87,7 +88,7 @@ final class InvitationService
                 self::inviteLink($invitation->token)
             );
         } catch (\Throwable $e) {
-            error_log('[InvitationService] sms failed: ' . $e->getMessage());
+            Logger::error('InvitationService', 'ارسال پیامک دعوت ناموفق بود', [], $e);
         }
 
         return ['invitation' => $invitation, 'sms_sent' => $smsSent];

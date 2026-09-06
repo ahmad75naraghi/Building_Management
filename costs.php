@@ -18,8 +18,8 @@ $ctx = building_role_context($building_id);
 $current_user_id = $ctx['user_id'];
 $is_manager = $ctx['is_manager'];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    $action = $_POST['action'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action'])) {
+    $action = $_POST['form_action'];
 
     // ---- اقدامات مدیریتی ----
     $manager_actions = ['create_cost', 'update_cost', 'delete_cost', 'confirm_payment', 'create_monthly', 'save_charge_settings', 'create_penalty_setting'];
@@ -302,7 +302,7 @@ require_once 'includes/header.php';
             <?php endif; ?>
 
             <form method="POST" action="" style="margin-top:12px;">
-                <input type="hidden" name="action" value="create_monthly">
+                <input type="hidden" name="form_action" value="create_monthly">
                 <button type="submit" class="btn-chip btn-chip-success" style="width:100%;justify-content:center;padding:10px;">
                     ثبت شارژ ماه جاری (<?= fa_digits(date('Y-m')) ?>)
                 </button>
@@ -394,7 +394,7 @@ require_once 'includes/header.php';
                                 ویرایش
                             </button>
                             <form method="POST" action="" data-confirm="این هزینه حذف شود؟" style="display:inline;">
-                                <input type="hidden" name="action" value="delete_cost">
+                                <input type="hidden" name="form_action" value="delete_cost">
                                 <input type="hidden" name="cost_id" value="<?= $c_id ?>">
                                 <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
                             </form>
@@ -442,7 +442,7 @@ require_once 'includes/header.php';
 
                     <?php if ((int) ($payment['user_id'] ?? 0) === $current_user_id && ($payment['status'] ?? '') !== 'confirmed'): ?>
                         <form method="POST" action="" enctype="multipart/form-data" class="card-actions" style="flex-wrap:wrap;gap:8px;">
-                            <input type="hidden" name="action" value="upload_receipt">
+                            <input type="hidden" name="form_action" value="upload_receipt">
                             <input type="hidden" name="payment_id" value="<?= $p_id ?>">
                             <input type="file" name="receipt" accept=".jpg,.jpeg,.png,.webp,.pdf" required
                                    style="flex:1;min-width:140px;font-size:11px;color:var(--text-gray);">
@@ -452,7 +452,7 @@ require_once 'includes/header.php';
 
                     <?php if ($is_manager && ($payment['status'] ?? '') !== 'confirmed'): ?>
                         <form method="POST" action="" class="card-actions">
-                            <input type="hidden" name="action" value="confirm_payment">
+                            <input type="hidden" name="form_action" value="confirm_payment">
                             <input type="hidden" name="payment_id" value="<?= $p_id ?>">
                             <button type="submit" class="btn-chip btn-chip-success" style="width:100%;justify-content:center;">تأیید پرداخت</button>
                         </form>
@@ -468,7 +468,7 @@ require_once 'includes/header.php';
 
 <?php modal_start('pay-cost', 'پرداخت شارژ', 'پس از ثبت، رسید را آپلود کنید'); ?>
     <form method="POST" action="" class="space-y-4" data-loading>
-        <input type="hidden" name="action" value="submit_payment">
+        <input type="hidden" name="form_action" value="submit_payment">
         <input type="hidden" name="cost_id" value="">
         <div>
             <label for="pay_amount" class="form-label">مبلغ پرداختی (تومان)</label>
@@ -487,7 +487,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('charge-settings', 'تنظیم شارژ ماهیانه', 'ثابت، بر اساس نفرات، یا دلخواه'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
-            <input type="hidden" name="action" value="save_charge_settings">
+            <input type="hidden" name="form_action" value="save_charge_settings">
 
             <div>
                 <label class="form-label">روش محاسبه شارژ</label>
@@ -546,7 +546,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('add-cost', 'ثبت هزینه جدید', 'هزینه یا شارژ موردی'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
-            <input type="hidden" name="action" value="create_cost">
+            <input type="hidden" name="form_action" value="create_cost">
             <?php include 'includes/_cost_form_fields.php'; ?>
             <button type="submit" class="btn-primary">ثبت هزینه</button>
         </form>
@@ -554,7 +554,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('edit-cost', 'ویرایش هزینه', 'تغییر عنوان، مبلغ و مهلت'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
-            <input type="hidden" name="action" value="update_cost">
+            <input type="hidden" name="form_action" value="update_cost">
             <input type="hidden" name="cost_id" value="">
             <?php include 'includes/_cost_form_fields.php'; ?>
             <button type="submit" class="btn-primary">ذخیره تغییرات</button>
@@ -563,7 +563,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('penalty-settings', 'جریمه دیرکرد', 'به‌ازای تأخیر از مهلت پرداخت'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
-            <input type="hidden" name="action" value="create_penalty_setting">
+            <input type="hidden" name="form_action" value="create_penalty_setting">
             <div>
                 <label for="penalty_type" class="form-label">نوع جریمه</label>
                 <select id="penalty_type" name="penalty_type" class="form-input">

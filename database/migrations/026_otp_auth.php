@@ -55,6 +55,7 @@ class Migration_026_otp_auth
         try {
             $db->exec("DROP TABLE IF EXISTS otp_codes");
         } catch (Throwable $e) {
+            error_log('[026] rollback step skipped: ' . $e->getMessage());
         }
     }
 }

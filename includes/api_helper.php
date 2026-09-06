@@ -1,5 +1,17 @@
 <?php
-session_start();
+
+require_once __DIR__ . '/../vendor/autoload.php';
+
+use App\Core\Logger;
+
+// هیچ خطایی نباید بی‌صدا بماند: هشدارها، استثناهای مدیریت‌نشده و خطاهای مرگبار لاگ می‌شوند
+Logger::install();
+
+// جلسه فقط وقتی شروع می‌شود که هنوز فعال نیست و خروجی ارسال نشده باشد
+// (در تست‌ها و اجرای CLI ممکن است هر دو شرط برقرار نباشد)
+if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
+    session_start();
+}
 
 // آدرس دقیق API — در حالت عادی همان سرور اصلی است.
 // برای اجرای محلی می‌توانید بدون دست‌زدن به این فایل، متغیر محیطی API_BASE_URL را تنظیم کنید:
@@ -66,14 +78,43 @@ function callAPI($method, $endpoint, $data = false) {
     curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 0);
     curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, 0);
     
+    $started = microtime(true);
     $result = curl_exec($curl);
     $http_status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    $curl_errno = curl_errno($curl);
+    $curl_error = curl_error($curl);
     curl_close($curl);
-    
+
+    $took = (int) round((microtime(true) - $started) * 1000);
+    $log_ctx = [
+        'method' => strtoupper($method),
+        'endpoint' => $endpoint,
+        'http_code' => $http_status,
+        'duration_ms' => $took,
+    ];
+
+    // خطای شبکه/ترنسپورت: اصلاً به سرور نرسیدیم
+    if ($curl_errno !== 0) {
+        Logger::error('callAPI', 'ارتباط شبکه‌ای با API برقرار نشد', $log_ctx + [
+            'curl_errno' => $curl_errno,
+            'curl_error' => $curl_error,
+        ]);
+        return [
+            'success' => false,
+            'message' => 'ارتباط با API برقرار نشد.',
+            'raw_error' => htmlspecialchars(substr($curl_error, 0, 250)),
+            'http_code' => $http_status,
+        ];
+    }
+
     $result_string = is_string($result) ? $result : '';
     $response = json_decode($result_string, true);
-    
+
+    // پاسخ JSON نبود: معمولاً یعنی صفحه خطای PHP یا HTML برگشته
     if (!is_array($response)) {
+        Logger::error('callAPI', 'پاسخ API قابل تفسیر نبود (JSON نیست)', $log_ctx + [
+            'body_preview' => substr($result_string, 0, 500),
+        ]);
         return [
             'success' => false,
             'message' => 'ارتباط با API برقرار نشد.',
@@ -81,7 +122,20 @@ function callAPI($method, $endpoint, $data = false) {
             'http_code' => $http_status
         ];
     }
-    
+
+    // پاسخ معتبر ولی ناموفق: سطح لاگ بسته به نوع خطا
+    if ($http_status >= 500) {
+        Logger::error('callAPI', 'API خطای سرور برگرداند', $log_ctx + [
+            'api_message' => $response['message'] ?? null,
+        ]);
+    } elseif ($http_status >= 400) {
+        Logger::warning('callAPI', 'درخواست API رد شد', $log_ctx + [
+            'api_message' => $response['message'] ?? null,
+        ]);
+    } elseif ($took > 3000) {
+        Logger::warning('callAPI', 'پاسخ API کند بود', $log_ctx);
+    }
+
     $response['http_code'] = $http_status;
     return $response;
 }
@@ -391,6 +445,8 @@ function building_role_context($building_id)
         'units' => [],
     ];
 
+    $raw_units = [];
+
     $me = callAPI('GET', '/auth/me');
     if (!empty($me['success'])) {
         $ctx['user_id'] = (int) ($me['data']['id'] ?? 0);
@@ -410,41 +466,78 @@ function building_role_context($building_id)
         // تعیین مالک/مستأجر/ساکن بودن از روی واحدها (منبع حقیقت واقعی)
         $units_resp = callAPI('GET', '/buildings/' . $building_id . '/units');
         if (!empty($units_resp['success'])) {
-            foreach (($units_resp['data']['units'] ?? []) as $u) {
-                $is_owner = (int) ($u['owner_user_id'] ?? 0) === $ctx['user_id'];
-                $is_tenant = (int) ($u['tenant_user_id'] ?? 0) === $ctx['user_id'];
-                if (!$is_owner && !$is_tenant) {
-                    continue;
-                }
-                $ctx['units'][] = $u;
-                if ($is_owner) {
-                    $ctx['is_owner'] = true;
-                    // مالک وقتی ساکن است که owner_resident فعال باشد
-                    if (!empty($u['owner_resident'])) {
-                        $ctx['is_resident'] = true;
-                    }
-                }
-                if ($is_tenant) {
-                    // مستأجر همیشه ساکن واحد است
-                    $ctx['is_tenant'] = true;
+            $raw_units = $units_resp['data']['units'] ?? [];
+        }
+    }
+
+    $ctx = derive_role_context($ctx['user_id'], $ctx['role'], $raw_units);
+
+    $cache[$building_id] = $ctx;
+    return $ctx;
+}
+
+/**
+ * منطق خالص تعیین نقش و سکونت — بدون تماس با API تا قابل تست باشد.
+ *
+ * قواعد:
+ *   • مدیر ساختمان با نقش عضویت manager مشخص می‌شود.
+ *   • مالک: در واحدی owner_user_id او باشد، یا نقش عضویتش owner باشد.
+ *   • مستأجر: در واحدی tenant_user_id او باشد، یا نقش عضویتش tenant باشد.
+ *   • مستأجر همیشه ساکن است؛ مالک فقط وقتی owner_resident واحد فعال باشد.
+ *
+ * @param int    $user_id شناسه کاربر
+ * @param string $role    نقش عضویت در ساختمان
+ * @param array  $units   فهرست واحدهای ساختمان
+ * @return array زمینه نقش
+ */
+function derive_role_context($user_id, $role, array $units = [])
+{
+    $user_id = (int) $user_id;
+    $role = (string) ($role ?: 'resident');
+
+    $ctx = [
+        'user_id' => $user_id,
+        'role' => $role,
+        'role_label' => member_role_label($role),
+        'is_manager' => ($role === 'manager'),
+        'is_owner' => false,
+        'is_tenant' => false,
+        'is_resident' => false,
+        'units' => [],
+    ];
+
+    if ($user_id > 0) {
+        foreach ($units as $u) {
+            $is_owner = (int) ($u['owner_user_id'] ?? 0) === $user_id;
+            $is_tenant = (int) ($u['tenant_user_id'] ?? 0) === $user_id;
+            if (!$is_owner && !$is_tenant) {
+                continue;
+            }
+            $ctx['units'][] = $u;
+            if ($is_owner) {
+                $ctx['is_owner'] = true;
+                // مالک وقتی ساکن است که owner_resident فعال باشد
+                if (!empty($u['owner_resident'])) {
                     $ctx['is_resident'] = true;
                 }
+            }
+            if ($is_tenant) {
+                // مستأجر همیشه ساکن واحد است
+                $ctx['is_tenant'] = true;
+                $ctx['is_resident'] = true;
             }
         }
     }
 
-    $ctx['is_manager'] = ($ctx['role'] === 'manager');
     // اگر نقش عضویت صراحتاً مالک/مستأجر بود ولی واحدی ثبت نشده، همان را لحاظ کن
-    if (!$ctx['is_owner'] && $ctx['role'] === 'owner') {
+    if (!$ctx['is_owner'] && $role === 'owner') {
         $ctx['is_owner'] = true;
     }
-    if (!$ctx['is_tenant'] && $ctx['role'] === 'tenant') {
+    if (!$ctx['is_tenant'] && $role === 'tenant') {
         $ctx['is_tenant'] = true;
         $ctx['is_resident'] = true;
     }
-    $ctx['role_label'] = member_role_label($ctx['role']);
 
-    $cache[$building_id] = $ctx;
     return $ctx;
 }
 

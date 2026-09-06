@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Core\Logger;
 use App\Exceptions\AppException;
 use App\Exceptions\ValidationException;
 use App\Models\User;
@@ -54,7 +55,7 @@ final class UserService
         try {
             (new SmsService())->sendWelcomeSms($phone, $name);
         } catch (\Throwable $e) {
-            error_log('[UserService] welcome sms failed: ' . $e->getMessage());
+            Logger::error('UserService', 'ارسال پیامک خوش‌آمدگویی ناموفق بود', ['user_id' => $userId], $e);
         }
 
         return $user;
@@ -168,7 +169,7 @@ final class UserService
         try {
             (new SmsService())->sendWelcomeSms((string) $user->phone, (string) ($user->name ?: 'کاربر'));
         } catch (\Throwable $e) {
-            error_log('[UserService] welcome sms failed: ' . $e->getMessage());
+            Logger::error('UserService', 'ارسال پیامک خوش‌آمدگویی ناموفق بود', ['user_id' => $userId], $e);
         }
 
         $user->password_hash = 'set';

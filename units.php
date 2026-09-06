@@ -38,7 +38,7 @@ if ($building_id > 0) {
 
 // ثبت / ویرایش / حذف واحد
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $building_id > 0) {
-    $action = $_POST['_action'] ?? 'create';
+    $action = $_POST['form_action'] ?? 'create';
 
     if (!$is_manager) {
         $alert_message = 'فقط مدیر ساختمان می‌تواند واحدها را مدیریت کند.';
@@ -235,7 +235,7 @@ require_once 'includes/header.php';
                                 ویرایش
                             </button>
                             <form method="POST" action="?building_id=<?= $building_id ?>" data-confirm="واحد حذف شود؟ این عمل قابل بازگشت نیست." style="display:inline;">
-                                <input type="hidden" name="_action" value="delete">
+                                <input type="hidden" name="form_action" value="delete">
                                 <input type="hidden" name="unit_id" value="<?= $u_id ?>">
                                 <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
                             </form>
@@ -252,7 +252,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('add-unit', 'افزودن واحد جدید', 'مشخصات واحد و ساکنین'); ?>
         <form method="POST" action="?building_id=<?= $building_id ?>" class="space-y-4" data-loading>
-            <input type="hidden" name="_action" value="create">
+            <input type="hidden" name="form_action" value="create">
             <?php include 'includes/_unit_form_fields.php'; ?>
             <button type="submit" class="btn-primary">ذخیره واحد</button>
         </form>
@@ -260,7 +260,7 @@ require_once 'includes/header.php';
 
     <?php modal_start('edit-unit', 'ویرایش واحد', 'مشخصات، ساکنین و شارژ'); ?>
         <form method="POST" action="?building_id=<?= $building_id ?>" class="space-y-4" data-loading>
-            <input type="hidden" name="_action" value="update">
+            <input type="hidden" name="form_action" value="update">
             <input type="hidden" name="unit_id" value="">
             <?php include 'includes/_unit_form_fields.php'; ?>
             <button type="submit" class="btn-primary">ذخیره تغییرات</button>

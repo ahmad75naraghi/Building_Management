@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Core\Logger;
 use App\Config\AppConfig;
 use App\Exceptions\AppException;
 use App\Exceptions\ValidationException;
@@ -248,7 +249,10 @@ final class CostService
             $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         } catch (\Throwable $e) {
             // ستون‌های جدید هنوز مایگریت نشده‌اند
-            error_log('[CostService] calculateMonthlyCharges fallback: ' . $e->getMessage());
+            Logger::warning('CostService', 'خواندن واحدها برای محاسبه شارژ ناموفق بود؛ احتمالاً مایگریشن اجرا نشده است', [
+                'building_id' => $buildingId,
+                'reason' => $e->getMessage(),
+            ]);
             $rows = [];
         }
 
@@ -309,7 +313,10 @@ final class CostService
                 $this->createMonthlyCharge($buildingId, $userId);
             }
         } catch (\Throwable $e) {
-            error_log('[CostService] ensureMonthlyCharge skipped: ' . $e->getMessage());
+            Logger::error('CostService', 'ساخت خودکار شارژ ماهانه انجام نشد', [
+                'building_id' => $buildingId,
+                'user_id' => $userId,
+            ], $e);
         }
     }
 

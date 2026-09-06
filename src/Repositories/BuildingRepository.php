@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Core\Logger;
 use App\Core\Database;
 use App\Models\Building;
 use PDO;
@@ -52,7 +53,10 @@ final class BuildingRepository
                     $db->exec("ALTER TABLE buildings ADD COLUMN `{$column}` " . self::OPTIONAL_COLUMNS[$column]);
                     $exists = true;
                 } catch (\Throwable $e) {
-                    error_log('[BuildingRepository] could not add column ' . $column . ': ' . $e->getMessage());
+                    Logger::warning('BuildingRepository', 'افزودن ستون به جدول ساختمان‌ها ناموفق بود', [
+                'column' => $column,
+                'reason' => $e->getMessage(),
+            ]);
                 }
             }
         } catch (\Throwable $e) {

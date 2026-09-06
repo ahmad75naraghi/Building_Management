@@ -17,8 +17,8 @@ $alert_message = '';
 $alert_type = 'error';
 
 // افزودن کامنت
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    if ($_POST['action'] === 'add_comment') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action'])) {
+    if ($_POST['form_action'] === 'add_comment') {
         $comment = trim($_POST['comment'] ?? '');
         if ($comment === '') {
             $alert_message = 'متن کامنت را وارد کنید.';
@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $alert_message = $response['message'] ?? 'خطا در ثبت کامنت.';
             }
         }
-    } elseif ($_POST['action'] === 'update_status') {
+    } elseif ($_POST['form_action'] === 'update_status') {
         $status = $_POST['status'] ?? 'open';
         $response = callAPI('PUT', '/tickets/' . $ticket_id . '/status', ['status' => $status]);
         if (isset($response['success']) && $response['success'] === true) {
@@ -110,7 +110,7 @@ require_once 'includes/page_head.php';
     <div class="card p-4 mt-4">
         <h3 class="text-sm font-bold text-gray-700 mb-3">تغییر وضعیت تیکت</h3>
         <form method="POST" action="" class="flex gap-2">
-            <input type="hidden" name="action" value="update_status">
+            <input type="hidden" name="form_action" value="update_status">
             <select name="status" class="form-input flex-1">
                 <option value="open" <?= ($ticket['status'] ?? '') === 'open' ? 'selected' : '' ?>>باز</option>
                 <option value="in_progress" <?= ($ticket['status'] ?? '') === 'in_progress' ? 'selected' : '' ?>>در حال بررسی</option>
@@ -156,7 +156,7 @@ require_once 'includes/page_head.php';
     <div class="card p-5 mt-6">
         <h3 class="font-bold text-gray-800 mb-4">افزودن کامنت</h3>
         <form method="POST" action="" class="space-y-4">
-            <input type="hidden" name="action" value="add_comment">
+            <input type="hidden" name="form_action" value="add_comment">
             <div>
                 <textarea id="comment" name="comment" rows="3" required class="form-input" placeholder="پاسخ یا پیگیری خود را بنویسید..."></textarea>
             </div>

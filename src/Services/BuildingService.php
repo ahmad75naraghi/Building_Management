@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Core\Logger;
 use App\Exceptions\ValidationException;
 use App\Models\Building;
 use App\Repositories\BuildingRepository;
@@ -176,7 +177,9 @@ final class BuildingService
             }
         } catch (\Throwable $e) {
             // ساخت ساختار نباید مانع ثبت ساختمان شود
-            error_log('[BuildingService] scaffoldFloorsAndUnits failed: ' . $e->getMessage());
+            Logger::error('BuildingService', 'ساخت خودکار طبقات و واحدها ناموفق بود', [
+                'building_id' => $buildingId,
+            ], $e);
         }
     }
 
