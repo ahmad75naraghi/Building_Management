@@ -221,6 +221,84 @@ final class CostController
      * ثبت شارژ ماهیانه ثابت برای ماه جاری.
      * POST /api/costs/monthly-charge با building_id در بدنه
      */
+    /**
+     * پیش‌نمایش محاسبه شارژ ماهیانه (سهم هر واحد) بدون ثبت هزینه.
+     * برای نمایش «چه کسی چقدر می‌پردازد» در صفحه مالی.
+     */
+    public function update(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        if (!$userId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication required',
+            ]);
+        }
+        $id = (int) ($request->getAttribute('id') ?? 0);
+        $data = $request->getJsonBody() ?? [];
+        try {
+            $cost = $this->service->updateCost($id, $data, (int) $userId);
+            if (!$cost) {
+                return (new Response())->setStatusCode(404)->setJson([
+                    'success' => false, 'message' => 'Cost not found',
+                ]);
+            }
+            return (new Response())->setJson([
+                'success' => true,
+                'message' => 'Cost updated',
+                'data' => $cost->toArray(),
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function destroy(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        if (!$userId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication required',
+            ]);
+        }
+        $id = (int) ($request->getAttribute('id') ?? 0);
+        try {
+            $deleted = $this->service->deleteCost($id, (int) $userId);
+            return (new Response())->setJson([
+                'success' => $deleted,
+                'message' => $deleted ? 'Cost deleted' : 'Cost not found',
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function chargePreview(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        if (!$userId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false,
+                'message' => 'Authentication required',
+            ]);
+        }
+        $buildingId = (int) ($request->getQueryParam('building_id') ?? 0);
+        if ($buildingId <= 0) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false,
+                'message' => 'building_id query parameter is required',
+            ]);
+        }
+        $breakdown = $this->service->calculateMonthlyCharges($buildingId);
+        return (new Response())->setJson([
+            'success' => true,
+            'data' => $breakdown,
+        ]);
+    }
+
     public function monthlyCharge(Request $request): Response
     {
         $userId = $request->getAttribute('user_id');

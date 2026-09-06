@@ -45,6 +45,21 @@ final class ExtraModulesRepository
         return (bool) $stmt->fetchColumn();
     }
 
+    /**
+     * نقش کاربر در ساختمان: manager | owner | tenant | resident | board
+     */
+    public function memberRole(int $userId, int $buildingId): ?string
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "SELECT role FROM building_members
+             WHERE user_id = ? AND building_id = ? AND status = 'active' LIMIT 1"
+        );
+        $stmt->execute([$userId, $buildingId]);
+        $role = $stmt->fetchColumn();
+        return $role !== false ? (string) $role : null;
+    }
+
     // ------------------------------------------------------------------
     // Bookings
     // ------------------------------------------------------------------
@@ -511,6 +526,87 @@ final class ExtraModulesRepository
         'meetings' => 'meetings',
         'reviews' => 'reviews',
     ];
+
+    /**
+     * ستون‌های قابل ویرایش هر ماژول (allowlist).
+     * فقط این ستون‌ها از ورودی کاربر پذیرفته می‌شوند تا SQL پویا امن بماند.
+     *
+     * @var array<string, list<string>>
+     */
+    private const MODULE_EDITABLE_COLUMNS = [
+        'bookings' => ['booking_date', 'start_time', 'end_time', 'status', 'common_area_id'],
+        'announcements' => ['title', 'content', 'is_pinned'],
+        'maintenance' => ['title', 'description', 'status', 'assigned_technician_id'],
+        'votes' => ['title', 'description', 'end_date', 'status'],
+        'visitors' => ['visitor_name', 'visitor_car_plate', 'visit_date', 'entry_time', 'exit_time', 'status'],
+        'documents' => ['title', 'document_type'],
+        'consumption' => ['consumption_type', 'reading_value', 'reading_date', 'notes', 'unit_id'],
+        'emergency-contacts' => ['contact_name', 'contact_role', 'phone', 'email'],
+        'meetings' => ['title', 'description', 'meeting_date', 'location', 'status'],
+        'reviews' => ['rating', 'comment', 'category_id'],
+    ];
+
+    /**
+     * ستون‌های مجاز ویرایش برای یک ماژول.
+     *
+     * @return list<string>
+     */
+    public function editableColumns(string $module): array
+    {
+        return self::MODULE_EDITABLE_COLUMNS[$module] ?? [];
+    }
+
+    /**
+     * ویرایش عمومی یک رکورد ماژول.
+     * نام جدول و ستون‌ها هر دو از allowlist می‌آیند، پس SQL پویا امن است.
+     *
+     * @param array<string, mixed> $data
+     */
+    public function updateModuleEntity(string $module, int $id, array $data): bool
+    {
+        $table = self::MODULE_TABLES[$module] ?? null;
+        $allowed = self::MODULE_EDITABLE_COLUMNS[$module] ?? null;
+        if ($table === null || $allowed === null) {
+            return false;
+        }
+
+        $sets = [];
+        $values = [];
+        foreach ($allowed as $column) {
+            if (array_key_exists($column, $data)) {
+                $sets[] = "`{$column}` = ?";
+                $values[] = $data[$column];
+            }
+        }
+        if (empty($sets)) {
+            return false;
+        }
+
+        $values[] = $id;
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "UPDATE `{$table}` SET " . implode(', ', $sets) . " WHERE id = ?"
+        );
+        return $stmt->execute($values);
+    }
+
+    /**
+     * دریافت یک رکورد ماژول (برای بررسی مالکیت و نمایش در فرم ویرایش).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findModuleEntity(string $module, int $id): ?array
+    {
+        $table = self::MODULE_TABLES[$module] ?? null;
+        if ($table === null) {
+            return null;
+        }
+        $db = Database::getConnection();
+        $stmt = $db->prepare("SELECT * FROM `{$table}` WHERE id = ? LIMIT 1");
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        return $row !== false ? $row : null;
+    }
 
     public function getBuildingIdForModule(string $module, int $id): ?int
     {

@@ -143,6 +143,137 @@ final class BuildingController
         ]);
     }
 
+    /**
+     * آیا کاربر مدیر فعال این ساختمان است؟ (ساختار مجتمع فقط با مدیر تغییر می‌کند)
+     */
+    private function isBuildingManager(int $userId, int $buildingId): bool
+    {
+        $db = \App\Core\Database::getConnection();
+        $stmt = $db->prepare(
+            "SELECT id FROM building_members
+             WHERE user_id = ? AND building_id = ? AND role = 'manager' AND status = 'active' LIMIT 1"
+        );
+        $stmt->execute([$userId, $buildingId]);
+        return (bool) $stmt->fetchColumn();
+    }
+
+    /**
+     * پاسخ خطای «فقط مدیر» — برای عملیات ساختاری ساختمان.
+     */
+    private function managerOnlyGuard(Request $request, int $buildingId): ?Response
+    {
+        $userId = (int) ($request->getAttribute('user_id') ?? 0);
+        if (!$userId || !$buildingId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false,
+                'message' => 'Authentication and building id required',
+            ]);
+        }
+        if (!$this->isBuildingManager($userId, $buildingId)) {
+            return (new Response())->setStatusCode(403)->setJson([
+                'success' => false,
+                'message' => 'فقط مدیر ساختمان می‌تواند این بخش را تغییر دهد.',
+            ]);
+        }
+        return null;
+    }
+
+    /**
+     * ویرایش/حذف عمومی برای جدول‌های ساختاری ساختمان (blocks/floors/common_areas).
+     *
+     * @param array<int,string> $allowed ستون‌های قابل ویرایش
+     */
+    private function updateStructureRow(Request $request, string $table, array $allowed): Response
+    {
+        $id = (int) ($request->getAttribute('id') ?? 0);
+        $db = \App\Core\Database::getConnection();
+
+        $stmt = $db->prepare("SELECT building_id FROM {$table} WHERE id = ? LIMIT 1");
+        $stmt->execute([$id]);
+        $buildingId = (int) ($stmt->fetchColumn() ?: 0);
+        if ($buildingId <= 0) {
+            return (new Response())->setStatusCode(404)->setJson([
+                'success' => false,
+                'message' => 'Record not found',
+            ]);
+        }
+        if ($guard = $this->managerOnlyGuard($request, $buildingId)) {
+            return $guard;
+        }
+
+        $data = $request->getJsonBody() ?? [];
+        $sets = [];
+        $values = [];
+        foreach ($allowed as $column) {
+            if (array_key_exists($column, $data)) {
+                $sets[] = "{$column} = ?";
+                $values[] = $data[$column] === '' ? null : $data[$column];
+            }
+        }
+        if (!$sets) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false,
+                'message' => 'هیچ فیلدی برای ویرایش ارسال نشده است.',
+            ]);
+        }
+        $values[] = $id;
+        $db->prepare("UPDATE {$table} SET " . implode(', ', $sets) . " WHERE id = ?")->execute($values);
+
+        return (new Response())->setJson(['success' => true, 'message' => 'Updated']);
+    }
+
+    private function deleteStructureRow(Request $request, string $table): Response
+    {
+        $id = (int) ($request->getAttribute('id') ?? 0);
+        $db = \App\Core\Database::getConnection();
+
+        $stmt = $db->prepare("SELECT building_id FROM {$table} WHERE id = ? LIMIT 1");
+        $stmt->execute([$id]);
+        $buildingId = (int) ($stmt->fetchColumn() ?: 0);
+        if ($buildingId <= 0) {
+            return (new Response())->setStatusCode(404)->setJson([
+                'success' => false,
+                'message' => 'Record not found',
+            ]);
+        }
+        if ($guard = $this->managerOnlyGuard($request, $buildingId)) {
+            return $guard;
+        }
+
+        $db->prepare("DELETE FROM {$table} WHERE id = ?")->execute([$id]);
+        return (new Response())->setJson(['success' => true, 'message' => 'Deleted']);
+    }
+
+    public function updateBlock(Request $request): Response
+    {
+        return $this->updateStructureRow($request, 'blocks', ['name', 'description']);
+    }
+
+    public function destroyBlock(Request $request): Response
+    {
+        return $this->deleteStructureRow($request, 'blocks');
+    }
+
+    public function updateFloor(Request $request): Response
+    {
+        return $this->updateStructureRow($request, 'floors', ['floor_number', 'name', 'block_id']);
+    }
+
+    public function destroyFloor(Request $request): Response
+    {
+        return $this->deleteStructureRow($request, 'floors');
+    }
+
+    public function updateCommonArea(Request $request): Response
+    {
+        return $this->updateStructureRow($request, 'common_areas', ['name', 'type', 'description', 'bookable']);
+    }
+
+    public function destroyCommonArea(Request $request): Response
+    {
+        return $this->deleteStructureRow($request, 'common_areas');
+    }
+
     private function isBuildingMember(int $userId, int $buildingId): bool
     {
         $db = \App\Core\Database::getConnection();
@@ -189,6 +320,9 @@ final class BuildingController
     public function storeBlock(Request $request): Response
     {
         $buildingId = (int) $request->getAttribute('building_id');
+        if ($guard = $this->managerOnlyGuard($request, $buildingId)) {
+            return $guard;
+        }
         $data = $request->getJsonBody() ?? [];
         $db = \App\Core\Database::getConnection();
 
@@ -218,6 +352,9 @@ final class BuildingController
     public function storeFloor(Request $request): Response
     {
         $buildingId = (int) $request->getAttribute('building_id');
+        if ($guard = $this->managerOnlyGuard($request, $buildingId)) {
+            return $guard;
+        }
         $data = $request->getJsonBody() ?? [];
         $db = \App\Core\Database::getConnection();
 
@@ -377,6 +514,9 @@ final class BuildingController
     public function storeCommonArea(Request $request): Response
     {
         $buildingId = (int) $request->getAttribute('building_id');
+        if ($guard = $this->managerOnlyGuard($request, $buildingId)) {
+            return $guard;
+        }
         $data = $request->getJsonBody() ?? [];
         $db = \App\Core\Database::getConnection();
 

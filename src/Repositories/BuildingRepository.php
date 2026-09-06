@@ -25,6 +25,8 @@ final class BuildingRepository
         'parking_spots' => 'INT NOT NULL DEFAULT 0',
         'monthly_charge' => 'DECIMAL(15,2) NOT NULL DEFAULT 0',
         'monthly_charge_enabled' => 'TINYINT(1) NOT NULL DEFAULT 0',
+        'charge_mode' => "VARCHAR(20) NOT NULL DEFAULT 'fixed'",
+        'charge_per_person' => 'DECIMAL(15,2) NOT NULL DEFAULT 0',
     ];
 
     /**
@@ -80,6 +82,8 @@ final class BuildingRepository
             'parking_spots' => $building->parking_spots,
             'monthly_charge' => $building->monthly_charge,
             'monthly_charge_enabled' => (int) $building->monthly_charge_enabled,
+            'charge_mode' => $building->charge_mode,
+            'charge_per_person' => $building->charge_per_person,
         ];
         foreach ($extra as $col => $val) {
             if ($this->hasColumn($col)) {
@@ -151,6 +155,9 @@ final class BuildingRepository
         $building->parking_spots = isset($row['parking_spots']) ? (int) $row['parking_spots'] : 0;
         $building->monthly_charge = isset($row['monthly_charge']) ? (float) $row['monthly_charge'] : 0.0;
         $building->monthly_charge_enabled = isset($row['monthly_charge_enabled']) ? (bool) $row['monthly_charge_enabled'] : false;
+        $building->charge_mode = isset($row['charge_mode']) && $row['charge_mode'] !== null
+            ? (string) $row['charge_mode'] : 'fixed';
+        $building->charge_per_person = isset($row['charge_per_person']) ? (float) $row['charge_per_person'] : 0.0;
         $building->my_role = $row['member_role'] ?? null;
         $building->created_at = $row['created_at'];
         return $building;
@@ -174,6 +181,8 @@ final class BuildingRepository
             'parking_spots' => $building->parking_spots,
             'monthly_charge' => $building->monthly_charge,
             'monthly_charge_enabled' => (int) $building->monthly_charge_enabled,
+            'charge_mode' => $building->charge_mode,
+            'charge_per_person' => $building->charge_per_person,
         ];
         foreach ($optional as $col => $val) {
             if ($this->hasColumn($col)) {

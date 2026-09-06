@@ -70,8 +70,13 @@ final class CostService
         if (!$building) {
             throw new AppException('ساختمان یافت نشد.');
         }
-        if (!$building->monthly_charge_enabled || $building->monthly_charge <= 0) {
-            throw new AppException('شارژ ثابت ماهیانه برای این ساختمان تنظیم نشده است. ابتدا مبلغ شارژ ثابت را ذخیره کنید.');
+        if (!$building->monthly_charge_enabled) {
+            throw new AppException('شارژ ماهیانه برای این ساختمان فعال نیست. ابتدا آن را در صفحه مالی تنظیم کنید.');
+        }
+
+        $breakdown = $this->calculateMonthlyCharges($buildingId);
+        if ($breakdown['total'] <= 0) {
+            throw new AppException($this->chargeConfigHint($building->charge_mode));
         }
 
         $monthKey = date('Y-m');
@@ -92,11 +97,12 @@ final class CostService
         $cost->building_id = $buildingId;
         $cost->title = 'شارژ ماهیانه ' . $monthKey;
         $cost->description = $marker;
-        $cost->amount = (float) $building->monthly_charge;
+        $cost->amount = $breakdown['total'];
         $cost->cost_type = 'periodic';
         $cost->target_audience = 'all';
-        $cost->division_method = 'fixed_share';
-        $cost->division_details = null;
+        $cost->division_method = self::CHARGE_MODE_DIVISION[$building->charge_mode] ?? 'fixed_share';
+        // جزئیات تقسیم (سهم هر واحد) برای شفافیت ذخیره می‌شود
+        $cost->division_details = $breakdown['units'];
         $cost->due_date = date('Y-m-t');
         $cost->status = 'pending';
         $cost->is_recurring = true;
@@ -108,6 +114,178 @@ final class CostService
         return $cost;
     }
 
+    /** نگاشت حالت شارژ به روش تقسیم هزینه */
+    private const CHARGE_MODE_DIVISION = [
+        'fixed' => 'fixed_share',
+        'per_person' => 'people_count',
+        'custom' => 'custom',
+    ];
+
+    /**
+     * پیام راهنما وقتی تنظیمات شارژ ناقص است.
+     */
+    private function chargeConfigHint(string $mode): string
+    {
+        switch ($mode) {
+            case 'per_person':
+                return 'شارژ نفری محاسبه نشد. «مبلغ به‌ازای هر نفر» را تنظیم کنید و تعداد نفرات واحدها را در صفحه واحدها وارد کنید.';
+            case 'custom':
+                return 'شارژ دلخواه محاسبه نشد. برای حداقل یک واحد «شارژ اختصاصی» تعیین کنید.';
+            default:
+                return 'مبلغ شارژ ثابت ماهیانه تنظیم نشده است. ابتدا مبلغ را ذخیره کنید.';
+        }
+    }
+
+    /**
+     * آیا کاربر مدیر این ساختمان است؟
+     */
+    private function isManager(int $userId, int $buildingId): bool
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "SELECT id FROM building_members
+             WHERE user_id = ? AND building_id = ? AND role = 'manager' AND status = 'active' LIMIT 1"
+        );
+        $stmt->execute([$userId, $buildingId]);
+        return (bool) $stmt->fetchColumn();
+    }
+
+    /**
+     * ویرایش هزینه — فقط مدیر ساختمان.
+     */
+    public function updateCost(int $costId, array $data, int $userId): ?Cost
+    {
+        $cost = $this->costRepo->findById($costId);
+        if (!$cost) {
+            return null;
+        }
+        if (!$this->isManager($userId, $cost->building_id)) {
+            throw new AppException('فقط مدیر ساختمان می‌تواند هزینه‌ها را ویرایش کند.');
+        }
+
+        if (array_key_exists('title', $data)) {
+            $title = trim((string) $data['title']);
+            if ($title === '') {
+                throw new ValidationException('عنوان هزینه نمی‌تواند خالی باشد.');
+            }
+            $cost->title = $title;
+        }
+        if (array_key_exists('amount', $data)) {
+            $amount = (float) $data['amount'];
+            if ($amount <= 0) {
+                throw new ValidationException('مبلغ هزینه باید بزرگ‌تر از صفر باشد.');
+            }
+            $cost->amount = $amount;
+        }
+        if (array_key_exists('description', $data)) {
+            $description = trim((string) $data['description']);
+            // توضیح داخلی شارژ خودکار نباید پاک شود
+            if (!str_starts_with((string) $cost->description, 'auto:monthly:')) {
+                $cost->description = $description !== '' ? $description : null;
+            }
+        }
+        if (array_key_exists('cost_type', $data)) {
+            $cost->cost_type = in_array($data['cost_type'], ['periodic', 'one_time'], true)
+                ? $data['cost_type'] : $cost->cost_type;
+        }
+        if (array_key_exists('division_method', $data)) {
+            $cost->division_method = in_array($data['division_method'], ['fixed_share', 'area', 'people_count', 'custom'], true)
+                ? $data['division_method'] : $cost->division_method;
+        }
+        if (array_key_exists('target_audience', $data)) {
+            $cost->target_audience = in_array($data['target_audience'], ['all', 'owners', 'tenants', 'residents'], true)
+                ? $data['target_audience'] : $cost->target_audience;
+        }
+        if (array_key_exists('due_date', $data)) {
+            $cost->due_date = !empty($data['due_date']) ? (string) $data['due_date'] : null;
+        }
+
+        $this->costRepo->update($cost);
+        return $this->costRepo->findById($costId);
+    }
+
+    /**
+     * حذف هزینه — فقط مدیر ساختمان.
+     */
+    public function deleteCost(int $costId, int $userId): bool
+    {
+        $cost = $this->costRepo->findById($costId);
+        if (!$cost) {
+            return false;
+        }
+        if (!$this->isManager($userId, $cost->building_id)) {
+            throw new AppException('فقط مدیر ساختمان می‌تواند هزینه‌ها را حذف کند.');
+        }
+        return $this->costRepo->delete($costId);
+    }
+
+    /**
+     * محاسبه شارژ ماهیانه هر واحد بر اساس حالت انتخابی ساختمان.
+     *
+     * حالت‌ها:
+     *   fixed       مبلغ ثابت برای هر واحد (monthly_charge)
+     *   per_person  تعداد نفرات ساکن واحد × نرخ هر نفر (charge_per_person)
+     *   custom      مبلغ اختصاصی هر واحد (units.custom_charge)
+     *
+     * @return array{mode: string, total: float, units: list<array{unit_id:int, unit_number:string, residents_count:int, amount:float}>}
+     */
+    public function calculateMonthlyCharges(int $buildingId): array
+    {
+        $building = (new BuildingRepository())->findById($buildingId);
+        if (!$building) {
+            return ['mode' => 'fixed', 'total' => 0.0, 'units' => []];
+        }
+
+        $mode = $building->charge_mode ?: 'fixed';
+        $db = Database::getConnection();
+
+        try {
+            $stmt = $db->prepare(
+                "SELECT id, unit_number, residents_count, custom_charge
+                 FROM units WHERE building_id = ? ORDER BY unit_number ASC"
+            );
+            $stmt->execute([$buildingId]);
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            // ستون‌های جدید هنوز مایگریت نشده‌اند
+            error_log('[CostService] calculateMonthlyCharges fallback: ' . $e->getMessage());
+            $rows = [];
+        }
+
+        $units = [];
+        $total = 0.0;
+        foreach ($rows as $row) {
+            $residents = (int) ($row['residents_count'] ?? 0);
+            switch ($mode) {
+                case 'per_person':
+                    $amount = $residents * (float) $building->charge_per_person;
+                    break;
+                case 'custom':
+                    $amount = $row['custom_charge'] !== null ? (float) $row['custom_charge'] : 0.0;
+                    break;
+                default:
+                    $amount = (float) $building->monthly_charge;
+            }
+            if ($amount <= 0) {
+                continue;
+            }
+            $units[] = [
+                'unit_id' => (int) $row['id'],
+                'unit_number' => (string) $row['unit_number'],
+                'residents_count' => $residents,
+                'amount' => $amount,
+            ];
+            $total += $amount;
+        }
+
+        // اگر هنوز واحدی ثبت نشده، در حالت ثابت دست‌کم مبلغ پایه لحاظ می‌شود
+        if (empty($units) && $mode === 'fixed' && $building->monthly_charge > 0) {
+            $total = (float) $building->monthly_charge;
+        }
+
+        return ['mode' => $mode, 'total' => $total, 'units' => $units];
+    }
+
     /**
      * اطمینان از وجود شارژ ماه جاری (فراخوانی خودکار هنگام مشاهده مالی).
      * خطاها نادیده گرفته می‌شوند تا نمایش صفحه متوقف نشود.
@@ -116,7 +294,11 @@ final class CostService
     {
         try {
             $building = (new BuildingRepository())->findById($buildingId);
-            if (!$building || !$building->monthly_charge_enabled || $building->monthly_charge <= 0) {
+            if (!$building || !$building->monthly_charge_enabled) {
+                return;
+            }
+            // بسته به حالت شارژ، تنظیمات لازم باید کامل باشد
+            if ($this->calculateMonthlyCharges($buildingId)['total'] <= 0) {
                 return;
             }
             $monthKey = date('Y-m');

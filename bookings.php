@@ -11,62 +11,83 @@ $building_id = (int) ($_GET['building_id'] ?? $_SESSION['active_building_id'] ??
 
 $alert_message = '';
 $alert_type = 'error';
+$reopen_modal = '';
+
+// هر عضو می‌تواند رزرو کند؛ تأیید/رد رزرو فقط با مدیر است.
+$ctx = building_role_context($building_id);
+$is_manager = $ctx['is_manager'];
+$current_user_id = $ctx['user_id'];
 
 // دریافت لیست مشاعات (برای انتخاب در فرم)
 $common_areas = [];
 if ($building_id > 0) {
     $areas_response = callAPI('GET', '/buildings/' . $building_id . '/common-areas');
-    if (isset($areas_response['success']) && $areas_response['success'] === true) {
+    if (!empty($areas_response['success'])) {
         $common_areas = $areas_response['data']['common_areas'] ?? [];
     }
 }
 
-// ثبت رزرو جدید
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $building_id > 0) {
-    $common_area_id = (int) ($_POST['common_area_id'] ?? 0);
-    $booking_date = trim($_POST['booking_date'] ?? '');
-    if ($common_area_id <= 0 || $booking_date === '') {
-        $alert_message = 'مشاع و تاریخ رزرو را انتخاب کنید.';
-    } else {
-        $payload = [
-            'building_id' => $building_id,
-            'common_area_id' => $common_area_id,
-            'booking_date' => $booking_date,
-            'start_time' => trim($_POST['start_time'] ?? ''),
-            'end_time' => trim($_POST['end_time'] ?? ''),
-        ];
-        $response = callAPI('POST', '/bookings', $payload);
-        if (isset($response['success']) && $response['success'] === true) {
-            $alert_message = 'رزرو با موفقیت ثبت شد.';
-            $alert_type = 'success';
-        } else {
-            $alert_message = $response['message'] ?? 'خطا در ثبت رزرو.';
-        }
-    }
-} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    $action = $_POST['action'];
+    $action = $_POST['form_action'] ?? 'create';
 
-    if ($action === 'update_booking_status') {
-        $booking_id = (int) ($_POST['booking_id'] ?? 0);
-        $status = trim($_POST['status'] ?? '');
-        if ($booking_id > 0 && in_array($status, ['pending', 'confirmed', 'cancelled', 'completed'], true)) {
-            $response = callAPI('PUT', '/bookings/' . $booking_id . '/status', ['status' => $status]);
-            if (isset($response['success']) && $response['success'] === true) {
-                $alert_message = 'وضعیت رزرو به‌روزرسانی شد.';
-                $alert_type = 'success';
-            } else {
-                $alert_message = $response['message'] ?? 'خطا در تغییر وضعیت رزرو.';
+    if ($action === 'update_status') {
+        if (!$is_manager) {
+            $alert_message = 'تأیید یا رد رزرو فقط توسط مدیر ساختمان انجام می‌شود.';
+        } else {
+            $booking_id = (int) ($_POST['booking_id'] ?? 0);
+            $status = trim($_POST['status'] ?? '');
+            if ($booking_id > 0 && in_array($status, ['pending', 'confirmed', 'cancelled', 'completed'], true)) {
+                $response = callAPI('PUT', '/bookings/' . $booking_id . '/status', ['status' => $status]);
+                if (!empty($response['success'])) {
+                    $alert_message = 'وضعیت رزرو به‌روزرسانی شد.';
+                    $alert_type = 'success';
+                } else {
+                    $alert_message = $response['message'] ?? 'خطا در تغییر وضعیت رزرو.';
+                }
             }
         }
-    } elseif ($action === 'delete_booking') {
+    } elseif ($action === 'delete') {
         $booking_id = (int) ($_POST['booking_id'] ?? 0);
-        if ($booking_id > 0) {
-            $response = callAPI('DELETE', '/bookings/' . $booking_id);
-            if (isset($response['success']) && $response['success'] === true) {
-                $alert_message = 'رزرو حذف شد.';
-                $alert_type = 'success';
+        $response = callAPI('DELETE', '/bookings/' . $booking_id);
+        if (!empty($response['success'])) {
+            $alert_message = 'رزرو حذف شد.';
+            $alert_type = 'success';
+        } else {
+            $alert_message = $response['message'] ?? 'خطا در حذف رزرو.';
+        }
+    } else {
+        $common_area_id = (int) ($_POST['common_area_id'] ?? 0);
+        $booking_date = trim($_POST['booking_date'] ?? '');
+        if ($common_area_id <= 0 || $booking_date === '') {
+            $alert_message = 'مشاع و تاریخ رزرو را انتخاب کنید.';
+            $reopen_modal = $action === 'update' ? 'edit-booking' : 'add-booking';
+        } else {
+            $payload = [
+                'common_area_id' => $common_area_id,
+                'booking_date' => $booking_date,
+                'start_time' => trim($_POST['start_time'] ?? ''),
+                'end_time' => trim($_POST['end_time'] ?? ''),
+            ];
+            if ($action === 'update') {
+                $booking_id = (int) ($_POST['booking_id'] ?? 0);
+                $response = callAPI('PUT', '/bookings/' . $booking_id, $payload);
+                if (!empty($response['success'])) {
+                    $alert_message = 'رزرو ویرایش شد.';
+                    $alert_type = 'success';
+                } else {
+                    $alert_message = $response['message'] ?? 'خطا در ویرایش رزرو.';
+                    $reopen_modal = 'edit-booking';
+                }
             } else {
-                $alert_message = $response['message'] ?? 'خطا در حذف رزرو.';
+                $payload['building_id'] = $building_id;
+                $response = callAPI('POST', '/bookings', $payload);
+                if (!empty($response['success'])) {
+                    $alert_message = 'رزرو با موفقیت ثبت شد.';
+                    $alert_type = 'success';
+                } else {
+                    $alert_message = $response['message'] ?? 'خطا در ثبت رزرو.';
+                    $reopen_modal = 'add-booking';
+                }
             }
         }
     }
@@ -77,11 +98,11 @@ $bookings = [];
 $building_name = '';
 if ($building_id > 0) {
     $building_response = callAPI('GET', '/buildings/' . $building_id);
-    if (isset($building_response['success']) && $building_response['success'] === true) {
+    if (!empty($building_response['success'])) {
         $building_name = $building_response['data']['name'] ?? '';
     }
     $list_response = callAPI('GET', '/bookings', ['building_id' => $building_id]);
-    if (isset($list_response['success']) && $list_response['success'] === true) {
+    if (!empty($list_response['success'])) {
         $bookings = $list_response['data'] ?? [];
     }
 }
@@ -91,128 +112,133 @@ foreach ($common_areas as $area) {
     $area_names[$area['id']] = $area['name'];
 }
 
+$status_chips = [
+    'pending' => 'chip-amber',
+    'confirmed' => 'chip-green',
+    'cancelled' => 'chip-red',
+    'completed' => 'chip-gray',
+];
+
 $page_title = 'رزرو مشاعات';
 $header_sub = $building_name ?: 'سالن، استخر و...';
-$back_url = 'building_view.php?id=' . $building_id;
-$active_nav = 'home';
-require_once 'includes/page_head.php';
+$back_url = 'dashboard.php?building_id=' . $building_id;
+$nav_active = 'none';
+$nav_building_id = $building_id;
+require_once 'includes/header.php';
 ?>
 
 <main class="p-5">
 
-    <!-- دکمه افزودن -->
-    <a href="#add-form"
-       class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg shadow-blue-600/25 transition-all active:scale-[0.98]">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-        </svg>
-        <span>رزرو جدید</span>
-    </a>
+    <?php if (empty($common_areas)): ?>
+        <div class="hint-card">
+            ⚠️ ابتدا از صفحه «مشاعات» یک فضای قابل رزرو (مثل سالن اجتماعات) ایجاد کنید.
+        </div>
+    <?php else: ?>
+        <?php modal_open_button('add-booking', 'رزرو جدید'); ?>
+    <?php endif; ?>
 
-    <!-- لیست رزروها -->
-    <h2 class="section-title">رزروهای ثبت‌شده</h2>
+    <div class="section-header-row" style="margin: 18px 0 12px;">
+        <h2 class="section-title">رزروهای ثبت‌شده (<?= fa_digits(count($bookings)) ?>)</h2>
+    </div>
 
     <?php if (empty($bookings)): ?>
-        <div class="card empty-state">
-            <div class="text-4xl mb-3">📅</div>
+        <div class="empty-state">
+            <div style="font-size: 34px; margin-bottom: 8px;">📅</div>
             رزروی ثبت نشده است.
         </div>
     <?php else: ?>
         <div class="space-y-3">
             <?php foreach ($bookings as $booking): ?>
+                <?php
+                $b_id = (int) ($booking['id'] ?? 0);
+                $b_area = (int) ($booking['common_area_id'] ?? 0);
+                $b_date = $booking['booking_date'] ?? '';
+                $b_start = $booking['start_time'] ?? '';
+                $b_end = $booking['end_time'] ?? '';
+                $b_status = $booking['status'] ?? 'pending';
+                $is_mine = (int) ($booking['user_id'] ?? 0) === $current_user_id;
+                $can_modify = $is_manager || $is_mine;
+                ?>
                 <div class="card p-4">
                     <div class="flex items-start justify-between gap-3">
                         <div class="flex-1 min-w-0">
                             <h3 class="font-bold text-gray-800 text-sm">
-                                <?= htmlspecialchars($area_names[$booking['common_area_id'] ?? ''] ?? 'مشاع') ?>
+                                <?= htmlspecialchars($area_names[$b_area] ?? 'مشاع') ?>
                             </h3>
                             <p class="text-sm text-gray-500 mt-1">
-                                <?php if (!empty($booking['booking_date'])): ?>
-                                    📅 <?= htmlspecialchars($booking['booking_date']) ?>
-                                <?php endif; ?>
-                                <?php if (!empty($booking['start_time'])): ?>
-                                    • 🕐 <?= htmlspecialchars($booking['start_time']) ?><?= !empty($booking['end_time']) ? ' تا ' . htmlspecialchars($booking['end_time']) : '' ?>
+                                <?php if ($b_date !== ''): ?>📅 <?= fa_digits($b_date) ?><?php endif; ?>
+                                <?php if ($b_start !== ''): ?>
+                                    • 🕐 <?= fa_digits(substr($b_start, 0, 5)) ?><?= $b_end !== '' ? ' تا ' . fa_digits(substr($b_end, 0, 5)) : '' ?>
                                 <?php endif; ?>
                             </p>
+                            <?php if (!$is_mine && !empty($booking['user_name'])): ?>
+                                <p class="text-[11px] text-gray-400 mt-1">رزروکننده: <?= htmlspecialchars($booking['user_name']) ?></p>
+                            <?php endif; ?>
                         </div>
-                        <span class="text-xs px-2.5 py-1 rounded-full flex-shrink-0 <?= (($booking['status'] ?? '') === 'confirmed') ? 'bg-green-100 text-green-700' : 'bg-blue-50 text-blue-700' ?>">
-                            <?= htmlspecialchars(booking_status_label($booking['status'] ?? '')) ?>
+                        <span class="chip <?= $status_chips[$b_status] ?? 'chip-gray' ?>">
+                            <?= htmlspecialchars(booking_status_label($b_status)) ?>
                         </span>
                     </div>
-                    <!-- مدیریت رزرو -->
-                    <div class="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-                        <form method="POST" action="" class="flex items-center gap-2 flex-1">
-                            <input type="hidden" name="action" value="update_booking_status">
-                            <input type="hidden" name="booking_id" value="<?= (int) $booking['id'] ?>">
-                            <select name="status" class="form-input text-xs py-2">
-                                <option value="pending" <?= ($booking['status'] ?? '') === 'pending' ? 'selected' : '' ?>>در انتظار تأیید</option>
-                                <option value="confirmed" <?= ($booking['status'] ?? '') === 'confirmed' ? 'selected' : '' ?>>تأیید شده</option>
-                                <option value="cancelled" <?= ($booking['status'] ?? '') === 'cancelled' ? 'selected' : '' ?>>لغو شده</option>
-                                <option value="completed" <?= ($booking['status'] ?? '') === 'completed' ? 'selected' : '' ?>>انجام شده</option>
-                            </select>
-                            <button type="submit" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-3 py-2 rounded-lg transition-colors flex-shrink-0">
-                                ثبت وضعیت
-                            </button>
-                        </form>
-                        <form method="POST" action="" data-confirm="این رزرو حذف شود؟">
-                            <input type="hidden" name="action" value="delete_booking">
-                            <input type="hidden" name="booking_id" value="<?= (int) $booking['id'] ?>">
-                            <button type="submit" class="text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-lg transition-colors flex-shrink-0">
-                                حذف
-                            </button>
-                        </form>
-                    </div>
+
+                    <?php if ($can_modify): ?>
+                        <div class="card-actions" style="flex-wrap:wrap;">
+                            <?php if ($is_mine): ?>
+                                <button type="button" class="btn-chip btn-chip-edit"
+                                        data-modal-open="edit-booking"
+                                        data-set-booking_id="<?= $b_id ?>"
+                                        data-set-common_area_id="<?= $b_area ?>"
+                                        data-set-booking_date="<?= htmlspecialchars($b_date) ?>"
+                                        data-set-start_time="<?= htmlspecialchars(substr($b_start, 0, 5)) ?>"
+                                        data-set-end_time="<?= htmlspecialchars(substr($b_end, 0, 5)) ?>">
+                                    ویرایش
+                                </button>
+                            <?php endif; ?>
+
+                            <?php if ($is_manager): ?>
+                                <form method="POST" action="" style="display:flex;gap:6px;align-items:center;flex:1;min-width:180px;">
+                                    <input type="hidden" name="form_action" value="update_status">
+                                    <input type="hidden" name="booking_id" value="<?= $b_id ?>">
+                                    <select name="status" class="form-input" style="padding:7px 10px;font-size:11.5px;flex:1;">
+                                        <option value="pending" <?= $b_status === 'pending' ? 'selected' : '' ?>>در انتظار تأیید</option>
+                                        <option value="confirmed" <?= $b_status === 'confirmed' ? 'selected' : '' ?>>تأیید شده</option>
+                                        <option value="cancelled" <?= $b_status === 'cancelled' ? 'selected' : '' ?>>لغو شده</option>
+                                        <option value="completed" <?= $b_status === 'completed' ? 'selected' : '' ?>>انجام شده</option>
+                                    </select>
+                                    <button type="submit" class="btn-chip btn-chip-neutral">ثبت</button>
+                                </form>
+                            <?php endif; ?>
+
+                            <form method="POST" action="" data-confirm="این رزرو حذف شود؟" style="display:inline;">
+                                <input type="hidden" name="form_action" value="delete">
+                                <input type="hidden" name="booking_id" value="<?= $b_id ?>">
+                                <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
+                            </form>
+                        </div>
+                    <?php endif; ?>
                 </div>
             <?php endforeach; ?>
         </div>
     <?php endif; ?>
 
-    <!-- فرم افزودن -->
-    <div id="add-form" class="card p-5 mt-6">
-        <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            ثبت رزرو جدید
-        </h3>
-        <?php if (empty($common_areas)): ?>
-            <div class="bg-amber-50 text-amber-700 border border-amber-200 rounded-xl p-4 text-sm mb-4">
-                ابتدا از صفحه «مشاعات» یک فضای قابل رزرو (مثل سالن اجتماعات) ایجاد کنید.
-            </div>
-        <?php endif; ?>
-        <form method="POST" action="" class="space-y-4">
-            <div>
-                <label for="common_area_id" class="form-label">مشاع *</label>
-                <select id="common_area_id" name="common_area_id" required class="form-input">
-                    <option value="">— انتخاب مشاع —</option>
-                    <?php foreach ($common_areas as $area): ?>
-                        <option value="<?= (int) $area['id'] ?>"><?= htmlspecialchars($area['name']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div>
-                <label for="booking_date" class="form-label">تاریخ رزرو *</label>
-                <input type="date" id="booking_date" name="booking_date" required class="form-input">
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label for="start_time" class="form-label">از ساعت</label>
-                    <input type="time" id="start_time" name="start_time" class="form-input">
-                </div>
-                <div>
-                    <label for="end_time" class="form-label">تا ساعت</label>
-                    <input type="time" id="end_time" name="end_time" class="form-input">
-                </div>
-            </div>
-            <button type="submit" class="btn-primary" <?= empty($common_areas) ? 'disabled style="opacity:.5; cursor:not-allowed;"' : '' ?>>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                ثبت رزرو
-            </button>
-        </form>
-    </div>
-
 </main>
 
-<?php require_once 'includes/page_tail.php'; ?>
+<?php if (!empty($common_areas)): ?>
+    <?php modal_start('add-booking', 'ثبت رزرو جدید', 'فضای مشاع، تاریخ و ساعت'); ?>
+        <form method="POST" action="" class="space-y-4" data-loading>
+            <input type="hidden" name="form_action" value="create">
+            <?php include 'includes/_booking_form_fields.php'; ?>
+            <button type="submit" class="btn-primary">ثبت رزرو</button>
+        </form>
+    <?php modal_end(); ?>
+
+    <?php modal_start('edit-booking', 'ویرایش رزرو', 'اصلاح تاریخ یا ساعت رزرو'); ?>
+        <form method="POST" action="" class="space-y-4" data-loading>
+            <input type="hidden" name="form_action" value="update">
+            <input type="hidden" name="booking_id" value="">
+            <?php include 'includes/_booking_form_fields.php'; ?>
+            <button type="submit" class="btn-primary">ذخیره تغییرات</button>
+        </form>
+    <?php modal_end(); ?>
+<?php endif; ?>
+
+<?php require_once 'includes/footer.php'; ?>

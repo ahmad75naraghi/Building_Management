@@ -44,6 +44,37 @@ final class CostRepository
         return $row ? $this->mapRow($row) : null;
     }
 
+    /**
+     * ویرایش هزینه (فیلدهای قابل تغییر توسط مدیر).
+     */
+    public function update(Cost $cost): bool
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "UPDATE costs SET
+                title = ?, description = ?, amount = ?, cost_type = ?,
+                target_audience = ?, division_method = ?, due_date = ?
+             WHERE id = ?"
+        );
+        return $stmt->execute([
+            $cost->title,
+            $cost->description,
+            $cost->amount,
+            $cost->cost_type,
+            $cost->target_audience,
+            $cost->division_method,
+            $cost->due_date,
+            $cost->id,
+        ]);
+    }
+
+    public function delete(int $id): bool
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare("DELETE FROM costs WHERE id = ?");
+        return $stmt->execute([$id]);
+    }
+
     public function findByBuildingId(int $buildingId): array
     {
         $db = Database::getConnection();

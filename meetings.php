@@ -11,52 +11,27 @@ $building_id = (int) ($_GET['building_id'] ?? $_SESSION['active_building_id'] ??
 
 $alert_message = '';
 $alert_type = 'error';
+$reopen_modal = '';
 
-// ثبت جلسه جدید
+// جلسات ساختمان توسط مدیر ایجاد/ویرایش/حذف می‌شوند؛ ساکنین فقط مشاهده می‌کنند.
+$ctx = building_role_context($building_id);
+$is_manager = $ctx['is_manager'];
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $building_id > 0) {
-    $title = trim($_POST['title'] ?? '');
-    if ($title === '') {
-        $alert_message = 'عنوان جلسه را وارد کنید.';
-    } else {
-        $payload = [
-            'building_id' => $building_id,
-            'title' => $title,
-            'description' => trim($_POST['description'] ?? ''),
-            'meeting_date' => !empty($_POST['meeting_date']) ? $_POST['meeting_date'] : null,
-            'location' => trim($_POST['location'] ?? ''),
-        ];
-        $response = callAPI('POST', '/meetings', $payload);
-        if (isset($response['success']) && $response['success'] === true) {
-            $alert_message = 'جلسه با موفقیت ثبت شد.';
-            $alert_type = 'success';
-        } else {
-            $alert_message = $response['message'] ?? 'خطا در ثبت جلسه.';
-        }
-    }
-} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    $action = $_POST['action'];
+    $action = $_POST['form_action'] ?? 'create';
 
-    if ($action === 'update_meeting_status') {
+    if (!$is_manager) {
+        $alert_message = 'فقط مدیر ساختمان می‌تواند جلسات را مدیریت کند.';
+    } elseif ($action === 'update_status') {
         $meeting_id = (int) ($_POST['meeting_id'] ?? 0);
         $status = trim($_POST['status'] ?? '');
         if ($meeting_id > 0 && in_array($status, ['scheduled', 'completed', 'cancelled'], true)) {
             $response = callAPI('PUT', '/meetings/' . $meeting_id . '/status', ['status' => $status]);
-            if (isset($response['success']) && $response['success'] === true) {
+            if (!empty($response['success'])) {
                 $alert_message = 'وضعیت جلسه به‌روزرسانی شد.';
                 $alert_type = 'success';
             } else {
                 $alert_message = $response['message'] ?? 'خطا در تغییر وضعیت جلسه.';
-            }
-        }
-    } elseif ($action === 'delete_meeting') {
-        $meeting_id = (int) ($_POST['meeting_id'] ?? 0);
-        if ($meeting_id > 0) {
-            $response = callAPI('DELETE', '/meetings/' . $meeting_id);
-            if (isset($response['success']) && $response['success'] === true) {
-                $alert_message = 'جلسه حذف شد.';
-                $alert_type = 'success';
-            } else {
-                $alert_message = $response['message'] ?? 'خطا در حذف جلسه.';
             }
         }
     } elseif ($action === 'add_minutes') {
@@ -64,14 +39,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $building_id > 0) {
         $content = trim($_POST['minutes_content'] ?? '');
         if ($meeting_id > 0 && $content !== '') {
             $response = callAPI('POST', '/meetings/' . $meeting_id . '/minutes', ['minutes_content' => $content]);
-            if (isset($response['success']) && $response['success'] === true) {
+            if (!empty($response['success'])) {
                 $alert_message = 'صورت‌جلسه ثبت شد.';
                 $alert_type = 'success';
             } else {
                 $alert_message = $response['message'] ?? 'خطا در ثبت صورت‌جلسه.';
+                $reopen_modal = 'add-minutes';
             }
         } else {
             $alert_message = 'متن صورت‌جلسه را وارد کنید.';
+            $reopen_modal = 'add-minutes';
+        }
+    } elseif ($action === 'delete') {
+        $meeting_id = (int) ($_POST['meeting_id'] ?? 0);
+        $response = callAPI('DELETE', '/meetings/' . $meeting_id);
+        if (!empty($response['success'])) {
+            $alert_message = 'جلسه حذف شد.';
+            $alert_type = 'success';
+        } else {
+            $alert_message = $response['message'] ?? 'خطا در حذف جلسه.';
+        }
+    } else {
+        $title = trim($_POST['title'] ?? '');
+        if ($title === '') {
+            $alert_message = 'عنوان جلسه را وارد کنید.';
+            $reopen_modal = $action === 'update' ? 'edit-meeting' : 'add-meeting';
+        } else {
+            $payload = [
+                'title' => $title,
+                'description' => trim($_POST['description'] ?? ''),
+                'meeting_date' => !empty($_POST['meeting_date']) ? $_POST['meeting_date'] : null,
+                'location' => trim($_POST['location'] ?? ''),
+            ];
+            if ($action === 'update') {
+                $meeting_id = (int) ($_POST['meeting_id'] ?? 0);
+                $response = callAPI('PUT', '/meetings/' . $meeting_id, $payload);
+                if (!empty($response['success'])) {
+                    $alert_message = 'جلسه ویرایش شد.';
+                    $alert_type = 'success';
+                } else {
+                    $alert_message = $response['message'] ?? 'خطا در ویرایش جلسه.';
+                    $reopen_modal = 'edit-meeting';
+                }
+            } else {
+                $payload['building_id'] = $building_id;
+                $response = callAPI('POST', '/meetings', $payload);
+                if (!empty($response['success'])) {
+                    $alert_message = 'جلسه با موفقیت ثبت شد.';
+                    $alert_type = 'success';
+                } else {
+                    $alert_message = $response['message'] ?? 'خطا در ثبت جلسه.';
+                    $reopen_modal = 'add-meeting';
+                }
+            }
         }
     }
 }
@@ -81,133 +101,153 @@ $meetings = [];
 $building_name = '';
 if ($building_id > 0) {
     $building_response = callAPI('GET', '/buildings/' . $building_id);
-    if (isset($building_response['success']) && $building_response['success'] === true) {
+    if (!empty($building_response['success'])) {
         $building_name = $building_response['data']['name'] ?? '';
     }
     $list_response = callAPI('GET', '/meetings', ['building_id' => $building_id]);
-    if (isset($list_response['success']) && $list_response['success'] === true) {
+    if (!empty($list_response['success'])) {
         $meetings = $list_response['data'] ?? [];
     }
 }
 
+$status_chips = [
+    'scheduled' => 'chip-gold',
+    'completed' => 'chip-green',
+    'cancelled' => 'chip-red',
+];
+
 $page_title = 'جلسات';
 $header_sub = $building_name ?: 'جلسات ساختمان';
-$back_url = 'building_view.php?id=' . $building_id;
-$active_nav = 'home';
-require_once 'includes/page_head.php';
+$back_url = 'dashboard.php?building_id=' . $building_id;
+$nav_active = 'none';
+$nav_building_id = $building_id;
+require_once 'includes/header.php';
 ?>
 
 <main class="p-5">
 
-    <!-- دکمه افزودن -->
-    <a href="#add-form"
-       class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg shadow-blue-600/25 transition-all active:scale-[0.98]">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-        </svg>
-        <span>ثبت جلسه جدید</span>
-    </a>
+    <?php if ($is_manager): ?>
+        <?php modal_open_button('add-meeting', 'ثبت جلسه جدید'); ?>
+    <?php else: ?>
+        <div class="hint-card">🤝 جلسات ساختمان توسط مدیر برنامه‌ریزی می‌شود؛ در ادامه می‌توانید زمان و صورت‌جلسه‌ها را ببینید.</div>
+    <?php endif; ?>
 
-    <!-- لیست جلسات -->
-    <h2 class="section-title">جلسات ساختمان</h2>
+    <div class="section-header-row" style="margin: 18px 0 12px;">
+        <h2 class="section-title">جلسات ساختمان (<?= fa_digits(count($meetings)) ?>)</h2>
+    </div>
 
     <?php if (empty($meetings)): ?>
-        <div class="card empty-state">
-            <div class="text-4xl mb-3">🤝</div>
+        <div class="empty-state">
+            <div style="font-size: 34px; margin-bottom: 8px;">🤝</div>
             جلسه‌ای ثبت نشده است.
         </div>
     <?php else: ?>
         <div class="space-y-3">
             <?php foreach ($meetings as $meeting): ?>
+                <?php
+                $m_id = (int) ($meeting['id'] ?? 0);
+                $m_title = $meeting['title'] ?? 'بدون عنوان';
+                $m_desc = $meeting['description'] ?? '';
+                $m_date = $meeting['meeting_date'] ?? '';
+                $m_loc = $meeting['location'] ?? '';
+                $m_status = $meeting['status'] ?? 'scheduled';
+                $m_minutes = $meeting['minutes_content'] ?? '';
+                ?>
                 <div class="card p-4">
                     <div class="flex items-start justify-between gap-3">
-                        <h3 class="font-bold text-gray-800 text-sm flex-1"><?= htmlspecialchars($meeting['title'] ?? 'بدون عنوان') ?></h3>
-                        <span class="text-[11px] px-2 py-0.5 rounded-full flex-shrink-0 <?= (($meeting['status'] ?? '') === 'completed') ? 'bg-green-100 text-green-700' : (($meeting['status'] ?? '') === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-blue-50 text-blue-700') ?>">
-                            <?= htmlspecialchars(meeting_status_label($meeting['status'] ?? 'scheduled')) ?>
+                        <h3 class="font-bold text-gray-800 text-sm flex-1"><?= htmlspecialchars($m_title) ?></h3>
+                        <span class="chip <?= $status_chips[$m_status] ?? 'chip-gray' ?>">
+                            <?= htmlspecialchars(meeting_status_label($m_status)) ?>
                         </span>
                     </div>
-                    <?php if (!empty($meeting['description'])): ?>
-                        <p class="text-sm text-gray-500 mt-2 leading-6"><?= nl2br(htmlspecialchars($meeting['description'])) ?></p>
+
+                    <?php if ($m_desc !== ''): ?>
+                        <p class="text-sm text-gray-500 mt-2 leading-6"><?= nl2br(htmlspecialchars($m_desc)) ?></p>
                     <?php endif; ?>
-                    <?php if (!empty($meeting['meeting_date']) || !empty($meeting['location'])): ?>
+
+                    <?php if ($m_date !== '' || $m_loc !== ''): ?>
                         <p class="text-xs text-gray-400 mt-2">
-                            📅 <?= htmlspecialchars($meeting['meeting_date'] ?? '') ?>
-                            <?php if (!empty($meeting['location'])): ?> • 📍 <?= htmlspecialchars($meeting['location']) ?><?php endif; ?>
+                            📅 <?= fa_digits($m_date) ?>
+                            <?php if ($m_loc !== ''): ?> • 📍 <?= htmlspecialchars($m_loc) ?><?php endif; ?>
                         </p>
                     <?php endif; ?>
-                    <!-- مدیریت جلسه -->
-                    <div class="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-                        <form method="POST" action="" class="flex items-center gap-2 flex-1">
-                            <input type="hidden" name="action" value="update_meeting_status">
-                            <input type="hidden" name="meeting_id" value="<?= (int) $meeting['id'] ?>">
-                            <select name="status" class="form-input text-xs py-2">
-                                <option value="scheduled" <?= ($meeting['status'] ?? '') === 'scheduled' ? 'selected' : '' ?>>برنامه‌ریزی شده</option>
-                                <option value="completed" <?= ($meeting['status'] ?? '') === 'completed' ? 'selected' : '' ?>>برگزار شده</option>
-                                <option value="cancelled" <?= ($meeting['status'] ?? '') === 'cancelled' ? 'selected' : '' ?>>لغو شده</option>
-                            </select>
-                            <button type="submit" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-3 py-2 rounded-lg transition-colors flex-shrink-0">
-                                ثبت وضعیت
+
+                    <?php if ($m_minutes !== ''): ?>
+                        <div class="hint-card" style="margin-top:10px;">
+                            <strong>صورت‌جلسه:</strong><br><?= nl2br(htmlspecialchars($m_minutes)) ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if ($is_manager): ?>
+                        <div class="card-actions" style="flex-wrap:wrap;">
+                            <button type="button" class="btn-chip btn-chip-edit"
+                                    data-modal-open="edit-meeting"
+                                    data-set-meeting_id="<?= $m_id ?>"
+                                    data-set-title="<?= htmlspecialchars($m_title) ?>"
+                                    data-set-description="<?= htmlspecialchars($m_desc) ?>"
+                                    data-set-meeting_date="<?= htmlspecialchars($m_date) ?>"
+                                    data-set-location="<?= htmlspecialchars($m_loc) ?>">
+                                ویرایش
                             </button>
-                        </form>
-                        <form method="POST" action="" data-confirm="این جلسه حذف شود؟">
-                            <input type="hidden" name="action" value="delete_meeting">
-                            <input type="hidden" name="meeting_id" value="<?= (int) $meeting['id'] ?>">
-                            <button type="submit" class="text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-lg transition-colors flex-shrink-0">
-                                حذف
+                            <button type="button" class="btn-chip btn-chip-neutral"
+                                    data-modal-open="add-minutes"
+                                    data-set-meeting_id="<?= $m_id ?>"
+                                    data-set-minutes_content="<?= htmlspecialchars($m_minutes) ?>">
+                                صورت‌جلسه
                             </button>
-                        </form>
-                    </div>
-                    <!-- صورت‌جلسه -->
-                    <form method="POST" action="" class="mt-3 pt-3 border-t border-dashed border-gray-200">
-                        <input type="hidden" name="action" value="add_minutes">
-                        <input type="hidden" name="meeting_id" value="<?= (int) $meeting['id'] ?>">
-                        <label class="form-label text-[11px]">صورت‌جلسه</label>
-                        <textarea name="minutes_content" rows="2" class="form-input text-sm" placeholder="خلاصه تصمیمات این جلسه..."></textarea>
-                        <button type="submit" class="mt-2 text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold px-3 py-2 rounded-lg transition-colors">
-                            ثبت صورت‌جلسه
-                        </button>
-                    </form>
+                            <form method="POST" action="" style="display:flex;gap:6px;align-items:center;flex:1;min-width:170px;">
+                                <input type="hidden" name="form_action" value="update_status">
+                                <input type="hidden" name="meeting_id" value="<?= $m_id ?>">
+                                <select name="status" class="form-input" style="padding:7px 10px;font-size:11.5px;flex:1;">
+                                    <option value="scheduled" <?= $m_status === 'scheduled' ? 'selected' : '' ?>>برنامه‌ریزی شده</option>
+                                    <option value="completed" <?= $m_status === 'completed' ? 'selected' : '' ?>>برگزار شده</option>
+                                    <option value="cancelled" <?= $m_status === 'cancelled' ? 'selected' : '' ?>>لغو شده</option>
+                                </select>
+                                <button type="submit" class="btn-chip btn-chip-neutral">ثبت</button>
+                            </form>
+                            <form method="POST" action="" data-confirm="این جلسه حذف شود؟" style="display:inline;">
+                                <input type="hidden" name="form_action" value="delete">
+                                <input type="hidden" name="meeting_id" value="<?= $m_id ?>">
+                                <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
+                            </form>
+                        </div>
+                    <?php endif; ?>
                 </div>
             <?php endforeach; ?>
         </div>
     <?php endif; ?>
 
-    <!-- فرم افزودن -->
-    <div id="add-form" class="card p-5 mt-6">
-        <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            ثبت جلسه جدید
-        </h3>
-        <form method="POST" action="" class="space-y-4">
-            <div>
-                <label for="title" class="form-label">عنوان جلسه *</label>
-                <input type="text" id="title" name="title" required class="form-input" placeholder="مثال: جلسه مجمع سالیانه">
-            </div>
-            <div>
-                <label for="description" class="form-label">دستور جلسه (اختیاری)</label>
-                <textarea id="description" name="description" rows="2" class="form-input" placeholder="موارد دستور جلسه..."></textarea>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label for="meeting_date" class="form-label">تاریخ جلسه</label>
-                    <input type="date" id="meeting_date" name="meeting_date" class="form-input">
-                </div>
-                <div>
-                    <label for="location" class="form-label">مکان</label>
-                    <input type="text" id="location" name="location" class="form-input" placeholder="مثال: سالن اجتماعات">
-                </div>
-            </div>
-            <button type="submit" class="btn-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                ثبت جلسه
-            </button>
-        </form>
-    </div>
-
 </main>
 
-<?php require_once 'includes/page_tail.php'; ?>
+<?php if ($is_manager): ?>
+    <?php modal_start('add-meeting', 'ثبت جلسه جدید', 'عنوان، زمان و محل برگزاری'); ?>
+        <form method="POST" action="" class="space-y-4" data-loading>
+            <input type="hidden" name="form_action" value="create">
+            <?php include 'includes/_meeting_form_fields.php'; ?>
+            <button type="submit" class="btn-primary">ثبت جلسه</button>
+        </form>
+    <?php modal_end(); ?>
+
+    <?php modal_start('edit-meeting', 'ویرایش جلسه', 'اصلاح اطلاعات جلسه'); ?>
+        <form method="POST" action="" class="space-y-4" data-loading>
+            <input type="hidden" name="form_action" value="update">
+            <input type="hidden" name="meeting_id" value="">
+            <?php include 'includes/_meeting_form_fields.php'; ?>
+            <button type="submit" class="btn-primary">ذخیره تغییرات</button>
+        </form>
+    <?php modal_end(); ?>
+
+    <?php modal_start('add-minutes', 'ثبت صورت‌جلسه', 'خلاصه تصمیمات این جلسه'); ?>
+        <form method="POST" action="" class="space-y-4" data-loading>
+            <input type="hidden" name="form_action" value="add_minutes">
+            <input type="hidden" name="meeting_id" value="">
+            <div>
+                <label class="form-label">متن صورت‌جلسه *</label>
+                <textarea name="minutes_content" rows="6" required class="form-input" placeholder="تصمیمات و مصوبات جلسه..."></textarea>
+            </div>
+            <button type="submit" class="btn-primary">ثبت صورت‌جلسه</button>
+        </form>
+    <?php modal_end(); ?>
+<?php endif; ?>
+
+<?php require_once 'includes/footer.php'; ?>

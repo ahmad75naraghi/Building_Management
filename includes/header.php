@@ -14,6 +14,7 @@
  *   $alert_message  متن پیام خطا/موفقیت (اختیاری)
  *   $alert_type     error|success (پیش‌فرض: error)
  *   $standalone     اگر true باشد فقط <head> و <body> بدون هدر اپ (برای صفحات ورود/ثبت‌نام)
+ *   $reopen_modal   شناسه پاپ‌آپی که بعد از ارسال ناموفق فرم دوباره باز شود
  *   $header_variant اگر 'home' باشد، هدر اصلی (زنگ + عنوان + دکمه پروفایل) به‌جای هدر
  *                   صفحات داخلی (دکمه بازگشت) نمایش داده می‌شود.
  * ============================================================ */
@@ -26,6 +27,10 @@ $alert_message = $alert_message ?? '';
 $alert_type   = $alert_type ?? 'error';
 $standalone   = $standalone ?? false;
 $header_variant = $header_variant ?? 'subpage';
+$reopen_modal = $reopen_modal ?? '';
+
+// کامپوننت پاپ‌آپ مشترک در همه صفحات در دسترس باشد
+require_once __DIR__ . '/modal.php';
 
 // اگر تعداد اعلانات تعیین نشده بود، از API خوانده شود (نمایش نشان ناوبری و زنگ)
 if (!isset($unread_nav) && function_exists('callAPI')) {
@@ -58,7 +63,7 @@ if (!isset($unread_nav)) {
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
-<body class="app-body">
+<body class="app-body"<?= $reopen_modal !== '' ? ' data-reopen-modal="' . htmlspecialchars($reopen_modal) . '"' : '' ?>>
 
     <div class="app-container">
 

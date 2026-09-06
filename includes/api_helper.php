@@ -343,4 +343,111 @@ function member_role_label($role)
     return $map[$role] ?? 'عضو';
 }
 
+
+/**
+ * زمینه نقش کاربر جاری در یک ساختمان.
+ *
+ * خروجی: آرایه‌ای شامل
+ *   user_id        شناسه کاربر جاری
+ *   role           manager | owner | tenant | resident | board
+ *   role_label     برچسب فارسی نقش
+ *   is_manager     مدیر ساختمان؟
+ *   is_owner       مالک؟
+ *   is_tenant      مستأجر؟
+ *   is_resident    آیا این کاربر واقعاً در ساختمان ساکن است؟
+ *   units          واحدهایی که کاربر با آن‌ها در ارتباط است
+ *
+ * نتیجه در طول یک درخواست کش می‌شود تا API چند بار صدا زده نشود.
+ */
+function building_role_context($building_id)
+{
+    static $cache = [];
+    $building_id = (int) $building_id;
+    if (isset($cache[$building_id])) {
+        return $cache[$building_id];
+    }
+
+    $ctx = [
+        'user_id' => 0,
+        'role' => 'resident',
+        'role_label' => 'عضو',
+        'is_manager' => false,
+        'is_owner' => false,
+        'is_tenant' => false,
+        'is_resident' => false,
+        'units' => [],
+    ];
+
+    $me = callAPI('GET', '/auth/me');
+    if (!empty($me['success'])) {
+        $ctx['user_id'] = (int) ($me['data']['id'] ?? 0);
+    }
+
+    if ($building_id > 0 && $ctx['user_id'] > 0) {
+        $members = callAPI('GET', '/buildings/' . $building_id . '/members');
+        if (!empty($members['success'])) {
+            foreach (($members['data'] ?? []) as $m) {
+                if ((int) ($m['user_id'] ?? 0) === $ctx['user_id']) {
+                    $ctx['role'] = $m['role'] ?? 'resident';
+                    break;
+                }
+            }
+        }
+
+        // تعیین مالک/مستأجر/ساکن بودن از روی واحدها (منبع حقیقت واقعی)
+        $units_resp = callAPI('GET', '/buildings/' . $building_id . '/units');
+        if (!empty($units_resp['success'])) {
+            foreach (($units_resp['data']['units'] ?? []) as $u) {
+                $is_owner = (int) ($u['owner_user_id'] ?? 0) === $ctx['user_id'];
+                $is_tenant = (int) ($u['tenant_user_id'] ?? 0) === $ctx['user_id'];
+                if (!$is_owner && !$is_tenant) {
+                    continue;
+                }
+                $ctx['units'][] = $u;
+                if ($is_owner) {
+                    $ctx['is_owner'] = true;
+                    // مالک وقتی ساکن است که owner_resident فعال باشد
+                    if (!empty($u['owner_resident'])) {
+                        $ctx['is_resident'] = true;
+                    }
+                }
+                if ($is_tenant) {
+                    // مستأجر همیشه ساکن واحد است
+                    $ctx['is_tenant'] = true;
+                    $ctx['is_resident'] = true;
+                }
+            }
+        }
+    }
+
+    $ctx['is_manager'] = ($ctx['role'] === 'manager');
+    // اگر نقش عضویت صراحتاً مالک/مستأجر بود ولی واحدی ثبت نشده، همان را لحاظ کن
+    if (!$ctx['is_owner'] && $ctx['role'] === 'owner') {
+        $ctx['is_owner'] = true;
+    }
+    if (!$ctx['is_tenant'] && $ctx['role'] === 'tenant') {
+        $ctx['is_tenant'] = true;
+        $ctx['is_resident'] = true;
+    }
+    $ctx['role_label'] = member_role_label($ctx['role']);
+
+    $cache[$building_id] = $ctx;
+    return $ctx;
+}
+
+/**
+ * برچسب وضعیت سکونت یک واحد.
+ */
+function occupancy_label($unit)
+{
+    $status = $unit['occupancy_status'] ?? '';
+    $map = [
+        'owner_occupied' => 'مالک ساکن است',
+        'tenant_occupied' => 'مستأجر ساکن است',
+        'vacant' => 'خالی',
+        'no_owner' => 'بدون مالک',
+    ];
+    return $map[$status] ?? 'نامشخص';
+}
+
 ?>

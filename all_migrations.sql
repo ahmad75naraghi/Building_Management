@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS buildings (
     parking_spots INT NOT NULL DEFAULT 0,
     monthly_charge DECIMAL(15,2) NOT NULL DEFAULT 0,
     monthly_charge_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    charge_mode VARCHAR(20) NOT NULL DEFAULT 'fixed', -- fixed | per_person | custom
+    charge_per_person DECIMAL(15,2) NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL DEFAULT NULL,
@@ -112,6 +114,8 @@ CREATE TABLE IF NOT EXISTS units (
     owner_user_id INT DEFAULT NULL,
     tenant_user_id INT DEFAULT NULL,
     owner_resident TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'آیا مالک در واحد ساکن است (1) یا نه (0)',
+    residents_count INT NOT NULL DEFAULT 0 COMMENT 'تعداد نفرات ساکن واحد (مبنای شارژ نفری)',
+    custom_charge DECIMAL(15,2) NULL DEFAULT NULL COMMENT 'شارژ دلخواه این واحد (حالت custom)',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (building_id) REFERENCES buildings(id) ON DELETE CASCADE,
     FOREIGN KEY (block_id) REFERENCES blocks(id) ON DELETE SET NULL,

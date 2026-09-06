@@ -30,10 +30,14 @@ final class Routes
         // Blocks
         'POST /api/buildings/{building_id}/blocks' => ['App\Http\Controllers\BuildingController', 'storeBlock'],
         'GET /api/buildings/{building_id}/blocks' => ['App\Http\Controllers\BuildingController', 'indexBlocks'],
+        'PUT /api/blocks/{id}' => ['App\Http\Controllers\BuildingController', 'updateBlock'],
+        'DELETE /api/blocks/{id}' => ['App\Http\Controllers\BuildingController', 'destroyBlock'],
 
         // Floors
         'POST /api/buildings/{building_id}/floors' => ['App\Http\Controllers\BuildingController', 'storeFloor'],
         'GET /api/buildings/{building_id}/floors' => ['App\Http\Controllers\BuildingController', 'indexFloors'],
+        'PUT /api/floors/{id}' => ['App\Http\Controllers\BuildingController', 'updateFloor'],
+        'DELETE /api/floors/{id}' => ['App\Http\Controllers\BuildingController', 'destroyFloor'],
 
         // Units
         'POST /api/buildings/{building_id}/units' => ['App\Http\Controllers\BuildingController', 'storeUnit'],
@@ -44,6 +48,8 @@ final class Routes
         // Common Areas
         'POST /api/buildings/{building_id}/common-areas' => ['App\Http\Controllers\BuildingController', 'storeCommonArea'],
         'GET /api/buildings/{building_id}/common-areas' => ['App\Http\Controllers\BuildingController', 'indexCommonAreas'],
+        'PUT /api/common-areas/{id}' => ['App\Http\Controllers\BuildingController', 'updateCommonArea'],
+        'DELETE /api/common-areas/{id}' => ['App\Http\Controllers\BuildingController', 'destroyCommonArea'],
 
         // Members / Invitations
         'POST /api/buildings/{building_id}/invitations' => ['App\Http\Controllers\BuildingController', 'createInvitation'],
@@ -69,6 +75,9 @@ final class Routes
         'GET /api/costs/summary' => ['App\Http\Controllers\CostController', 'summary'],
         'POST /api/costs' => ['App\Http\Controllers\CostController', 'store'],
         'POST /api/costs/monthly-charge' => ['App\Http\Controllers\CostController', 'monthlyCharge'],
+        'GET /api/costs/charge-preview' => ['App\Http\Controllers\CostController', 'chargePreview'],
+        'PUT /api/costs/{id}' => ['App\Http\Controllers\CostController', 'update'],
+        'DELETE /api/costs/{id}' => ['App\Http\Controllers\CostController', 'destroy'],
         'GET /api/payments' => ['App\Http\Controllers\CostController', 'indexPayments'],
         'POST /api/payments/submit' => ['App\Http\Controllers\CostController', 'submitPayment'],
         'POST /api/payments/{payment_id}/upload-receipt' => ['App\Http\Controllers\CostController', 'uploadReceipt'],
@@ -118,6 +127,18 @@ final class Routes
         'PUT /api/visitors/{id}/checkout' => ['App\Http\Controllers\ExtraModulesController', 'visitorCheckout'],
         'PUT /api/meetings/{id}/status' => ['App\Http\Controllers\ExtraModulesController', 'updateMeetingStatus'],
         'PUT /api/votes/{id}/status' => ['App\Http\Controllers\ExtraModulesController', 'updateVoteStatus'],
+
+        // Editing (Phase 6+ modules) — ویرایش هر چیزی که ثبت شده
+        'PUT /api/bookings/{id}' => ['App\Http\Controllers\ExtraModulesController', 'updateBooking'],
+        'PUT /api/announcements/{id}' => ['App\Http\Controllers\ExtraModulesController', 'updateAnnouncement'],
+        'PUT /api/maintenance/{id}' => ['App\Http\Controllers\ExtraModulesController', 'updateMaintenance'],
+        'PUT /api/visitors/{id}' => ['App\Http\Controllers\ExtraModulesController', 'updateVisitor'],
+        'PUT /api/documents/{id}' => ['App\Http\Controllers\ExtraModulesController', 'updateDocument'],
+        'PUT /api/consumption/{id}' => ['App\Http\Controllers\ExtraModulesController', 'updateConsumption'],
+        'PUT /api/emergency-contacts/{id}' => ['App\Http\Controllers\ExtraModulesController', 'updateEmergencyContact'],
+        'PUT /api/meetings/{id}' => ['App\Http\Controllers\ExtraModulesController', 'updateMeeting'],
+        'PUT /api/reviews/{id}' => ['App\Http\Controllers\ExtraModulesController', 'updateReview'],
+        'PUT /api/votes/{id}' => ['App\Http\Controllers\ExtraModulesController', 'updateVote'],
 
         // Deletion (Phase 6+ modules)
         'DELETE /api/bookings/{id}' => ['App\Http\Controllers\ExtraModulesController', 'destroyBooking'],

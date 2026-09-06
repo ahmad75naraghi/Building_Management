@@ -49,6 +49,9 @@ final class BuildingService
         $building->monthly_charge_enabled = isset($data['monthly_charge_enabled'])
             ? (bool) $data['monthly_charge_enabled']
             : ($building->monthly_charge > 0);
+        $building->charge_mode = self::normalizeChargeMode($data['charge_mode'] ?? 'fixed');
+        $building->charge_per_person = isset($data['charge_per_person'])
+            ? max(0, (float) $data['charge_per_person']) : 0.0;
 
         $id = $this->repo->create($building);
         $building->id = $id;
@@ -237,6 +240,12 @@ final class BuildingService
         if (array_key_exists('monthly_charge_enabled', $data)) {
             $building->monthly_charge_enabled = (bool) $data['monthly_charge_enabled'];
         }
+        if (array_key_exists('charge_mode', $data)) {
+            $building->charge_mode = self::normalizeChargeMode($data['charge_mode']);
+        }
+        if (array_key_exists('charge_per_person', $data)) {
+            $building->charge_per_person = max(0, (float) $data['charge_per_person']);
+        }
 
         if (!empty($data['hierarchy_settings']) && is_array($data['hierarchy_settings'])) {
             $building->hierarchy_settings = $data['hierarchy_settings'];
@@ -245,6 +254,15 @@ final class BuildingService
 
         $this->repo->update($building);
         return $this->repo->findById($id);
+    }
+
+    /**
+     * اعتبارسنجی حالت شارژ. مقادیر مجاز: fixed | per_person | custom
+     */
+    public static function normalizeChargeMode($mode): string
+    {
+        $mode = is_string($mode) ? $mode : 'fixed';
+        return in_array($mode, ['fixed', 'per_person', 'custom'], true) ? $mode : 'fixed';
     }
 
     public function deleteBuilding(int $buildingId): bool

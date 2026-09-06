@@ -11,50 +11,74 @@ $building_id = (int) ($_GET['building_id'] ?? $_SESSION['active_building_id'] ??
 
 $alert_message = '';
 $alert_type = 'error';
+$reopen_modal = '';
 
-// دریافت لیست واحدها (برای انتخاب در فرم)
+// قرائت کنتور: مدیر برای همه واحدها، ساکن فقط برای واحد خودش.
+$ctx = building_role_context($building_id);
+$is_manager = $ctx['is_manager'];
+$current_user_id = $ctx['user_id'];
+$my_unit_ids = array_map(static fn($u) => (int) ($u['id'] ?? 0), $ctx['units']);
+
+// واحدهای قابل انتخاب
 $units = [];
 if ($building_id > 0) {
     $units_response = callAPI('GET', '/buildings/' . $building_id . '/units');
-    if (isset($units_response['success']) && $units_response['success'] === true) {
+    if (!empty($units_response['success'])) {
         $units = $units_response['data']['units'] ?? [];
     }
 }
+$selectable_units = $is_manager
+    ? $units
+    : array_values(array_filter($units, static fn($u) => in_array((int) ($u['id'] ?? 0), $my_unit_ids, true)));
 
-// ثبت قرائت کنتور
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $building_id > 0) {
-    $amount = trim($_POST['reading_value'] ?? '');
-    if ($amount === '') {
-        $alert_message = 'مقدار قرائت را وارد کنید.';
-    } else {
-        $payload = [
-            'building_id' => $building_id,
-            'unit_id' => !empty($_POST['unit_id']) ? (int) $_POST['unit_id'] : null,
-            'consumption_type' => $_POST['consumption_type'] ?? 'water',
-            'reading_value' => (float) $amount,
-            'reading_date' => !empty($_POST['reading_date']) ? $_POST['reading_date'] : null,
-            'notes' => trim($_POST['notes'] ?? ''),
-        ];
-        $response = callAPI('POST', '/consumption', $payload);
-        if (isset($response['success']) && $response['success'] === true) {
-            $alert_message = 'قرائت کنتور با موفقیت ثبت شد.';
+    $action = $_POST['form_action'] ?? 'create';
+
+    if ($action === 'delete') {
+        $item_id = (int) ($_POST['item_id'] ?? 0);
+        $response = callAPI('DELETE', '/consumption/' . $item_id);
+        if (!empty($response['success'])) {
+            $alert_message = 'قرائت حذف شد.';
             $alert_type = 'success';
         } else {
-            $alert_message = $response['message'] ?? 'خطا در ثبت قرائت.';
+            $alert_message = $response['message'] ?? 'خطا در حذف قرائت.';
         }
-    }
-} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    $action_name = $_POST['action'];
-
-    if ($action_name === 'delete_consumption') {
-        $item_id = (int) ($_POST['item_id'] ?? 0);
-        if ($item_id > 0) {
-            $response = callAPI('DELETE', '/consumption/' . $item_id);
-            if (isset($response['success']) && $response['success'] === true) {
-                $alert_message = 'حذف با موفقیت انجام شد.';
-                $alert_type = 'success';
+    } else {
+        $amount = en_digits(trim($_POST['reading_value'] ?? ''));
+        $unit_id = !empty($_POST['unit_id']) ? (int) $_POST['unit_id'] : null;
+        if ($amount === '' || !is_numeric($amount)) {
+            $alert_message = 'مقدار قرائت را وارد کنید.';
+            $reopen_modal = $action === 'update' ? 'edit-reading' : 'add-reading';
+        } elseif (!$is_manager && $unit_id !== null && !in_array($unit_id, $my_unit_ids, true)) {
+            $alert_message = 'شما فقط می‌توانید برای واحد خودتان قرائت ثبت کنید.';
+        } else {
+            $payload = [
+                'unit_id' => $unit_id,
+                'consumption_type' => $_POST['consumption_type'] ?? 'water',
+                'reading_value' => (float) $amount,
+                'reading_date' => !empty($_POST['reading_date']) ? $_POST['reading_date'] : null,
+                'notes' => trim($_POST['notes'] ?? ''),
+            ];
+            if ($action === 'update') {
+                $item_id = (int) ($_POST['item_id'] ?? 0);
+                $response = callAPI('PUT', '/consumption/' . $item_id, $payload);
+                if (!empty($response['success'])) {
+                    $alert_message = 'قرائت ویرایش شد.';
+                    $alert_type = 'success';
+                } else {
+                    $alert_message = $response['message'] ?? 'خطا در ویرایش قرائت.';
+                    $reopen_modal = 'edit-reading';
+                }
             } else {
-                $alert_message = $response['message'] ?? 'خطا در حذف.';
+                $payload['building_id'] = $building_id;
+                $response = callAPI('POST', '/consumption', $payload);
+                if (!empty($response['success'])) {
+                    $alert_message = 'قرائت با موفقیت ثبت شد.';
+                    $alert_type = 'success';
+                } else {
+                    $alert_message = $response['message'] ?? 'خطا در ثبت قرائت.';
+                    $reopen_modal = 'add-reading';
+                }
             }
         }
     }
@@ -65,130 +89,127 @@ $readings = [];
 $building_name = '';
 if ($building_id > 0) {
     $building_response = callAPI('GET', '/buildings/' . $building_id);
-    if (isset($building_response['success']) && $building_response['success'] === true) {
+    if (!empty($building_response['success'])) {
         $building_name = $building_response['data']['name'] ?? '';
     }
     $list_response = callAPI('GET', '/consumption', ['building_id' => $building_id]);
-    if (isset($list_response['success']) && $list_response['success'] === true) {
+    if (!empty($list_response['success'])) {
         $readings = $list_response['data'] ?? [];
     }
 }
 
+// ساکن غیر مدیر فقط قرائت‌های واحد خودش را می‌بیند
+if (!$is_manager) {
+    $readings = array_values(array_filter($readings, static function ($r) use ($my_unit_ids, $current_user_id) {
+        return in_array((int) ($r['unit_id'] ?? 0), $my_unit_ids, true)
+            || (int) ($r['created_by'] ?? 0) === $current_user_id;
+    }));
+}
+
 $unit_labels = [];
 foreach ($units as $u) {
-    $unit_labels[$u['id']] = 'واحد ' . ($u['unit_number'] ?? $u['id']);
+    $unit_labels[$u['id']] = 'واحد ' . fa_digits($u['unit_number'] ?? $u['id']);
 }
 
 $page_title = 'مصرف انرژی';
 $header_sub = $building_name ?: 'قرائت کنتور';
-$back_url = 'building_view.php?id=' . $building_id;
-$active_nav = 'home';
-require_once 'includes/page_head.php';
+$back_url = 'dashboard.php?building_id=' . $building_id;
+$nav_active = 'none';
+$nav_building_id = $building_id;
+require_once 'includes/header.php';
 ?>
 
 <main class="p-5">
 
-    <!-- دکمه افزودن -->
-    <a href="#add-form"
-       class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg shadow-blue-600/25 transition-all active:scale-[0.98]">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-        </svg>
-        <span>ثبت قرائت جدید</span>
-    </a>
+    <?php if ($is_manager || !empty($selectable_units)): ?>
+        <?php modal_open_button('add-reading', 'ثبت قرائت جدید'); ?>
+    <?php else: ?>
+        <div class="hint-card">⚡ برای ثبت قرائت، ابتدا باید واحدی به نام شما در ساختمان ثبت شده باشد.</div>
+    <?php endif; ?>
 
-    <!-- لیست قرائت‌ها -->
-    <h2 class="section-title">قرائت‌های ثبت‌شده</h2>
+    <div class="section-header-row" style="margin: 18px 0 12px;">
+        <h2 class="section-title">قرائت‌های ثبت‌شده (<?= fa_digits(count($readings)) ?>)</h2>
+    </div>
 
     <?php if (empty($readings)): ?>
-        <div class="card empty-state">
-            <div class="text-4xl mb-3">⚡</div>
+        <div class="empty-state">
+            <div style="font-size: 34px; margin-bottom: 8px;">⚡</div>
             قرائتی ثبت نشده است.
         </div>
     <?php else: ?>
         <div class="space-y-3">
             <?php foreach ($readings as $reading): ?>
+                <?php
+                $r_id = (int) ($reading['id'] ?? 0);
+                $r_unit = (int) ($reading['unit_id'] ?? 0);
+                $r_type = $reading['consumption_type'] ?? 'water';
+                $r_value = $reading['reading_value'] ?? 0;
+                $r_date = $reading['reading_date'] ?? '';
+                $r_notes = $reading['notes'] ?? '';
+                $can_modify = $is_manager
+                    || in_array($r_unit, $my_unit_ids, true)
+                    || (int) ($reading['created_by'] ?? 0) === $current_user_id;
+                ?>
                 <div class="card p-4">
-                    <div class="flex items-center gap-4">
-                        <div class="w-11 h-11 rounded-xl bg-green-50 text-green-600 flex items-center justify-center flex-shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
-                        </div>
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 rounded-xl bg-green-50 text-green-600 flex items-center justify-center flex-shrink-0" style="font-size:19px;">⚡</div>
                         <div class="flex-1 min-w-0">
                             <h3 class="font-bold text-gray-800 text-sm">
-                                <?= htmlspecialchars(consumption_type_label($reading['consumption_type'] ?? '')) ?>
-                                <span class="text-gray-400 font-normal">— <?= htmlspecialchars($unit_labels[$reading['unit_id'] ?? ''] ?? ('واحد ' . ($reading['unit_id'] ?? '—'))) ?></span>
+                                <?= htmlspecialchars(consumption_type_label($r_type)) ?>
+                                <span class="text-gray-400 font-normal">— <?= htmlspecialchars($unit_labels[$r_unit] ?? 'مشاعات') ?></span>
                             </h3>
                             <p class="text-sm text-gray-500 mt-1">
-                                مقدار: <?= fa_number($reading['reading_value'] ?? 0) ?>
-                                <?php if (!empty($reading['reading_date'])): ?>
-                                    • <?= htmlspecialchars($reading['reading_date']) ?>
-                                <?php endif; ?>
+                                مقدار: <?= fa_number($r_value) ?>
+                                <?php if ($r_date !== ''): ?> • <?= fa_digits($r_date) ?><?php endif; ?>
                             </p>
                         </div>
-                        <form method="POST" action="" data-confirm="این قرائت حذف شود؟">
-                            <input type="hidden" name="action" value="delete_consumption">
-                            <input type="hidden" name="item_id" value="<?= (int) $reading['id'] ?>">
-                            <button type="submit" class="text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-lg transition-colors flex-shrink-0">
-                                حذف
-                            </button>
-                        </form>
                     </div>
+
+                    <?php if ($r_notes !== ''): ?>
+                        <p class="text-xs text-gray-400 mt-2 leading-6"><?= nl2br(htmlspecialchars($r_notes)) ?></p>
+                    <?php endif; ?>
+
+                    <?php if ($can_modify): ?>
+                        <div class="card-actions">
+                            <button type="button" class="btn-chip btn-chip-edit"
+                                    data-modal-open="edit-reading"
+                                    data-set-item_id="<?= $r_id ?>"
+                                    data-set-unit_id="<?= $r_unit ?>"
+                                    data-set-consumption_type="<?= htmlspecialchars($r_type) ?>"
+                                    data-set-reading_value="<?= htmlspecialchars((string) $r_value) ?>"
+                                    data-set-reading_date="<?= htmlspecialchars($r_date) ?>"
+                                    data-set-notes="<?= htmlspecialchars($r_notes) ?>">
+                                ویرایش
+                            </button>
+                            <form method="POST" action="" data-confirm="این قرائت حذف شود؟" style="display:inline;">
+                                <input type="hidden" name="form_action" value="delete">
+                                <input type="hidden" name="item_id" value="<?= $r_id ?>">
+                                <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
+                            </form>
+                        </div>
+                    <?php endif; ?>
                 </div>
             <?php endforeach; ?>
         </div>
     <?php endif; ?>
 
-    <!-- فرم افزودن -->
-    <div id="add-form" class="card p-5 mt-6">
-        <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            ثبت قرائت کنتور
-        </h3>
-        <form method="POST" action="" class="space-y-4">
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label for="consumption_type" class="form-label">نوع مصرف</label>
-                    <select id="consumption_type" name="consumption_type" class="form-input">
-                        <option value="water">آب</option>
-                        <option value="electricity">برق</option>
-                        <option value="gas">گاز</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="unit_id" class="form-label">واحد</label>
-                    <select id="unit_id" name="unit_id" class="form-input">
-                        <option value="">— بدون واحد —</option>
-                        <?php foreach ($units as $u): ?>
-                            <option value="<?= (int) $u['id'] ?>"><?= htmlspecialchars($unit_labels[$u['id']]) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-            </div>
-            <div>
-                <label for="reading_value" class="form-label">مقدار قرائت *</label>
-                <input type="number" id="reading_value" name="reading_value" required min="0" step="0.1" class="form-input" placeholder="مثال: 150">
-            </div>
-            <div>
-                <label for="reading_date" class="form-label">تاریخ قرائت</label>
-                <input type="date" id="reading_date" name="reading_date" class="form-input">
-            </div>
-            <div>
-                <label for="notes" class="form-label">یادداشت (اختیاری)</label>
-                <textarea id="notes" name="notes" rows="2" class="form-input" placeholder="توضیح اضافه..."></textarea>
-            </div>
-            <button type="submit" class="btn-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                ثبت قرائت
-            </button>
-        </form>
-    </div>
-
 </main>
 
-<?php require_once 'includes/page_tail.php'; ?>
+<?php modal_start('add-reading', 'ثبت قرائت کنتور', 'نوع مصرف، واحد و مقدار'); ?>
+    <form method="POST" action="" class="space-y-4" data-loading>
+        <input type="hidden" name="form_action" value="create">
+        <?php include 'includes/_consumption_form_fields.php'; ?>
+        <button type="submit" class="btn-primary">ثبت قرائت</button>
+    </form>
+<?php modal_end(); ?>
+
+<?php modal_start('edit-reading', 'ویرایش قرائت', 'اصلاح مقدار یا تاریخ قرائت'); ?>
+    <form method="POST" action="" class="space-y-4" data-loading>
+        <input type="hidden" name="form_action" value="update">
+        <input type="hidden" name="item_id" value="">
+        <?php include 'includes/_consumption_form_fields.php'; ?>
+        <button type="submit" class="btn-primary">ذخیره تغییرات</button>
+    </form>
+<?php modal_end(); ?>
+
+<?php require_once 'includes/footer.php'; ?>

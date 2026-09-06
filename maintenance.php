@@ -11,50 +11,73 @@ $building_id = (int) ($_GET['building_id'] ?? $_SESSION['active_building_id'] ??
 
 $alert_message = '';
 $alert_type = 'error';
+$reopen_modal = '';
 
-// ثبت درخواست تعمیرات
+// نقش کاربر: همه اعضا می‌توانند درخواست ثبت کنند؛
+// تغییر وضعیت فقط برای مدیر، ویرایش/حذف برای مدیر یا ثبت‌کننده همان درخواست.
+$ctx = building_role_context($building_id);
+$is_manager = $ctx['is_manager'];
+$current_user_id = $ctx['user_id'];
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $building_id > 0) {
-    $title = trim($_POST['title'] ?? '');
-    if ($title === '') {
-        $alert_message = 'عنوان مشکل را وارد کنید.';
-    } else {
-        $payload = [
-            'building_id' => $building_id,
-            'title' => $title,
-            'description' => trim($_POST['description'] ?? ''),
-        ];
-        $response = callAPI('POST', '/maintenance', $payload);
-        if (isset($response['success']) && $response['success'] === true) {
-            $alert_message = 'درخواست تعمیرات با موفقیت ثبت شد.';
-            $alert_type = 'success';
-        } else {
-            $alert_message = $response['message'] ?? 'خطا در ثبت درخواست.';
-        }
-    }
-} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    $action = $_POST['action'];
+    $action = $_POST['form_action'] ?? 'create';
 
-    if ($action === 'update_maintenance_status') {
-        $request_id = (int) ($_POST['request_id'] ?? 0);
-        $status = trim($_POST['status'] ?? '');
-        if ($request_id > 0 && in_array($status, ['pending', 'in_progress', 'resolved', 'closed'], true)) {
-            $response = callAPI('PUT', '/maintenance/' . $request_id . '/status', ['status' => $status]);
-            if (isset($response['success']) && $response['success'] === true) {
-                $alert_message = 'وضعیت درخواست به‌روزرسانی شد.';
-                $alert_type = 'success';
-            } else {
-                $alert_message = $response['message'] ?? 'خطا در تغییر وضعیت.';
+    if ($action === 'update_status') {
+        if (!$is_manager) {
+            $alert_message = 'تغییر وضعیت درخواست فقط توسط مدیر ساختمان انجام می‌شود.';
+        } else {
+            $request_id = (int) ($_POST['request_id'] ?? 0);
+            $status = trim($_POST['status'] ?? '');
+            if ($request_id > 0 && in_array($status, ['pending', 'in_progress', 'resolved', 'closed'], true)) {
+                $response = callAPI('PUT', '/maintenance/' . $request_id . '/status', ['status' => $status]);
+                if (!empty($response['success'])) {
+                    $alert_message = 'وضعیت درخواست به‌روزرسانی شد.';
+                    $alert_type = 'success';
+                } else {
+                    $alert_message = $response['message'] ?? 'خطا در تغییر وضعیت.';
+                }
             }
         }
-    } elseif ($action === 'delete_maintenance') {
+    } elseif ($action === 'delete') {
         $request_id = (int) ($_POST['request_id'] ?? 0);
-        if ($request_id > 0) {
-            $response = callAPI('DELETE', '/maintenance/' . $request_id);
-            if (isset($response['success']) && $response['success'] === true) {
-                $alert_message = 'درخواست حذف شد.';
+        $response = callAPI('DELETE', '/maintenance/' . $request_id);
+        if (!empty($response['success'])) {
+            $alert_message = 'درخواست حذف شد.';
+            $alert_type = 'success';
+        } else {
+            $alert_message = $response['message'] ?? 'خطا در حذف درخواست.';
+        }
+    } else {
+        $title = trim($_POST['title'] ?? '');
+        $description = trim($_POST['description'] ?? '');
+        if ($title === '') {
+            $alert_message = 'عنوان مشکل را وارد کنید.';
+            $reopen_modal = $action === 'update' ? 'edit-maintenance' : 'add-maintenance';
+        } elseif ($action === 'update') {
+            $request_id = (int) ($_POST['request_id'] ?? 0);
+            $response = callAPI('PUT', '/maintenance/' . $request_id, [
+                'title' => $title,
+                'description' => $description,
+            ]);
+            if (!empty($response['success'])) {
+                $alert_message = 'درخواست ویرایش شد.';
                 $alert_type = 'success';
             } else {
-                $alert_message = $response['message'] ?? 'خطا در حذف درخواست.';
+                $alert_message = $response['message'] ?? 'خطا در ویرایش درخواست.';
+                $reopen_modal = 'edit-maintenance';
+            }
+        } else {
+            $response = callAPI('POST', '/maintenance', [
+                'building_id' => $building_id,
+                'title' => $title,
+                'description' => $description,
+            ]);
+            if (!empty($response['success'])) {
+                $alert_message = 'درخواست تعمیرات با موفقیت ثبت شد.';
+                $alert_type = 'success';
+            } else {
+                $alert_message = $response['message'] ?? 'خطا در ثبت درخواست.';
+                $reopen_modal = 'add-maintenance';
             }
         }
     }
@@ -65,112 +88,141 @@ $requests = [];
 $building_name = '';
 if ($building_id > 0) {
     $building_response = callAPI('GET', '/buildings/' . $building_id);
-    if (isset($building_response['success']) && $building_response['success'] === true) {
+    if (!empty($building_response['success'])) {
         $building_name = $building_response['data']['name'] ?? '';
     }
     $list_response = callAPI('GET', '/maintenance', ['building_id' => $building_id]);
-    if (isset($list_response['success']) && $list_response['success'] === true) {
+    if (!empty($list_response['success'])) {
         $requests = $list_response['data'] ?? [];
     }
 }
 
+$status_chips = [
+    'pending' => 'chip-amber',
+    'in_progress' => 'chip-gold',
+    'resolved' => 'chip-green',
+    'closed' => 'chip-gray',
+];
+
 $page_title = 'درخواست تعمیرات';
 $header_sub = $building_name ?: 'پشتیبانی فنی';
-$back_url = 'building_view.php?id=' . $building_id;
-$active_nav = 'home';
-require_once 'includes/page_head.php';
+$back_url = 'dashboard.php?building_id=' . $building_id;
+$nav_active = 'none';
+$nav_building_id = $building_id;
+require_once 'includes/header.php';
 ?>
 
 <main class="p-5">
 
-    <!-- دکمه افزودن -->
-    <a href="#add-form"
-       class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg shadow-blue-600/25 transition-all active:scale-[0.98]">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-        </svg>
-        <span>ثبت درخواست جدید</span>
-    </a>
+    <?php modal_open_button('add-maintenance', 'ثبت درخواست جدید'); ?>
 
-    <!-- لیست درخواست‌ها -->
-    <h2 class="section-title">درخواست‌های تعمیرات</h2>
+    <div class="section-header-row" style="margin: 18px 0 12px;">
+        <h2 class="section-title">درخواست‌های تعمیرات (<?= fa_digits(count($requests)) ?>)</h2>
+    </div>
 
     <?php if (empty($requests)): ?>
-        <div class="card empty-state">
-            <div class="text-4xl mb-3">🔧</div>
+        <div class="empty-state">
+            <div style="font-size: 34px; margin-bottom: 8px;">🔧</div>
             درخواست تعمیراتی ثبت نشده است.
         </div>
     <?php else: ?>
         <div class="space-y-3">
             <?php foreach ($requests as $request): ?>
+                <?php
+                $r_id = (int) ($request['id'] ?? 0);
+                $r_title = $request['title'] ?? 'بدون عنوان';
+                $r_desc = $request['description'] ?? '';
+                $r_status = $request['status'] ?? 'pending';
+                // ثبت‌کننده درخواست می‌تواند آن را ویرایش/حذف کند
+                $is_mine = (int) ($request['user_id'] ?? 0) === $current_user_id;
+                $can_modify = $is_manager || $is_mine;
+                ?>
                 <div class="card p-4">
                     <div class="flex items-start justify-between gap-3">
-                        <h3 class="font-bold text-gray-800 text-sm flex-1"><?= htmlspecialchars($request['title'] ?? 'بدون عنوان') ?></h3>
+                        <h3 class="font-bold text-gray-800 text-sm flex-1"><?= htmlspecialchars($r_title) ?></h3>
                         <span class="text-[11px] text-gray-400 flex-shrink-0"><?= fa_time_ago($request['created_at'] ?? '') ?></span>
                     </div>
-                    <?php if (!empty($request['description'])): ?>
-                        <p class="text-sm text-gray-500 mt-2 leading-6"><?= nl2br(htmlspecialchars($request['description'])) ?></p>
+
+                    <?php if ($r_desc !== ''): ?>
+                        <p class="text-sm text-gray-500 mt-2 leading-6"><?= nl2br(htmlspecialchars($r_desc)) ?></p>
                     <?php endif; ?>
-                    <div class="mt-3 flex items-center justify-between gap-2 flex-wrap">
-                        <span class="text-[10px] px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
-                            <?= htmlspecialchars(maintenance_status_label($request['status'] ?? 'pending')) ?>
+
+                    <div class="building-list-chips" style="margin-top:10px;">
+                        <span class="chip <?= $status_chips[$r_status] ?? 'chip-gray' ?>">
+                            <?= htmlspecialchars(maintenance_status_label($r_status)) ?>
                         </span>
-                        <span class="text-[10px] text-gray-400"><?= fa_time_ago($request['updated_at'] ?? $request['created_at'] ?? '') ?></span>
+                        <?php if (!empty($request['user_name'])): ?>
+                            <span class="chip chip-gray">ثبت: <?= htmlspecialchars($request['user_name']) ?></span>
+                        <?php endif; ?>
                     </div>
-                    <!-- مدیریت درخواست -->
-                    <div class="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-                        <form method="POST" action="" class="flex items-center gap-2 flex-1">
-                            <input type="hidden" name="action" value="update_maintenance_status">
-                            <input type="hidden" name="request_id" value="<?= (int) $request['id'] ?>">
-                            <select name="status" class="form-input text-xs py-2">
-                                <option value="pending" <?= ($request['status'] ?? '') === 'pending' ? 'selected' : '' ?>>در انتظار</option>
-                                <option value="in_progress" <?= ($request['status'] ?? '') === 'in_progress' ? 'selected' : '' ?>>در حال انجام</option>
-                                <option value="resolved" <?= ($request['status'] ?? '') === 'resolved' ? 'selected' : '' ?>>انجام‌شده</option>
-                                <option value="closed" <?= ($request['status'] ?? '') === 'closed' ? 'selected' : '' ?>>بسته‌شده</option>
-                            </select>
-                            <button type="submit" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-3 py-2 rounded-lg transition-colors flex-shrink-0">
-                                ثبت وضعیت
+
+                    <?php if ($can_modify): ?>
+                        <div class="card-actions" style="flex-wrap:wrap;">
+                            <button type="button" class="btn-chip btn-chip-edit"
+                                    data-modal-open="edit-maintenance"
+                                    data-set-request_id="<?= $r_id ?>"
+                                    data-set-title="<?= htmlspecialchars($r_title) ?>"
+                                    data-set-description="<?= htmlspecialchars($r_desc) ?>">
+                                ویرایش
                             </button>
-                        </form>
-                        <form method="POST" action="" data-confirm="این درخواست تعمیر حذف شود؟">
-                            <input type="hidden" name="action" value="delete_maintenance">
-                            <input type="hidden" name="request_id" value="<?= (int) $request['id'] ?>">
-                            <button type="submit" class="text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-lg transition-colors flex-shrink-0">
-                                حذف
-                            </button>
-                        </form>
-                    </div>
+
+                            <?php if ($is_manager): ?>
+                                <form method="POST" action="" style="display:flex;gap:6px;align-items:center;flex:1;min-width:180px;">
+                                    <input type="hidden" name="form_action" value="update_status">
+                                    <input type="hidden" name="request_id" value="<?= $r_id ?>">
+                                    <select name="status" class="form-input" style="padding:7px 10px;font-size:11.5px;flex:1;">
+                                        <option value="pending" <?= $r_status === 'pending' ? 'selected' : '' ?>>در انتظار</option>
+                                        <option value="in_progress" <?= $r_status === 'in_progress' ? 'selected' : '' ?>>در حال انجام</option>
+                                        <option value="resolved" <?= $r_status === 'resolved' ? 'selected' : '' ?>>انجام‌شده</option>
+                                        <option value="closed" <?= $r_status === 'closed' ? 'selected' : '' ?>>بسته‌شده</option>
+                                    </select>
+                                    <button type="submit" class="btn-chip btn-chip-neutral">ثبت</button>
+                                </form>
+                            <?php endif; ?>
+
+                            <form method="POST" action="" data-confirm="این درخواست حذف شود؟" style="display:inline;">
+                                <input type="hidden" name="form_action" value="delete">
+                                <input type="hidden" name="request_id" value="<?= $r_id ?>">
+                                <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
+                            </form>
+                        </div>
+                    <?php endif; ?>
                 </div>
             <?php endforeach; ?>
         </div>
     <?php endif; ?>
 
-    <!-- فرم افزودن -->
-    <div id="add-form" class="card p-5 mt-6">
-        <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
-            </svg>
-            ثبت درخواست تعمیرات
-        </h3>
-        <form method="POST" action="" class="space-y-4">
-            <div>
-                <label for="title" class="form-label">عنوان مشکل *</label>
-                <input type="text" id="title" name="title" required class="form-input" placeholder="مثال: نشتی لوله آب">
-            </div>
-            <div>
-                <label for="description" class="form-label">توضیحات (اختیاری)</label>
-                <textarea id="description" name="description" rows="3" class="form-input" placeholder="جزئیات مشکل و محل دقیق آن..."></textarea>
-            </div>
-            <button type="submit" class="btn-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                ثبت درخواست
-            </button>
-        </form>
-    </div>
-
 </main>
 
-<?php require_once 'includes/page_tail.php'; ?>
+<?php modal_start('add-maintenance', 'ثبت درخواست تعمیرات', 'مشکل را برای مدیر ساختمان گزارش کنید'); ?>
+    <form method="POST" action="" class="space-y-4" data-loading>
+        <input type="hidden" name="form_action" value="create">
+        <div>
+            <label for="add_m_title" class="form-label">عنوان مشکل *</label>
+            <input type="text" id="add_m_title" name="title" required class="form-input" placeholder="مثال: نشتی لوله آب">
+        </div>
+        <div>
+            <label for="add_m_desc" class="form-label">توضیحات (اختیاری)</label>
+            <textarea id="add_m_desc" name="description" rows="4" class="form-input" placeholder="جزئیات مشکل و محل دقیق آن..."></textarea>
+        </div>
+        <button type="submit" class="btn-primary">ثبت درخواست</button>
+    </form>
+<?php modal_end(); ?>
+
+<?php modal_start('edit-maintenance', 'ویرایش درخواست', 'اصلاح عنوان یا توضیحات'); ?>
+    <form method="POST" action="" class="space-y-4" data-loading>
+        <input type="hidden" name="form_action" value="update">
+        <input type="hidden" name="request_id" value="">
+        <div>
+            <label for="edit_m_title" class="form-label">عنوان مشکل *</label>
+            <input type="text" id="edit_m_title" name="title" required class="form-input">
+        </div>
+        <div>
+            <label for="edit_m_desc" class="form-label">توضیحات</label>
+            <textarea id="edit_m_desc" name="description" rows="4" class="form-input"></textarea>
+        </div>
+        <button type="submit" class="btn-primary">ذخیره تغییرات</button>
+    </form>
+<?php modal_end(); ?>
+
+<?php require_once 'includes/footer.php'; ?>
