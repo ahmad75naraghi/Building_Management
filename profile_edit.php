@@ -4,7 +4,7 @@ require_once 'includes/api_helper.php';
 
 // اگر کاربر لاگین نیست، به صفحه ورود هدایت شود
 if (!isset($_SESSION['token']) || empty($_SESSION['token'])) {
-    header("Location: login.php");
+    header("Location: auth.php");
     exit;
 }
 
@@ -74,6 +74,8 @@ require_once 'includes/header.php';
                 ویرایش مشخصات
             </h3>
             <form method="POST" action="" class="space-y-4">
+                <?= csrf_field() ?>
+                <input type="hidden" name="form_action" value="update_profile">
                 <div>
                     <label for="name" class="form-label">نام و نام خانوادگی *</label>
                     <input type="text" id="name" name="name" required class="form-input" placeholder="مثال: علی رضایی"

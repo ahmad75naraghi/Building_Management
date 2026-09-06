@@ -11,15 +11,15 @@ use Firebase\JWT\Key;
 final class JwtHelper
 {
     /**
-     * کلید امضای JWT — ترجیح با متغیر محیطی JWT_SECRET است (مقدار پیش‌فرض فقط برای توسعه)
+     * کلید امضای JWT — همیشه از تنظیمات خوانده می‌شود.
+     * در محیط تولید، نبودِ JWT_SECRET باعث خطای صریح می‌شود.
      */
     private static function secret(): string
     {
-        $env = getenv('JWT_SECRET');
-        return $env !== false && $env !== '' ? $env : AppConfig::JWT_SECRET;
+        return AppConfig::jwtSecret();
     }
 
-    public static function generate(array $payload, int $expiry = null): string
+    public static function generate(array $payload, ?int $expiry = null): string
     {
         $now = time();
         $payload['iat'] = $now;

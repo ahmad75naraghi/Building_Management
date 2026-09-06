@@ -3,7 +3,7 @@ require_once 'includes/api_helper.php';
 
 // بررسی لاگین
 if (!isset($_SESSION['token']) || empty($_SESSION['token'])) {
-    header("Location: login.php");
+    header("Location: auth.php");
     exit;
 }
 
@@ -11,9 +11,16 @@ $building_id = (int) ($_GET['building_id'] ?? $_SESSION['active_building_id'] ??
 
 $alert_message = '';
 $alert_type = 'error';
+$reopen_modal = '';
+
+// نقش کاربر — دعوت اعضا فقط توسط مدیر ساختمان
+$ctx = building_role_context($building_id);
+$is_manager = $ctx['is_manager'];
 
 // ارسال دعوت‌نامه (نام + شماره موبایل + نقش + واحد) همراه با پیامک لینک دعوت
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_manager) {
+    $alert_message = 'فقط مدیر ساختمان می‌تواند اعضا را دعوت کند.';
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['form_action'] ?? 'invite';
     if ($action === 'resend_sms') {
         $inv_id = (int) ($_POST['invitation_id'] ?? 0);
@@ -31,8 +38,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $invited_phone = normalize_phone($_POST['invited_phone'] ?? '');
         if ($invited_name === '') {
             $alert_message = 'نام و نام خانوادگی دعوت‌شونده را وارد کنید.';
+            $reopen_modal = 'invite-member';
         } elseif (!is_valid_phone($invited_phone)) {
             $alert_message = 'شماره موبایل معتبر نیست. مثال: 09123456789';
+            $reopen_modal = 'invite-member';
         } else {
             $payload = [
                 'invited_name' => $invited_name,
@@ -46,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $alert_type = 'success';
             } else {
                 $alert_message = $response['message'] ?? 'خطا در ارسال دعوت‌نامه.';
+                $reopen_modal = 'invite-member';
             }
         }
     }
@@ -53,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // دریافت لیست اعضا
 $members = [];
+$units = [];
 $building_name = '';
 $invitations = [];
 if ($building_id > 0) {
@@ -66,7 +77,6 @@ if ($building_id > 0) {
     }
     // لیست واحدها (برای انتخاب واحد در فرم دعوت)
     $units_response = callAPI('GET', '/buildings/' . $building_id . '/units');
-    $units = [];
     if (isset($units_response['success']) && $units_response['success'] === true) {
         $units = $units_response['data']['units'] ?? [];
     }
@@ -87,30 +97,27 @@ $role_labels = [
 
 $page_title = 'اعضای ساختمان';
 $header_sub = $building_name ?: 'ساکنین و مدیران';
-$back_url = 'building_view.php?id=' . $building_id;
-$active_nav = 'home';
-require_once 'includes/page_head.php';
+$back_url = 'dashboard.php?building_id=' . $building_id;
+$nav_active = 'none';
+$nav_building_id = $building_id;
+require_once 'includes/header.php';
 ?>
 
 <main class="p-5">
 
-    <!-- دکمه دعوت -->
-    <a href="#invite-form"
-       class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg shadow-blue-600/25 transition-all active:scale-[0.98]">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-        </svg>
-        <span>دعوت عضو جدید</span>
-    </a>
+    <?php if ($is_manager): ?>
+        <?php modal_open_button('invite-member', 'دعوت عضو جدید'); ?>
+    <?php else: ?>
+        <div class="hint-card">👥 دعوت اعضای جدید فقط توسط مدیر ساختمان انجام می‌شود.</div>
+    <?php endif; ?>
 
     <!-- لیست اعضا -->
     <h2 class="section-title">ساکنین و مدیران (<?= fa_digits(count($members)) ?> نفر)</h2>
 
     <?php if (empty($members)): ?>
-        <div class="card empty-state">
-            <div class="text-4xl mb-3">👥</div>
-            هنوز عضوی در ساختمان ثبت نشده است.<br>
-            با دکمه بالا اولین دعوت‌نامه را ارسال کنید.
+        <div class="empty-state">
+            <div style="font-size: 34px; margin-bottom: 8px;">👥</div>
+            هنوز عضوی در ساختمان ثبت نشده است.
         </div>
     <?php else: ?>
         <div class="space-y-3">
@@ -164,7 +171,7 @@ require_once 'includes/page_head.php';
 
     <!-- دعوت‌نامه‌های در انتظار -->
     <?php $pending_invitations = array_filter($invitations, fn($inv) => ($inv['status'] ?? '') === 'pending'); ?>
-    <?php if (!empty($pending_invitations)): ?>
+    <?php if ($is_manager && !empty($pending_invitations)): ?>
         <h2 class="section-title">دعوت‌نامه‌های در انتظار</h2>
         <div class="space-y-3">
             <?php foreach ($pending_invitations as $inv): ?>
@@ -195,6 +202,7 @@ require_once 'includes/page_head.php';
                                 کپی لینک
                             </button>
                             <form method="POST" action="" style="display:contents;">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="resend_sms">
                                 <input type="hidden" name="invitation_id" value="<?= (int) ($inv['id'] ?? 0) ?>">
                                 <button type="submit" class="text-xs bg-green-50 hover:bg-green-100 text-green-700 font-bold px-3 py-2 rounded-lg transition-colors">
@@ -230,57 +238,45 @@ require_once 'includes/page_head.php';
         </script>
     <?php endif; ?>
 
-    <!-- فرم دعوت -->
-    <div id="invite-form" class="card p-5 mt-6">
-        <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-            ارسال دعوت‌نامه
-        </h3>
-        <form method="POST" action="" class="space-y-4">
-            <input type="hidden" name="form_action" value="invite">
-            <div>
-                <label for="invited_name" class="form-label">نام و نام خانوادگی *</label>
-                <input type="text" id="invited_name" name="invited_name" required class="form-input" placeholder="مثال: رضا محمدی">
-            </div>
-            <div>
-                <label for="invited_phone" class="form-label">شماره موبایل (برای ارسال پیامک لینک دعوت) *</label>
-                <input type="tel" id="invited_phone" name="invited_phone" dir="ltr" required inputmode="numeric" class="form-input text-left" placeholder="09123456789">
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label for="role" class="form-label">نقش</label>
-                    <select id="role" name="role" class="form-input">
-                        <option value="tenant">مستأجر</option>
-                        <option value="owner">مالک</option>
-                        <option value="resident">ساکن</option>
-                        <option value="board">هیئت مدیره</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="unit_id" class="form-label">واحد (اختیاری)</label>
-                    <select id="unit_id" name="unit_id" class="form-input">
-                        <option value="">— انتخاب واحد —</option>
-                        <?php foreach ($units as $unit): ?>
-                            <option value="<?= (int) ($unit['id'] ?? 0) ?>">
-                                واحد <?= htmlspecialchars($unit['unit_number'] ?? '') ?>
-                                (<?= htmlspecialchars(unit_type_label($unit['type'] ?? '')) ?>)
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <p class="text-[11px] text-gray-400 mt-1">برای مالک/مستأجر، هنگام پذیرش دعوت‌نامه به‌صورت خودکار به واحد متصل می‌شود.</p>
-                </div>
-            </div>
-            <button type="submit" class="btn-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
-                ارسال دعوت‌نامه
-            </button>
-        </form>
-    </div>
-
 </main>
 
-<?php require_once 'includes/page_tail.php'; ?>
+<?php if ($is_manager): ?>
+    <?php modal_start('invite-member', 'ارسال دعوت‌نامه', 'لینک دعوت با پیامک ارسال می‌شود'); ?>
+        <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
+            <input type="hidden" name="form_action" value="invite">
+            <div>
+                <label class="form-label">نام و نام خانوادگی *</label>
+                <input type="text" name="invited_name" required class="form-input" placeholder="مثال: رضا محمدی">
+            </div>
+            <div>
+                <label class="form-label">شماره موبایل *</label>
+                <input type="tel" name="invited_phone" dir="ltr" required inputmode="numeric" class="form-input" style="text-align:left;" placeholder="09123456789">
+            </div>
+            <div>
+                <label class="form-label">نقش</label>
+                <select name="role" class="form-input">
+                    <option value="tenant">مستأجر</option>
+                    <option value="owner">مالک</option>
+                    <option value="resident">ساکن</option>
+                    <option value="board">هیئت مدیره</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label">واحد (اختیاری)</label>
+                <select name="unit_id" class="form-input">
+                    <option value="">— انتخاب واحد —</option>
+                    <?php foreach ($units as $unit): ?>
+                        <option value="<?= (int) ($unit['id'] ?? 0) ?>">
+                            واحد <?= fa_digits($unit['unit_number'] ?? '') ?> (<?= htmlspecialchars(unit_type_label($unit['type'] ?? '')) ?>)
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="text-[11px] text-gray-400 mt-1">هنگام پذیرش دعوت، کاربر به‌صورت خودکار به این واحد متصل می‌شود.</p>
+            </div>
+            <button type="submit" class="btn-primary">ارسال دعوت‌نامه</button>
+        </form>
+    <?php modal_end(); ?>
+<?php endif; ?>
+
+<?php require_once 'includes/footer.php'; ?>

@@ -118,7 +118,9 @@ Building_Management/
 │   └── app_styles.php         # shim قدیمی — لینک به style.css
 ├── docs/                      # proposal, final_decisions, phase_1_2, project_complete_summary
 ├── index.php                  # داشبورد وب (موبایل‌فرست، RTL)
-├── login.php / register.php / profile.php / logout.php
+├── auth.php                   # ورود/ثبت‌نام یکپارچه با موبایل و کد یک‌بارمصرف
+├── login.php / register.php   # فقط ریدایرکت ۳۰۱ به auth.php (سازگاری)
+├── profile.php / logout.php
 ├── building_add.php / building_view.php
 ├── all_migrations.sql         # اسکریپت جامع SQL (۳۲ جدول)
 ├── Building Management Pro - Master.postman_collection  # کالکشن Postman
@@ -145,36 +147,46 @@ cd Building_Management
 
 # ۲. نصب وابستگی‌ها
 composer install
-composer dump-autoload   # پس از افزودن کلاس‌های جدید (مدل/سرویس/...)
+composer dump-autoload   # پس از افزودن کلاس‌های جدید
 
-# ۳. ساخت دیتابیس و اجرای Migrationها
-mysql -u <user> -p < database  # (اختیاری: ساخت دیتابیس)
-composer migrate
+# ۳. تنظیمات محیطی (اجباری)
+cp .env.example .env
+openssl rand -base64 48        # خروجی را در JWT_SECRET بگذارید
+#   سپس در .env این‌ها را پر کنید:
+#     APP_ENV=production
+#     JWT_SECRET=<کلید تولیدشده>
+#     DB_PASSWORD=<رمز دیتابیس>
+#     APP_URL=https://example.com/b
 
-# یا به‌جای مرحله ۳، اسکریپت جامع SQL:
-mysql -u <user> -p < all_migrations.sql
+# ۴. ساخت دیتابیس و اجرای مایگریشن‌ها
+composer migrate:status        # ببینید چه چیزی در انتظار است
+composer migrate               # اجرای مایگریشن‌های اعمال‌نشده
+#   یا به‌جای آن، اسکریپت جامع:
+#     mysql -u <user> -p <db> < all_migrations.sql
 
-# ۴. تنظیم دیتابیس و JWT Secret در config/app.php
-#    dsn / username / password در متد getDatabaseConfig()
+# ۵. بررسی سلامت و آمادگی
+composer health                # php scripts/healthcheck.php
 
-# ۵. بررسی صحت اتصال کل پروژه (مسیرها، کنترلرها، سرویس‌ها، مدل‌ها، اسکیما)
-composer verify          # php scripts/verify.php
+# ۶. اجرای تست‌ها (بدون نیاز به دیتابیس)
+composer test                  # php tests/Integration/run.php
 
-# ۶. اجرای سرور API (بک‌اند)
-composer serve           # php -S 0.0.0.0:8000 public/index.php  (همه روت‌های /api/*)
+# ۷. اجرای سرور API (بک‌اند)
+composer serve                 # php -S 0.0.0.0:8000 -t public/
 
-# ۷. اجرای فرانت‌اند (پنل وب) — در یک ترمینال جدا
-#     فرانت‌اند با cURL به API وصل می‌شود؛ آدرس API را با متغیر محیطی بدهید:
+# ۸. اجرای فرانت‌اند (پنل وب) — در ترمینالی جدا
 API_BASE_URL=http://localhost:8000/b/api php -S 0.0.0.0:8080
-#     سپس http://localhost:8080/login.php را باز کنید (ثبت‌نام → ورود → همه بخش‌ها)
+#   سپس http://localhost:8080/auth.php را باز کنید
 ```
+
+> ⚠️ از نسخه فعلی، **رمز دیتابیس و کلید JWT دیگر در `config/app.php` نیستند**.
+> اگر `.env` را نسازید، برنامه در محیط production عمداً بالا نمی‌آید و پیام صریح می‌دهد.
 
 ### نکته استقرار در ساب‌فولدر
 پروژه برای اجرا در ساب‌فولدر (مثلاً `/b`) طراحی شده است:
 - `.htaccess` درخواست‌های `api/*` را به `public/index.php` هدایت می‌کند.
 - `public/index.php` پیشوند `/b` را از URL حذف می‌کند تا مسیرها استاندارد خوانده شوند.
 - با XAMPP کافی است پروژه را در `htdocs/b` کپی کنید؛ سپس فرانت‌اند در
-  `http://localhost/b/login.php` و API در `http://localhost/b/api/...` در دسترس است.
+  `http://localhost/b/auth.php` و API در `http://localhost/b/api/...` در دسترس است.
 - آدرس پیش‌فرض API در `includes/api_helper.php` سرور اصلی (`https://file.falnic.com/b/api`) است؛
   برای اجرای محلی از `API_BASE_URL` استفاده کنید (بدون دست‌زدن به فایل).
 - فرانت‌اند (index.php و... ) از طریق `includes/api_helper.php` با `API_BASE_URL` به API متصل می‌شود.
@@ -211,27 +223,63 @@ php scripts/monthly_charges.php
 php scripts/migrator.php   # شامل 023 (ورود با موبایل) و 024 (مشخصات ساختمان + نام دعوت‌شونده)
 ```
 
-## ⚙️ تنظیمات (config/app.php)
+## ⚙️ تنظیمات
+
+### متغیرهای محیطی (فایل `.env`)
+
+از روی `.env.example` بسازید. مقادیر حساس **دیگر در کد نیستند**.
+
+| متغیر | پیش‌فرض | اجباری در production | توضیح |
+|---|---|---|---|
+| `APP_ENV` | `production` | — | `development` / `testing` / `production` |
+| `APP_URL` | آدرس سرور اصلی | ✅ | برای ساخت لینک دعوت در پیامک |
+| `JWT_SECRET` | — | ✅ | کلید امضای JWT، حداقل ۳۲ کاراکتر |
+| `DB_DSN` | `mysql:host=localhost;...` | — | رشته اتصال PDO |
+| `DB_USERNAME` | `file_b` | — | کاربر دیتابیس |
+| `DB_PASSWORD` | — | ✅ | رمز دیتابیس |
+| `SMS_USERNAME` / `SMS_PASSWORD` / `SMS_BODY_ID` | — | — | پنل ملی‌پیامک |
+| `APP_LOG_DIR` | `storage/logs` | — | مسیر فایل‌های لاگ |
+| `APP_LOG_LEVEL` | `info` | — | `debug`/`info`/`warning`/`error`/`critical` |
+| `OTP_DEBUG` | خاموش | ❌ هرگز | با `1` کد ورود در پاسخ API برمی‌گردد (فقط توسعه) |
+| `API_INSECURE_SSL` | خاموش | ❌ هرگز | غیرفعال‌کردن بررسی SSL (فقط توسعه محلی) |
+
+> **پیش‌فرض امن:** اگر `APP_ENV` تنظیم نشود، `production` فرض می‌شود.
+> در این حالت نبودِ `JWT_SECRET` یا `DB_PASSWORD` باعث **خطای صریح** می‌شود
+> تا برنامه با تنظیمات ناامن بالا نیاید.
+
+### ثابت‌های کد (`config/app.php`)
 
 | ثابت | مقدار | توضیح |
 |---|---|---|
 | `APP_NAME` | Building Management Pro | نام اپلیکیشن |
 | `APP_VERSION` | 1.0.0 | نسخه |
-| `APP_ENV` | development | development / production |
-| `JWT_SECRET` | (رشته تصادفی) | کلید امضای JWT |
-| `JWT_ALGO` | HS256 | الگوریتم |
+| `JWT_ALGO` | HS256 | الگوریتم امضا |
 | `JWT_EXPIRY` | 3600 | انقضای توکن (ثانیه) |
 | `JWT_REFRESH_EXPIRY` | 604800 | انقضای رفرش (۷ روز) |
 | `REDIS_HOST/PORT/DB` | 127.0.0.1:6379/0 | Redis |
 | `MAX_FILE_SIZE` | 5MB | حداکثر حجم فایل |
 | `ALLOWED_MIME_TYPES` | jpeg/png/webp/pdf | MIME مجاز |
 
-> ⚠️ **امنیت**: در محیط production حتماً `JWT_SECRET` و رمز دیتابیس را تغییر دهید و `APP_ENV` را روی `production` بگذارید.
->
-> 🚨 **مهم:** اگر این مخزن را روی GitHub عمومی منتشر کرده‌اید، **رمز دیتابیس پیش‌فرض و `JWT_SECRET` در تاریخچه‌ی git لو رفته‌اند**. حتماً:
-> 1. رمز دیتابیس را در هاست **عوض کنید** (چرخش رمز)،
-> 2. `JWT_SECRET` را از طریق `JWT_SECRET` env تنظیم کنید،
-> 3. از متغیرهای `DB_*` برای اتصال دیتابیس استفاده کنید (مقادیر پیش‌فرض فقط برای توسعه هستند).
+> 🚨 **هشدار مهم درباره اسرار قدیمی:**
+> رمز دیتابیس و `JWT_SECRET` قبلی **در تاریخچه‌ی git باقی مانده‌اند**.
+> حذفشان از کد کافی نیست — حتماً:
+> 1. رمز دیتابیس را روی هاست **عوض کنید**،
+> 2. یک `JWT_SECRET` تازه بسازید (`openssl rand -base64 48`)،
+> 3. هر دو را در `.env` قرار دهید (که در `.gitignore` است).
+> تا وقتی این کار انجام نشود، کلید قدیمی همچنان قابل سوءاستفاده است.
+
+---
+
+## 🔐 امنیت
+
+| مکانیزم | توضیح |
+|---|---|
+| **CSRF** | همه درخواست‌های POST به‌صورت خودکار بررسی می‌شوند؛ بدون توکن معتبر پاسخ ۴۱۹. در فرم‌های جدید `<?= csrf_field() ?>` را اضافه کنید. |
+| **محدودیت نرخ ورود** | ۵ تلاش ناموفق در ۱۵ دقیقه، سپس پاسخ ۴۲۹. کلید ترکیبی شماره+IP و ذخیره‌شده به‌صورت SHA-256. |
+| **کد یک‌بارمصرف** | انقضای ۲ دقیقه، فاصله ارسال مجدد ۶۰ ثانیه، سقف ۵ تلاش و ۶ کد در ساعت. کدها هش می‌شوند. |
+| **رمز عبور** | `password_hash()` با الگوریتم پیش‌فرض PHP. |
+| **SSL** | بررسی گواهی به‌صورت پیش‌فرض فعال است. |
+| **لاگ** | داده‌های حساس (رمز، توکن، کد) پیش از ثبت با `[redacted]` جایگزین می‌شوند. |
 
 ---
 
@@ -421,7 +469,7 @@ Migrationها از `001` تا `020` در `database/migrations/` و نسخه SQL 
 
 ---
 
-## 🔐 امنیت
+## 🔐 امنیت لایه API
 
 - ✅ **JWT HS256** با انقضای ۱ ساعته و Refresh
 - ✅ **Rate Limiting** بر اساس IP + مسیر (Redis) — `RateLimitMiddleware`
@@ -432,7 +480,7 @@ Migrationها از `001` تا `020` در `database/migrations/` و نسخه SQL 
 - ✅ **Soft Delete** در جداول حساس (`deleted_at`)
 - ✅ **Cache** برای درخواست‌های GET — `CacheMiddleware` (کلید کش شامل `user_id` است تا داده‌ی کاربران بین آن‌ها رد و بدل نشود)
 - ✅ هدرهای امنیتی: `X-Frame-Options: DENY`، `X-Content-Type-Options: nosniff`، `Referrer-Policy: strict-origin-when-cross-origin`
-- ✅ اسرار از طریق متغیر محیطی قابل تنظیم‌اند: `DB_DSN` / `DB_USERNAME` / `DB_PASSWORD` / `JWT_SECRET` (با فالبک برای توسعه)
+- ✅ اسرار **فقط** از متغیر محیطی خوانده می‌شوند: `DB_DSN` / `DB_USERNAME` / `DB_PASSWORD` / `JWT_SECRET` — بدون هیچ مقدار پیش‌فرضی در کد
 
 ---
 
@@ -444,17 +492,27 @@ Migrationها از `001` تا `020` در `database/migrations/` و نسخه SQL 
 | `docs/final_decisions.md` | تصمیمات نهایی ساختار (تایید شده) — سلسله مراتب، نقش‌ها، پرداخت، امنیت |
 | `docs/phase_1_2_complete.md` | گزارش تکمیل فاز ۱ و ۲ — هسته، ساختمان، سلسله مراتب |
 | `docs/project_complete_summary.md` | خلاصه کامل فازهای ۱ تا ۵ + فازهای باقی‌مانده |
+| `DEPLOYMENT.md` | **راهنمای گام‌به‌گام استقرار روی سرور** |
+| `tests/README.md` | راهنمای تست‌ها، لاگ‌گیری و امنیت |
+| `ci/README.md` | فعال‌سازی یکپارچگی پیوسته (گیت‌هاب اکشنز) |
 
 ---
 
 ## 🧪 تست و ابزارها
 
 ```bash
-composer test        # اجرای PHPUnit (تست‌های واحد Validator در tests/Unit)
-composer verify      # بررسی صحت اتصال کامل پروژه (routes, controllers, services, models, schema)
-composer migrate     # اجرای Migrationها
-composer serve       # سرور توسعه روی پورت 8000
+composer test            # ۳۰۸ تست یکپارچه (بدون نیاز به دیتابیس یا افزونه خاص)
+composer test:unit       # تست‌های قدیمی PHPUnit (tests/Unit)
+composer health          # بررسی سلامت و آمادگی استقرار
+composer migrate:status  # نمایش مایگریشن‌های در انتظار
+composer migrate         # اجرای مایگریشن‌های اعمال‌نشده
+composer verify          # بررسی اتصال routes/controllers/services/models/schema
+composer serve           # سرور توسعه روی پورت 8000
 ```
+
+تست‌ها یک پایگاه‌داده **SQLite در حافظه** می‌سازند و آن را به `App\Core\Database`
+تزریق می‌کنند، بنابراین سرویس‌های واقعی بدون نیاز به MySQL اجرا می‌شوند.
+جزئیات در `tests/README.md`.
 
 ---
 
@@ -468,8 +526,12 @@ composer serve       # سرور توسعه روی پورت 8000
 | فاز ۴ — تیکت‌ها | ✅ تکمیل |
 | فاز ۵ — دعوت‌نامه‌ها و اعلانات | ✅ تکمیل |
 | فاز ۶ — ماژول‌های حرفه‌ای (۱۰ ماژول) | ✅ تکمیل — GET/POST + تغییر وضعیت (PUT) + حذف (DELETE) + رأی‌گیری کامل با گزینه/رأی/نتیجه |
-| تست و بهینه‌سازی (PHPUnit, PHPStan, OpenAPI) | 🟡 PHPUnit پایه (tests/Unit) اضافه شد؛ PHPStan و OpenAPI باقی‌مانده |
-| استقرار production (OPcache, .env, Backup) | ⏳ باقی‌مانده |
+| ورود یکپارچه با موبایل و کد یک‌بارمصرف | ✅ تکمیل |
+| رابط مودال‌محور + ویرایش کامل + نقش‌ها + سه حالت شارژ | ✅ تکمیل |
+| لاگ‌گیر مرکزی و ۳۰۸ تست یکپارچه | ✅ تکمیل |
+| سخت‌سازی امنیتی (اسرار، CSRF، محدودیت نرخ) | ✅ تکمیل |
+| تست و بهینه‌سازی (PHPStan, OpenAPI) | 🟡 تست‌ها کامل؛ PHPStan و OpenAPI باقی‌مانده |
+| استقرار production (OPcache, .env, Backup) | 🟡 `.env` و healthcheck آماده؛ OPcache و Backup باقی‌مانده |
 
 ---
 

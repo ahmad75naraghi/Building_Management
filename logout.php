@@ -10,6 +10,6 @@ if (isset($_SESSION['token']) && !empty($_SESSION['token'])) {
 session_destroy();
 
 // هدایت کاربر به صفحه لاگین
-header("Location: login.php");
+header("Location: auth.php");
 exit;
 ?>

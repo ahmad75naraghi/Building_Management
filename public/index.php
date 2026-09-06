@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Config\AppConfig;
 use App\Config\Routes;
 use App\Core\Kernel;
+use App\Core\Logger;
 
 // 1. Load Composer Autoloader
 require __DIR__ . '/../vendor/autoload.php';
@@ -20,6 +21,9 @@ if (isset($_SERVER['REQUEST_URI']) && str_starts_with($_SERVER['REQUEST_URI'], $
     $_SERVER['REQUEST_URI'] = substr($_SERVER['REQUEST_URI'], strlen($subfolder));
 }
 
+// هر خطای مدیریت‌نشده‌ای در لایه API باید ثبت شود
+Logger::install();
+
 // Bootstrap error reporting based on environment
 if (AppConfig::isProduction()) {
     error_reporting(0);
@@ -30,6 +34,24 @@ if (AppConfig::isProduction()) {
 }
 
 // Initialize the Kernel and handle the request
-$kernel = new Kernel();
-$response = $kernel->handle();
-$response->send();
+try {
+    $kernel = new Kernel();
+    $response = $kernel->handle();
+    $response->send();
+} catch (\Throwable $e) {
+    Logger::critical('Kernel', 'پردازش درخواست با خطای مدیریت‌نشده متوقف شد', [
+        'method' => $_SERVER['REQUEST_METHOD'] ?? null,
+        'uri' => $_SERVER['REQUEST_URI'] ?? null,
+    ], $e);
+
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+    }
+    echo json_encode([
+        'success' => false,
+        'message' => AppConfig::isProduction()
+            ? 'خطای داخلی سرور. موضوع ثبت شد و بررسی می‌شود.'
+            : $e->getMessage(),
+    ], JSON_UNESCAPED_UNICODE);
+}

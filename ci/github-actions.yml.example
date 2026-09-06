@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  test:
+    name: تست و بررسی سلامت
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: نصب PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo, pdo_sqlite, json, curl
+          coverage: none
+
+      - name: کش وابستگی‌های کامپوزر
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: نصب وابستگی‌ها
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: بررسی نحوی همه فایل‌ها
+        run: |
+          find . -name '*.php' \
+            -not -path './vendor/*' \
+            -not -path './node_modules/*' \
+            -print0 | xargs -0 -n1 -P4 php -l > /dev/null
+
+      - name: تست‌های یکپارچه
+        run: php tests/Integration/run.php
+
+      - name: بررسی آمادگی محیط تولید
+        run: php scripts/healthcheck.php --ci

@@ -6,6 +6,7 @@ $vendorDir = dirname(__DIR__);
 $baseDir = dirname($vendorDir);
 
 return array(
+    'App\\Config\\AppConfig' => $baseDir . '/config/app.php',
     'App\\Core\\Container' => $baseDir . '/src/Core/Container.php',
     'App\\Core\\Database' => $baseDir . '/src/Core/Database.php',
     'App\\Core\\Kernel' => $baseDir . '/src/Core/Kernel.php',

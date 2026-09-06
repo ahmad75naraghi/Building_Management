@@ -193,11 +193,14 @@ final class UnitService
         $unit->owner_user_id = $occupants['owner_user_id'];
         $unit->tenant_user_id = $occupants['tenant_user_id'];
         $unit->owner_resident = $occupants['owner_resident'];
+        $unit->residents_count = isset($data['residents_count']) ? max(0, (int) $data['residents_count']) : 0;
+        $unit->custom_charge = isset($data['custom_charge']) && $data['custom_charge'] !== '' && $data['custom_charge'] !== null
+            ? max(0, (float) $data['custom_charge']) : null;
 
         $db = Database::getConnection();
         $stmt = $db->prepare(
-            "INSERT INTO units (building_id, block_id, floor_id, unit_number, area, type, owner_user_id, tenant_user_id, owner_resident)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO units (building_id, block_id, floor_id, unit_number, area, type, owner_user_id, tenant_user_id, owner_resident, residents_count, custom_charge)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
         $stmt->execute([
             $unit->building_id,
@@ -209,6 +212,8 @@ final class UnitService
             $unit->owner_user_id,
             $unit->tenant_user_id,
             (int) $unit->owner_resident,
+            $unit->residents_count,
+            $unit->custom_charge,
         ]);
         $unit->id = (int) $db->lastInsertId();
         $this->computeOccupancy($unit);
@@ -236,7 +241,8 @@ final class UnitService
         $stmt = $db->prepare(
             "UPDATE units SET
                 unit_number = ?, area = ?, type = ?, block_id = ?, floor_id = ?,
-                owner_user_id = ?, tenant_user_id = ?, owner_resident = ?
+                owner_user_id = ?, tenant_user_id = ?, owner_resident = ?,
+                residents_count = ?, custom_charge = ?
              WHERE id = ?"
         );
         $stmt->execute([
@@ -248,6 +254,9 @@ final class UnitService
             $occupants['owner_user_id'],
             $occupants['tenant_user_id'],
             (int) $occupants['owner_resident'],
+            isset($data['residents_count']) ? max(0, (int) $data['residents_count']) : 0,
+            isset($data['custom_charge']) && $data['custom_charge'] !== '' && $data['custom_charge'] !== null
+                ? max(0, (float) $data['custom_charge']) : null,
             $unitId,
         ]);
 
@@ -283,6 +292,9 @@ final class UnitService
         $u->owner_user_id = $row['owner_user_id'] !== null ? (int) $row['owner_user_id'] : null;
         $u->tenant_user_id = $row['tenant_user_id'] !== null ? (int) $row['tenant_user_id'] : null;
         $u->owner_resident = (bool) ($row['owner_resident'] ?? 0);
+        $u->residents_count = isset($row['residents_count']) ? (int) $row['residents_count'] : 0;
+        $u->custom_charge = isset($row['custom_charge']) && $row['custom_charge'] !== null
+            ? (float) $row['custom_charge'] : null;
         $u->created_at = $row['created_at'] ?? null;
         $u->owner_name = $row['owner_name'] ?? null;
         $u->owner_email = $row['owner_email'] ?? null;

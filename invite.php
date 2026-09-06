@@ -8,7 +8,7 @@ $alert_type = 'error';
 
 // اگر لاگین نیست، اول به ورود برود و برگردد
 if (!isset($_SESSION['token']) || empty($_SESSION['token'])) {
-    header("Location: login.php?redirect=" . urlencode('invite.php?token=' . urlencode($token)));
+    header("Location: auth.php?redirect=" . urlencode('invite.php?token=' . urlencode($token)));
     exit;
 }
 
@@ -93,6 +93,8 @@ require_once 'includes/page_head.php';
             <?php endif; ?>
 
             <form method="POST" action="" data-confirm="آیا این دعوت‌نامه را می‌پذیرید؟">
+                <?= csrf_field() ?>
+                <input type="hidden" name="form_action" value="accept_invite">
                 <input type="hidden" name="token" value="<?= htmlspecialchars($token) ?>">
                 <button type="submit" class="btn-primary w-full">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">

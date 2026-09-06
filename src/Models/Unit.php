@@ -27,6 +27,10 @@ final class Unit
     public ?int $owner_user_id = null;
     public ?int $tenant_user_id = null;
     public bool $owner_resident = false;
+    /** تعداد نفرات ساکن واحد (مبنای شارژ نفری) */
+    public int $residents_count = 0;
+    /** شارژ دلخواه این واحد (حالت custom) */
+    public ?float $custom_charge = null;
     public ?string $created_at = null;
 
     // فیلدهای الحاقی (از JOIN با users — فقط در خروجی، نه در دیتابیس)
@@ -57,6 +61,8 @@ final class Unit
             'owner_user_id' => $this->owner_user_id,
             'tenant_user_id' => $this->tenant_user_id,
             'owner_resident' => $this->owner_resident,
+            'residents_count' => $this->residents_count,
+            'custom_charge' => $this->custom_charge,
             'created_at' => $this->created_at,
             // اطلاعات مالک / مستاجر
             'owner_name' => $this->owner_name,

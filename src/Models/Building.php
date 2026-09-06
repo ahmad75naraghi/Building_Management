@@ -21,6 +21,10 @@ final class Building
     public int $parking_spots = 0;
     public float $monthly_charge = 0.0;
     public bool $monthly_charge_enabled = false;
+    /** نحوه محاسبه شارژ ماهیانه: fixed | per_person | custom */
+    public string $charge_mode = 'fixed';
+    /** نرخ شارژ به‌ازای هر نفر (حالت per_person) */
+    public float $charge_per_person = 0.0;
     /** نقش کاربر جاری در این ساختمان (manager و ...) — فقط نمایشی */
     public ?string $my_role = null;
     public ?string $created_at = null;
@@ -44,6 +48,8 @@ final class Building
             'parking_spots' => $this->parking_spots,
             'monthly_charge' => $this->monthly_charge,
             'monthly_charge_enabled' => $this->monthly_charge_enabled,
+            'charge_mode' => $this->charge_mode,
+            'charge_per_person' => $this->charge_per_person,
             'my_role' => $this->my_role,
         ];
     }

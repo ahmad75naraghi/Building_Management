@@ -13,6 +13,8 @@
             --green-success: #10b981;
             --red-danger: #ef4444;
             --blue-info: #3b82f6;
+            --app-header-h: 68px;
+            --app-nav-h: 74px;
         }
 
         * {
@@ -42,8 +44,20 @@
             overflow-x: hidden;
             display: flex;
             flex-direction: column;
-            padding-bottom: 100px;
-            /* فضای ناوبری پایین */
+            padding-bottom: 26px;
+        }
+
+        /* اگر صفحه هدر فیکس دارد، فضای بالای آن رزرو شود */
+        .app-container:has(> .app-header) { padding-top: var(--app-header-h); }
+        /* اگر صفحه ناوبری پایین فیکس دارد، فضای پایین آن رزرو شود */
+        .app-container:has(> .bottom-nav-bar) { padding-bottom: calc(var(--app-nav-h) + 26px); }
+
+        /* fallback برای مرورگرهای بدون پشتیبانی از :has() */
+        @supports not selector(:has(*)) {
+            .app-container {
+                padding-top: var(--app-header-h);
+                padding-bottom: calc(var(--app-nav-h) + 26px);
+            }
         }
 
         /* نوار وضعیت گوشی (Status Bar) */
@@ -69,6 +83,17 @@
             justify-content: space-between;
             align-items: center;
             padding: 12px 20px;
+            /* هدر فیکس (چسبیده به بالا) در همه صفحات */
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 440px;
+            height: var(--app-header-h);
+            z-index: 60;
+            background: var(--bg-dark-blue);
+            box-shadow: 0 6px 18px rgba(1, 10, 33, 0.35);
         }
 
         .header-profile-section {
@@ -722,11 +747,14 @@
 
         /* نوار ناوبری پایین (Bottom Nav) */
         .bottom-nav-bar {
-            position: absolute;
+            position: fixed;
             bottom: 0;
-            left: 0;
-            right: 0;
-            height: 74px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 440px;
+            height: var(--app-nav-h);
+            z-index: 60;
             background-color: var(--text-white);
             border-top: 1px solid #f1f5f9;
             border-radius: 24px 24px 0 0;
@@ -1039,3 +1067,516 @@
         .info-row-icon { width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-left: 10px; }
         .info-row-right { display: flex; align-items: center; flex: 1; min-width: 0; }
         .info-chevron { color: var(--text-gray); }
+
+        /* ==================== کارت‌های فهرست ساختمان (index.php) ==================== */
+        .space-y-3 > * + * { margin-top: 12px; }
+
+        .building-list-card {
+            display: flex;
+            align-items: stretch;
+            gap: 0;
+            background: var(--text-white);
+            border: 1px solid #eef2f7;
+            border-radius: 18px;
+            overflow: hidden;
+            text-decoration: none;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .building-list-card:hover { box-shadow: 0 10px 22px rgba(15, 23, 42, 0.09); }
+        .building-list-card:active { transform: scale(0.985); }
+
+        .building-list-thumb {
+            width: 92px;
+            min-height: 96px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .building-list-body { flex: 1; min-width: 0; padding: 12px 14px; }
+
+        .building-list-title {
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--text-dark);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .building-list-address {
+            font-size: 11px;
+            color: var(--text-gray);
+            margin-top: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .building-list-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+
+        .building-list-chevron {
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            color: #cbd5e1;
+            flex-shrink: 0;
+        }
+
+        /* برچسب‌های کوچک (chip) هم‌خانواده با دیزاین اپ */
+        .chip {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 4px 9px;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+        .chip-gold  { background: rgba(212, 163, 115, 0.16); color: #a1703a; }
+        .chip-gray  { background: #f1f5f9; color: var(--text-gray); }
+        .chip-green { background: rgba(16, 185, 129, 0.12); color: #047857; }
+        .chip-amber { background: rgba(245, 158, 11, 0.14); color: #b45309; }
+
+        /* کارت راهنما */
+        .hint-card {
+            background: var(--text-white);
+            border: 1px solid #eef2f7;
+            border-radius: 16px;
+            padding: 14px 16px;
+            font-size: 11.5px;
+            line-height: 2;
+            color: var(--text-gray);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
+        }
+
+        /* لینک‌های آیکونی هدر نباید زیرخط بگیرند */
+        .notification-bell,
+        .menu-hamburger,
+        .subpage-back-btn { text-decoration: none; }
+
+        /* ==================== پاپ‌آپ (Modal) استاندارد ==================== */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 200;
+            background: rgba(2, 8, 23, 0.55);
+            backdrop-filter: blur(3px);
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+            padding: 0;
+        }
+        .modal-overlay.is-open { opacity: 1; visibility: visible; }
+
+        .modal-sheet {
+            width: 100%;
+            max-width: 440px;
+            max-height: 88vh;
+            background: var(--bg-light-canvas);
+            border-radius: 26px 26px 0 0;
+            box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.28);
+            display: flex;
+            flex-direction: column;
+            transform: translateY(100%);
+            transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .modal-overlay.is-open .modal-sheet { transform: translateY(0); }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 16px 18px 12px;
+            border-bottom: 1px solid #e9eef5;
+            flex-shrink: 0;
+        }
+        .modal-title { font-size: 15px; font-weight: 800; color: var(--text-dark); }
+        .modal-subtitle { font-size: 11px; color: var(--text-gray); margin-top: 2px; }
+
+        .modal-close {
+            width: 34px;
+            height: 34px;
+            border-radius: 11px;
+            border: none;
+            background: #eef2f7;
+            color: var(--text-gray);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: background 0.2s;
+        }
+        .modal-close:hover { background: #e2e8f0; }
+
+        .modal-body { padding: 18px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+        /* دستگیره بالای شیت */
+        .modal-sheet::before {
+            content: "";
+            width: 42px;
+            height: 4px;
+            border-radius: 999px;
+            background: #cbd5e1;
+            margin: 8px auto 0;
+            flex-shrink: 0;
+        }
+
+        body.modal-open { overflow: hidden; }
+
+        /* دکمه اصلی افزودن (باز کردن پاپ‌آپ) */
+        .btn-add-primary {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: #fff;
+            font-weight: 800;
+            font-size: 13.5px;
+            border: none;
+            padding: 14px 16px;
+            border-radius: 16px;
+            cursor: pointer;
+            box-shadow: 0 10px 20px -6px rgba(37, 99, 235, 0.5);
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .btn-add-primary:hover { box-shadow: 0 12px 24px -6px rgba(37, 99, 235, 0.6); }
+        .btn-add-primary:active { transform: scale(0.98); }
+
+        /* دکمه‌های کوچک اقدام روی کارت‌ها (ویرایش/حذف) */
+        .card-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #f1f5f9;
+        }
+        .btn-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11.5px;
+            font-weight: 700;
+            padding: 7px 12px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.18s ease;
+        }
+        .btn-chip-edit { background: #eff6ff; color: #1d4ed8; }
+        .btn-chip-edit:hover { background: #dbeafe; }
+        .btn-chip-danger { background: #fef2f2; color: #dc2626; }
+        .btn-chip-danger:hover { background: #fee2e2; }
+        .btn-chip-neutral { background: #f1f5f9; color: var(--text-gray); }
+        .btn-chip-neutral:hover { background: #e2e8f0; }
+        .btn-chip-success { background: #ecfdf5; color: #047857; }
+        .btn-chip-success:hover { background: #d1fae5; }
+
+        /* ==================== کارت خلاصه مالی ==================== */
+        .finance-summary-card {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            border-radius: 20px;
+            padding: 18px;
+            color: #fff;
+            box-shadow: 0 12px 26px -10px rgba(37, 99, 235, 0.6);
+        }
+        .finance-summary-card h3 { font-size: 14px; font-weight: 800; }
+        .finance-pill {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 11px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .finance-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+        .finance-stat {
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 14px;
+            padding: 10px 6px;
+        }
+        .finance-stat p { font-size: 10px; opacity: 0.85; }
+        .finance-stat strong { display: block; font-size: 15px; font-weight: 800; margin-top: 4px; }
+        .finance-progress {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 999px;
+            overflow: hidden;
+            margin-top: 14px;
+        }
+        .finance-progress-bar { height: 100%; background: #fff; border-radius: 999px; transition: width 0.4s ease; }
+        .finance-progress-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            opacity: 0.85;
+            margin-top: 8px;
+        }
+
+        /* پیش‌نمایش سهم واحدها از شارژ */
+        .charge-preview-list { display: flex; flex-direction: column; gap: 6px; }
+        .charge-preview-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11.5px;
+            color: var(--text-dark);
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 7px 11px;
+        }
+        .charge-preview-row strong { color: var(--gold-primary); font-weight: 800; }
+
+        /* لیست انتخاب (رادیو) کارتی */
+        .choice-list { display: flex; flex-direction: column; gap: 8px; }
+        .choice-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            background: #f8fafc;
+            border: 1.5px solid #e9eef5;
+            border-radius: 13px;
+            padding: 12px 13px;
+            cursor: pointer;
+            transition: border-color 0.18s ease, background 0.18s ease;
+        }
+        .choice-item:has(input:checked) { border-color: var(--blue-info); background: #eff6ff; }
+        .choice-item input { margin-top: 3px; flex-shrink: 0; }
+        .choice-item strong { display: block; font-size: 13px; font-weight: 700; color: var(--text-dark); }
+        .choice-item small { display: block; font-size: 11px; color: var(--text-gray); margin-top: 3px; line-height: 1.7; }
+
+        /* چیپ خطر */
+        .chip-red { background: #fef2f2; color: #b91c1c; }
+
+        /* دکمه‌های خطر */
+        .btn-danger {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: #fff;
+            font-weight: 800;
+            font-size: 14px;
+            padding: 13px 16px;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: 0 10px 22px -10px rgba(220, 38, 38, 0.7);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .btn-danger:active { transform: scale(0.985); }
+
+        .btn-danger-soft {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: #fef2f2;
+            color: #b91c1c;
+            border: 1.5px solid #fecaca;
+            font-weight: 800;
+            font-size: 13.5px;
+            padding: 12px 16px;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: background 0.16s ease;
+        }
+        .btn-danger-soft:hover { background: #fee2e2; }
+
+        /* ستاره‌های امتیازدهی (RTL-safe، با ورودی رادیو) */
+        .rating-stars {
+            display: inline-flex;
+            flex-direction: row-reverse;
+            justify-content: flex-end;
+            gap: 4px;
+        }
+        .rating-stars input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .rating-stars label {
+            font-size: 30px;
+            line-height: 1;
+            color: #d9dee6;
+            cursor: pointer;
+            transition: color 0.15s ease, transform 0.15s ease;
+        }
+        .rating-stars label:hover,
+        .rating-stars label:hover ~ label,
+        .rating-stars input:checked ~ label { color: #f59e0b; }
+        .rating-stars label:hover { transform: scale(1.12); }
+        .rating-stars input:focus-visible + label { outline: 2px solid var(--blue-info); border-radius: 4px; }
+
+        /* ==================== صفحه ورود/ثبت‌نام یکپارچه ==================== */
+        .auth-body {
+            font-family: 'Vazirmatn', sans-serif;
+            background: #eef2f7;
+            margin: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .auth-shell {
+            position: relative;
+            max-width: 480px;
+            margin: 0 auto;
+            min-height: 100vh;
+            min-height: 100dvh;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-shadow: 0 4px 24px -6px rgba(15, 23, 42, 0.12);
+        }
+        .auth-glow {
+            position: absolute;
+            width: 260px;
+            height: 260px;
+            border-radius: 50%;
+            filter: blur(70px);
+            opacity: 0.22;
+            pointer-events: none;
+        }
+        .auth-glow-a { background: #2563eb; top: -80px; right: -70px; }
+        .auth-glow-b { background: #c8a94b; bottom: -90px; left: -70px; }
+
+        .auth-card {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            padding: 34px 28px 26px;
+        }
+
+        .auth-brand { text-align: center; margin-bottom: 22px; }
+        .auth-logo {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 60px;
+            height: 60px;
+            border-radius: 19px;
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: #fff;
+            box-shadow: 0 12px 26px -10px rgba(37, 99, 235, 0.75);
+            margin-bottom: 14px;
+        }
+        .auth-title { font-size: 21px; font-weight: 800; color: #0f172a; margin: 0; }
+        .auth-subtitle { font-size: 13px; color: #64748b; margin: 7px 0 0; line-height: 1.8; }
+
+        /* نوار پیشرفت گام‌ها */
+        .auth-steps {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            margin-bottom: 22px;
+        }
+        .auth-step-dot {
+            width: 26px;
+            height: 4px;
+            border-radius: 999px;
+            background: #e2e8f0;
+            transition: background 0.25s ease;
+        }
+        .auth-step-dot.is-active { background: #2563eb; }
+
+        /* پیام‌ها */
+        .auth-alert {
+            border-radius: 13px;
+            padding: 12px 14px;
+            font-size: 12.5px;
+            line-height: 1.9;
+            margin-bottom: 14px;
+        }
+        .auth-alert-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+        .auth-alert-info  { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+        .auth-alert-debug { background: #fffbeb; color: #92400e; border: 1px dashed #fcd34d; }
+
+        /* شماره در حال استفاده */
+        .auth-phone-badge {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background: #f8fafc;
+            border: 1px solid #e9eef5;
+            border-radius: 13px;
+            padding: 11px 14px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #334155;
+            margin-bottom: 16px;
+        }
+
+        /* فرم */
+        .auth-form { display: flex; flex-direction: column; gap: 16px; }
+        .auth-label {
+            display: block;
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #334155;
+            margin-bottom: 7px;
+        }
+        .auth-input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 14px 15px;
+            font-family: inherit;
+            font-size: 15px;
+            color: #0f172a;
+            background: #f8fafc;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 14px;
+            outline: none;
+            transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+        }
+        .auth-input:focus {
+            background: #fff;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+        }
+        .auth-input[dir="ltr"] { text-align: left; }
+        .auth-input-code {
+            text-align: center !important;
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: 10px;
+            padding: 15px;
+        }
+        .auth-hint { font-size: 11.5px; color: #94a3b8; margin: 7px 0 0; line-height: 1.8; }
+
+        .auth-btn {
+            width: 100%;
+            padding: 15px;
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 800;
+            color: #fff;
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            border: none;
+            border-radius: 14px;
+            cursor: pointer;
+            box-shadow: 0 12px 24px -12px rgba(37, 99, 235, 0.85);
+            transition: transform 0.14s ease, opacity 0.14s ease;
+        }
+        .auth-btn:active { transform: scale(0.985); }
+        .auth-btn:disabled, .auth-btn.is-loading { opacity: 0.65; cursor: not-allowed; }
+
+        .auth-secondary { margin-top: 16px; text-align: center; }
+        .auth-link-btn {
+            background: none;
+            border: none;
+            padding: 0;
+            font-family: inherit;
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #2563eb;
+            cursor: pointer;
+        }
+        .auth-link-btn:disabled { color: #94a3b8; cursor: default; }
+
+        .auth-footer { text-align: center; font-size: 11.5px; color: #cbd5e1; margin: 26px 0 0; }

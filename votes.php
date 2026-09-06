@@ -3,7 +3,7 @@ require_once 'includes/api_helper.php';
 
 // بررسی لاگین
 if (!isset($_SESSION['token']) || empty($_SESSION['token'])) {
-    header("Location: login.php");
+    header("Location: auth.php");
     exit;
 }
 
@@ -11,77 +11,103 @@ $building_id = (int) ($_GET['building_id'] ?? $_SESSION['active_building_id'] ??
 
 $alert_message = '';
 $alert_type = 'error';
+$reopen_modal = '';
+
+// ایجاد/ویرایش/حذف رأی‌گیری فقط با مدیر ساختمان؛ رأی دادن برای همه اعضا.
+$ctx = building_role_context($building_id);
+$is_manager = $ctx['is_manager'];
 
 // مدیریت فرم‌ها
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $building_id > 0) {
-    $action = $_POST['action'] ?? '';
+    $action = $_POST['form_action'] ?? '';
 
-    if ($action === 'create_vote') {
-        $title = trim($_POST['title'] ?? '');
-        if ($title === '') {
-            $alert_message = 'عنوان رأی‌گیری را وارد کنید.';
-        } else {
-            // گزینه‌ها: چند فیلد option[]
-            $options = [];
-            foreach (($_POST['option'] ?? []) as $opt) {
-                $opt = trim((string) $opt);
-                if ($opt !== '') {
-                    $options[] = $opt;
-                }
-            }
-            if (count($options) < 2) {
-                $alert_message = 'حداقل ۲ گزینه برای رأی‌گیری وارد کنید.';
-            } else {
-                $payload = [
-                    'building_id' => $building_id,
-                    'title' => $title,
-                    'description' => trim($_POST['description'] ?? ''),
-                    'start_date' => !empty($_POST['start_date']) ? $_POST['start_date'] : null,
-                    'end_date' => !empty($_POST['end_date']) ? $_POST['end_date'] : null,
-                    'options' => $options,
-                ];
-                $response = callAPI('POST', '/votes', $payload);
-                if (isset($response['success']) && $response['success'] === true) {
-                    $alert_message = 'رأی‌گیری با موفقیت ایجاد شد.';
-                    $alert_type = 'success';
-                } else {
-                    $alert_message = $response['message'] ?? 'خطا در ایجاد رأی‌گیری.';
-                }
-            }
-        }
-    } elseif ($action === 'cast_vote') {
+    if ($action === 'cast_vote') {
         $vote_id = (int) ($_POST['vote_id'] ?? 0);
         $option_id = (int) ($_POST['option_id'] ?? 0);
         if ($vote_id > 0 && $option_id > 0) {
             $response = callAPI('POST', '/votes/' . $vote_id . '/vote', ['option_id' => $option_id]);
-            if (isset($response['success']) && $response['success'] === true) {
+            if (!empty($response['success'])) {
                 $alert_message = 'رأی شما ثبت شد.';
                 $alert_type = 'success';
             } else {
                 $alert_message = $response['message'] ?? 'خطا در ثبت رأی.';
             }
         }
+    } elseif (!$is_manager) {
+        $alert_message = 'فقط مدیر ساختمان می‌تواند رأی‌گیری ایجاد یا ویرایش کند.';
     } elseif ($action === 'update_status') {
         $vote_id = (int) ($_POST['vote_id'] ?? 0);
         $status = ($_POST['status'] ?? 'closed') === 'active' ? 'active' : 'closed';
         if ($vote_id > 0) {
             $response = callAPI('PUT', '/votes/' . $vote_id . '/status', ['status' => $status]);
-            if (isset($response['success']) && $response['success'] === true) {
+            if (!empty($response['success'])) {
                 $alert_message = $status === 'closed' ? 'رأی‌گیری بسته شد.' : 'رأی‌گیری دوباره باز شد.';
                 $alert_type = 'success';
             } else {
                 $alert_message = $response['message'] ?? 'خطا در تغییر وضعیت.';
             }
         }
-    } elseif ($action === 'delete_vote') {
+    } elseif ($action === 'delete') {
         $vote_id = (int) ($_POST['vote_id'] ?? 0);
-        if ($vote_id > 0) {
-            $response = callAPI('DELETE', '/votes/' . $vote_id);
-            if (isset($response['success']) && $response['success'] === true) {
-                $alert_message = 'رأی‌گیری حذف شد.';
+        $response = callAPI('DELETE', '/votes/' . $vote_id);
+        if (!empty($response['success'])) {
+            $alert_message = 'رأی‌گیری حذف شد.';
+            $alert_type = 'success';
+        } else {
+            $alert_message = $response['message'] ?? 'خطا در حذف رأی‌گیری.';
+        }
+    } elseif ($action === 'update') {
+        // ویرایش فقط عنوان/توضیح/تاریخ‌ها — گزینه‌ها پس از شروع رأی‌گیری تغییر نمی‌کنند
+        $vote_id = (int) ($_POST['vote_id'] ?? 0);
+        $title = trim($_POST['title'] ?? '');
+        if ($title === '') {
+            $alert_message = 'عنوان رأی‌گیری را وارد کنید.';
+            $reopen_modal = 'edit-vote';
+        } else {
+            $response = callAPI('PUT', '/votes/' . $vote_id, [
+                'title' => $title,
+                'description' => trim($_POST['description'] ?? ''),
+                'start_date' => !empty($_POST['start_date']) ? $_POST['start_date'] : null,
+                'end_date' => !empty($_POST['end_date']) ? $_POST['end_date'] : null,
+            ]);
+            if (!empty($response['success'])) {
+                $alert_message = 'رأی‌گیری ویرایش شد.';
                 $alert_type = 'success';
             } else {
-                $alert_message = $response['message'] ?? 'خطا در حذف رأی‌گیری.';
+                $alert_message = $response['message'] ?? 'خطا در ویرایش رأی‌گیری.';
+                $reopen_modal = 'edit-vote';
+            }
+        }
+    } elseif ($action === 'create') {
+        $title = trim($_POST['title'] ?? '');
+        $options = [];
+        foreach (($_POST['option'] ?? []) as $opt) {
+            $opt = trim((string) $opt);
+            if ($opt !== '') {
+                $options[] = $opt;
+            }
+        }
+        if ($title === '') {
+            $alert_message = 'عنوان رأی‌گیری را وارد کنید.';
+            $reopen_modal = 'add-vote';
+        } elseif (count($options) < 2) {
+            $alert_message = 'حداقل ۲ گزینه برای رأی‌گیری وارد کنید.';
+            $reopen_modal = 'add-vote';
+        } else {
+            $response = callAPI('POST', '/votes', [
+                'building_id' => $building_id,
+                'title' => $title,
+                'description' => trim($_POST['description'] ?? ''),
+                'start_date' => !empty($_POST['start_date']) ? $_POST['start_date'] : null,
+                'end_date' => !empty($_POST['end_date']) ? $_POST['end_date'] : null,
+                'options' => $options,
+            ]);
+            if (!empty($response['success'])) {
+                $alert_message = 'رأی‌گیری با موفقیت ایجاد شد.';
+                $alert_type = 'success';
+            } else {
+                $alert_message = $response['message'] ?? 'خطا در ایجاد رأی‌گیری.';
+                $reopen_modal = 'add-vote';
             }
         }
     }
@@ -103,28 +129,27 @@ if ($building_id > 0) {
 
 $page_title = 'رأی‌گیری‌ها';
 $header_sub = $building_name ?: 'نظرسنجی ساکنین';
-$back_url = 'building_view.php?id=' . $building_id;
-$active_nav = 'home';
-require_once 'includes/page_head.php';
+$back_url = 'dashboard.php?building_id=' . $building_id;
+$nav_active = 'none';
+$nav_building_id = $building_id;
+require_once 'includes/header.php';
 ?>
 
 <main class="p-5">
 
-    <!-- دکمه افزودن -->
-    <a href="#add-form"
-       class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg shadow-blue-600/25 transition-all active:scale-[0.98]">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-        </svg>
-        <span>ایجاد رأی‌گیری جدید</span>
-    </a>
+    <?php if ($is_manager): ?>
+        <?php modal_open_button('add-vote', 'ایجاد رأی‌گیری جدید'); ?>
+    <?php else: ?>
+        <div class="hint-card">🗳️ رأی‌گیری‌ها توسط مدیر ساختمان ایجاد می‌شوند؛ شما می‌توانید در آن‌ها شرکت کنید.</div>
+    <?php endif; ?>
 
-    <!-- لیست رأی‌گیری‌ها -->
-    <h2 class="section-title">رأی‌گیری‌های ساختمان</h2>
+    <div class="section-header-row" style="margin: 18px 0 12px;">
+        <h2 class="section-title">رأی‌گیری‌های ساختمان (<?= fa_digits(count($votes)) ?>)</h2>
+    </div>
 
     <?php if (empty($votes)): ?>
-        <div class="card empty-state">
-            <div class="text-4xl mb-3">🗳️</div>
+        <div class="empty-state">
+            <div style="font-size: 34px; margin-bottom: 8px;">🗳️</div>
             رأی‌گیری‌ای ثبت نشده است.
         </div>
     <?php else: ?>
@@ -144,7 +169,7 @@ require_once 'includes/page_head.php';
                 <div class="card p-4">
                     <div class="flex items-start justify-between gap-3">
                         <h3 class="font-bold text-gray-800 text-sm flex-1"><?= htmlspecialchars($vote['title'] ?? 'بدون عنوان') ?></h3>
-                        <span class="text-[11px] px-2 py-0.5 rounded-full flex-shrink-0 <?= $is_active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600' ?>">
+                        <span class="chip <?= $is_active ? 'chip-green' : 'chip-gray' ?>">
                             <?= htmlspecialchars(vote_status_label($v_status)) ?>
                         </span>
                     </div>
@@ -158,7 +183,8 @@ require_once 'includes/page_head.php';
                     <?php if ($can_vote): ?>
                         <!-- فرم رأی دادن -->
                         <form method="POST" action="" class="mt-3 space-y-2">
-                            <input type="hidden" name="action" value="cast_vote">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="form_action" value="cast_vote">
                             <input type="hidden" name="vote_id" value="<?= (int) $vote['id'] ?>">
                             <?php foreach ($options as $opt): ?>
                                 <label class="flex items-center gap-3 bg-gray-50 hover:bg-blue-50 border border-gray-100 rounded-xl p-3 cursor-pointer transition-colors">
@@ -204,97 +230,125 @@ require_once 'includes/page_head.php';
                         <p class="text-xs text-gray-400 mt-3">گزینه‌ای برای این رأی‌گیری ثبت نشده است.</p>
                     <?php endif; ?>
 
-                    <!-- مدیریت -->
-                    <div class="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-                        <form method="POST" action="">
-                            <input type="hidden" name="action" value="update_status">
-                            <input type="hidden" name="vote_id" value="<?= (int) $vote['id'] ?>">
-                            <input type="hidden" name="status" value="<?= $is_active ? 'closed' : 'active' ?>">
-                            <button type="submit" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-3 py-2 rounded-lg transition-colors">
-                                <?= $is_active ? 'بستن رأی‌گیری' : 'بازکردن دوباره' ?>
+                    <?php if ($is_manager): ?>
+                        <div class="card-actions">
+                            <button type="button" class="btn-chip btn-chip-edit"
+                                    data-modal-open="edit-vote"
+                                    data-set-vote_id="<?= (int) $vote['id'] ?>"
+                                    data-set-title="<?= htmlspecialchars($vote['title'] ?? '') ?>"
+                                    data-set-description="<?= htmlspecialchars($vote['description'] ?? '') ?>"
+                                    data-set-start_date="<?= htmlspecialchars($vote['start_date'] ?? '') ?>"
+                                    data-set-end_date="<?= htmlspecialchars($vote['end_date'] ?? '') ?>">
+                                ویرایش
                             </button>
-                        </form>
-                        <form method="POST" action="" data-confirm="این رأی‌گیری برای همیشه حذف شود؟">
-                            <input type="hidden" name="action" value="delete_vote">
-                            <input type="hidden" name="vote_id" value="<?= (int) $vote['id'] ?>">
-                            <button type="submit" class="text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-lg transition-colors">
-                                حذف
-                            </button>
-                        </form>
-                    </div>
+                            <form method="POST" action="" style="display:inline;">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="form_action" value="update_status">
+                                <input type="hidden" name="vote_id" value="<?= (int) $vote['id'] ?>">
+                                <input type="hidden" name="status" value="<?= $is_active ? 'closed' : 'active' ?>">
+                                <button type="submit" class="btn-chip btn-chip-neutral">
+                                    <?= $is_active ? 'بستن رأی‌گیری' : 'بازکردن دوباره' ?>
+                                </button>
+                            </form>
+                            <form method="POST" action="" data-confirm="این رأی‌گیری برای همیشه حذف شود؟" style="display:inline;">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="form_action" value="delete">
+                                <input type="hidden" name="vote_id" value="<?= (int) $vote['id'] ?>">
+                                <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
+                            </form>
+                        </div>
+                    <?php endif; ?>
                 </div>
             <?php endforeach; ?>
         </div>
     <?php endif; ?>
 
-    <!-- فرم افزودن -->
-    <div id="add-form" class="card p-5 mt-6">
-        <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-            ایجاد رأی‌گیری جدید
-        </h3>
-        <form method="POST" action="" class="space-y-4">
-            <input type="hidden" name="action" value="create_vote">
-            <div>
-                <label for="title" class="form-label">عنوان رأی‌گیری *</label>
-                <input type="text" id="title" name="title" required class="form-input" placeholder="مثال: رنگ‌آمیزی نمای ساختمان">
-            </div>
-            <div>
-                <label for="description" class="form-label">توضیحات (اختیاری)</label>
-                <textarea id="description" name="description" rows="2" class="form-input" placeholder="شرح موضوع رأی‌گیری..."></textarea>
-            </div>
-            <div id="options-container" class="space-y-2">
-                <label class="form-label">گزینه‌ها * (حداقل ۲ گزینه)</label>
-                <div class="flex items-center gap-2">
-                    <input type="text" name="option[]" required class="form-input" placeholder="گزینه ۱">
-                </div>
-                <div class="flex items-center gap-2">
-                    <input type="text" name="option[]" required class="form-input" placeholder="گزینه ۲">
-                </div>
-                <div class="flex items-center gap-2">
-                    <input type="text" name="option[]" class="form-input" placeholder="گزینه ۳ (اختیاری)">
-                </div>
-            </div>
-            <button type="button" id="add-option-btn" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-3 py-2 rounded-lg transition-colors">
-                + افزودن گزینه دیگر
-            </button>
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label for="start_date" class="form-label">شروع</label>
-                    <input type="date" id="start_date" name="start_date" class="form-input">
-                </div>
-                <div>
-                    <label for="end_date" class="form-label">پایان</label>
-                    <input type="date" id="end_date" name="end_date" class="form-input">
-                </div>
-            </div>
-            <button type="submit" class="btn-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                ایجاد رأی‌گیری
-            </button>
-        </form>
-    </div>
-
 </main>
 
-<script>
-    // افزودن گزینه‌های بیشتر در فرم ایجاد رأی‌گیری
-    document.getElementById('add-option-btn').addEventListener('click', function () {
-        const container = document.getElementById('options-container');
-        const wrapper = document.createElement('div');
-        wrapper.className = 'flex items-center gap-2';
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.name = 'option[]';
-        input.className = 'form-input';
-        input.placeholder = 'گزینه جدید';
-        wrapper.appendChild(input);
-        container.appendChild(wrapper);
-    });
-</script>
+<?php if ($is_manager): ?>
 
-<?php require_once 'includes/page_tail.php'; ?>
+    <?php modal_start('add-vote', 'ایجاد رأی‌گیری جدید', 'عنوان، گزینه‌ها و بازه زمانی'); ?>
+        <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
+            <input type="hidden" name="form_action" value="create">
+            <div>
+                <label class="form-label">عنوان رأی‌گیری *</label>
+                <input type="text" name="title" required class="form-input" placeholder="مثال: رنگ‌آمیزی نمای ساختمان">
+            </div>
+            <div>
+                <label class="form-label">توضیحات (اختیاری)</label>
+                <textarea name="description" rows="2" class="form-input" placeholder="شرح موضوع رأی‌گیری..."></textarea>
+            </div>
+            <div>
+                <label class="form-label">گزینه‌ها * (حداقل ۲ گزینه)</label>
+                <div id="options-container" class="space-y-2">
+                    <input type="text" name="option[]" required class="form-input" placeholder="گزینه ۱">
+                    <input type="text" name="option[]" required class="form-input" placeholder="گزینه ۲">
+                    <input type="text" name="option[]" class="form-input" placeholder="گزینه ۳ (اختیاری)">
+                </div>
+                <button type="button" id="add-option-btn" class="btn-chip btn-chip-neutral" style="margin-top:8px;">
+                    + افزودن گزینه دیگر
+                </button>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">شروع</label>
+                    <input type="date" name="start_date" class="form-input">
+                </div>
+                <div>
+                    <label class="form-label">پایان</label>
+                    <input type="date" name="end_date" class="form-input">
+                </div>
+            </div>
+            <button type="submit" class="btn-primary">ایجاد رأی‌گیری</button>
+        </form>
+    <?php modal_end(); ?>
+
+    <?php modal_start('edit-vote', 'ویرایش رأی‌گیری', 'گزینه‌ها پس از ایجاد قابل تغییر نیستند'); ?>
+        <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
+            <input type="hidden" name="form_action" value="update">
+            <input type="hidden" name="vote_id" value="">
+            <div>
+                <label class="form-label">عنوان رأی‌گیری *</label>
+                <input type="text" name="title" required class="form-input">
+            </div>
+            <div>
+                <label class="form-label">توضیحات</label>
+                <textarea name="description" rows="3" class="form-input"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="form-label">شروع</label>
+                    <input type="date" name="start_date" class="form-input">
+                </div>
+                <div>
+                    <label class="form-label">پایان</label>
+                    <input type="date" name="end_date" class="form-input">
+                </div>
+            </div>
+            <button type="submit" class="btn-primary">ذخیره تغییرات</button>
+        </form>
+    <?php modal_end(); ?>
+
+    <script>
+        /* افزودن گزینه‌های بیشتر در فرم ایجاد رأی‌گیری */
+        (function () {
+            var btn = document.getElementById('add-option-btn');
+            var container = document.getElementById('options-container');
+            if (!btn || !container) { return; }
+            btn.addEventListener('click', function () {
+                var input = document.createElement('input');
+                input.type = 'text';
+                input.name = 'option[]';
+                input.className = 'form-input';
+                input.placeholder = 'گزینه جدید';
+                container.appendChild(input);
+                input.focus();
+            });
+        })();
+    </script>
+
+<?php endif; ?>
+
+<?php require_once 'includes/footer.php'; ?>

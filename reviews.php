@@ -3,7 +3,7 @@ require_once 'includes/api_helper.php';
 
 // بررسی لاگین
 if (!isset($_SESSION['token']) || empty($_SESSION['token'])) {
-    header("Location: login.php");
+    header("Location: auth.php");
     exit;
 }
 
@@ -11,39 +11,56 @@ $building_id = (int) ($_GET['building_id'] ?? $_SESSION['active_building_id'] ??
 
 $alert_message = '';
 $alert_type = 'error';
+$reopen_modal = '';
 
-// ثبت نظر جدید
+// هر عضو می‌تواند نظر بدهد؛ ویرایش/حذف فقط نظر خودش (یا مدیر).
+$ctx = building_role_context($building_id);
+$is_manager = $ctx['is_manager'];
+$current_user_id = $ctx['user_id'];
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $building_id > 0) {
-    $rating = (int) ($_POST['rating'] ?? 0);
-            if ($rating < 1 || $rating > 5) {
-                $alert_message = 'امتیاز را بین ۱ تا ۵ انتخاب کنید.';
-            } else {
-                $payload = [
-                    'building_id' => $building_id,
-                    'rating' => $rating,
-                    'category_id' => !empty($_POST['category_id']) ? (int) $_POST['category_id'] : null,
-                    'review_text' => trim($_POST['review_text'] ?? ''),
-                ];
-        $response = callAPI('POST', '/reviews', $payload);
-        if (isset($response['success']) && $response['success'] === true) {
-            $alert_message = 'نظر شما با موفقیت ثبت شد.';
+    $action = $_POST['form_action'] ?? 'create';
+
+    if ($action === 'delete') {
+        $item_id = (int) ($_POST['item_id'] ?? 0);
+        $response = callAPI('DELETE', '/reviews/' . $item_id);
+        if (!empty($response['success'])) {
+            $alert_message = 'نظر حذف شد.';
             $alert_type = 'success';
         } else {
-            $alert_message = $response['message'] ?? 'خطا در ثبت نظر.';
+            $alert_message = $response['message'] ?? 'خطا در حذف نظر.';
         }
-    }
-} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    $action_name = $_POST['action'];
-
-    if ($action_name === 'delete_review') {
-        $item_id = (int) ($_POST['item_id'] ?? 0);
-        if ($item_id > 0) {
-            $response = callAPI('DELETE', '/reviews/' . $item_id);
-            if (isset($response['success']) && $response['success'] === true) {
-                $alert_message = 'حذف با موفقیت انجام شد.';
-                $alert_type = 'success';
+    } else {
+        $rating = (int) ($_POST['rating'] ?? 0);
+        if ($rating < 1 || $rating > 5) {
+            $alert_message = 'امتیاز را بین ۱ تا ۵ انتخاب کنید.';
+            $reopen_modal = $action === 'update' ? 'edit-review' : 'add-review';
+        } else {
+            $payload = [
+                'rating' => $rating,
+                'category_id' => !empty($_POST['category_id']) ? (int) $_POST['category_id'] : null,
+                'review_text' => trim($_POST['review_text'] ?? ''),
+            ];
+            if ($action === 'update') {
+                $item_id = (int) ($_POST['item_id'] ?? 0);
+                $response = callAPI('PUT', '/reviews/' . $item_id, $payload);
+                if (!empty($response['success'])) {
+                    $alert_message = 'نظر شما ویرایش شد.';
+                    $alert_type = 'success';
+                } else {
+                    $alert_message = $response['message'] ?? 'خطا در ویرایش نظر.';
+                    $reopen_modal = 'edit-review';
+                }
             } else {
-                $alert_message = $response['message'] ?? 'خطا در حذف.';
+                $payload['building_id'] = $building_id;
+                $response = callAPI('POST', '/reviews', $payload);
+                if (!empty($response['success'])) {
+                    $alert_message = 'نظر شما با موفقیت ثبت شد.';
+                    $alert_type = 'success';
+                } else {
+                    $alert_message = $response['message'] ?? 'خطا در ثبت نظر.';
+                    $reopen_modal = 'add-review';
+                }
             }
         }
     }
@@ -54,11 +71,11 @@ $reviews = [];
 $building_name = '';
 if ($building_id > 0) {
     $building_response = callAPI('GET', '/buildings/' . $building_id);
-    if (isset($building_response['success']) && $building_response['success'] === true) {
+    if (!empty($building_response['success'])) {
         $building_name = $building_response['data']['name'] ?? '';
     }
     $list_response = callAPI('GET', '/reviews', ['building_id' => $building_id]);
-    if (isset($list_response['success']) && $list_response['success'] === true) {
+    if (!empty($list_response['success'])) {
         $reviews = $list_response['data'] ?? [];
     }
 }
@@ -66,7 +83,7 @@ if ($building_id > 0) {
 // دسته‌بندی‌های نظرات
 $review_categories = [];
 $categories_response = callAPI('GET', '/review-categories');
-if (isset($categories_response['success']) && $categories_response['success'] === true) {
+if (!empty($categories_response['success'])) {
     $review_categories = $categories_response['data'] ?? [];
 }
 $category_labels = [];
@@ -74,105 +91,113 @@ foreach ($review_categories as $cat) {
     $category_labels[$cat['id']] = $cat['name'];
 }
 
+// میانگین امتیاز
+$avg_rating = 0.0;
+if (!empty($reviews)) {
+    $sum = array_sum(array_map(static fn($r) => (int) ($r['rating'] ?? 0), $reviews));
+    $avg_rating = round($sum / count($reviews), 1);
+}
+
 $page_title = 'نظرات و امتیازها';
 $header_sub = $building_name ?: 'بازخورد ساکنین';
-$back_url = 'building_view.php?id=' . $building_id;
-$active_nav = 'home';
-require_once 'includes/page_head.php';
+$back_url = 'dashboard.php?building_id=' . $building_id;
+$nav_active = 'none';
+$nav_building_id = $building_id;
+require_once 'includes/header.php';
 ?>
 
 <main class="p-5">
 
-    <!-- دکمه افزودن -->
-    <a href="#add-form"
-       class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg shadow-blue-600/25 transition-all active:scale-[0.98]">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-        </svg>
-        <span>ثبت نظر جدید</span>
-    </a>
+    <?php modal_open_button('add-review', 'ثبت نظر جدید'); ?>
 
-    <!-- لیست نظرات -->
-    <h2 class="section-title">نظرات ساکنین</h2>
+    <?php if (!empty($reviews)): ?>
+        <div class="card p-4" style="margin-top:12px;text-align:center;">
+            <p class="text-xs text-gray-500">میانگین رضایت ساکنین</p>
+            <p style="font-size:28px;font-weight:800;color:var(--gold-primary);margin-top:4px;"><?= fa_number($avg_rating) ?></p>
+            <span class="text-amber-400 text-lg tracking-wider" dir="ltr"><?= review_stars((int) round($avg_rating)) ?></span>
+            <p class="text-[11px] text-gray-400 mt-1">از <?= fa_digits(count($reviews)) ?> نظر</p>
+        </div>
+    <?php endif; ?>
+
+    <div class="section-header-row" style="margin: 18px 0 12px;">
+        <h2 class="section-title">نظرات ساکنین (<?= fa_digits(count($reviews)) ?>)</h2>
+    </div>
 
     <?php if (empty($reviews)): ?>
-        <div class="card empty-state">
-            <div class="text-4xl mb-3">⭐</div>
-            نظری ثبت نشده است.<br>
-            اولین نظر را شما ثبت کنید.
+        <div class="empty-state">
+            <div style="font-size: 34px; margin-bottom: 8px;">⭐</div>
+            نظری ثبت نشده است.<br>اولین نظر را شما ثبت کنید.
         </div>
     <?php else: ?>
         <div class="space-y-3">
             <?php foreach ($reviews as $review): ?>
+                <?php
+                $rv_id = (int) ($review['id'] ?? 0);
+                $rv_rating = (int) ($review['rating'] ?? 0);
+                $rv_cat = (int) ($review['category_id'] ?? 0);
+                $rv_text = $review['review_text'] ?? '';
+                $is_mine = (int) ($review['user_id'] ?? 0) === $current_user_id;
+                ?>
                 <div class="card p-4">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-amber-400 text-lg tracking-wider" dir="ltr"><?= review_stars($review['rating'] ?? 0) ?></span>
+                        <span class="text-amber-400 text-lg tracking-wider" dir="ltr"><?= review_stars($rv_rating) ?></span>
                         <span class="text-[11px] text-gray-400"><?= fa_time_ago($review['created_at'] ?? '') ?></span>
                     </div>
-                    <?php if (!empty($review['category_id']) && isset($category_labels[$review['category_id']])): ?>
-                        <span class="inline-block mb-2 text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                            <?= htmlspecialchars($category_labels[$review['category_id']]) ?>
-                        </span>
+
+                    <?php if ($rv_cat > 0 && isset($category_labels[$rv_cat])): ?>
+                        <span class="chip chip-gray" style="margin-bottom:8px;"><?= htmlspecialchars($category_labels[$rv_cat]) ?></span>
                     <?php endif; ?>
-                    <?php if (!empty($review['review_text'])): ?>
-                        <p class="text-sm text-gray-600 leading-6"><?= nl2br(htmlspecialchars($review['review_text'])) ?></p>
+
+                    <?php if ($rv_text !== ''): ?>
+                        <p class="text-sm text-gray-600 leading-6"><?= nl2br(htmlspecialchars($rv_text)) ?></p>
                     <?php else: ?>
                         <p class="text-sm text-gray-400">(بدون متن)</p>
                     <?php endif; ?>
-                    <form method="POST" action="" class="mt-3 pt-3 border-t border-gray-100" data-confirm="این نظر حذف شود؟">
-                        <input type="hidden" name="action" value="delete_review">
-                        <input type="hidden" name="item_id" value="<?= (int) $review['id'] ?>">
-                        <button type="submit" class="text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-lg transition-colors">
-                            حذف نظر
-                        </button>
-                    </form>
+
+                    <?php if ($is_mine || $is_manager): ?>
+                        <div class="card-actions">
+                            <?php if ($is_mine): ?>
+                                <button type="button" class="btn-chip btn-chip-edit"
+                                        data-modal-open="edit-review"
+                                        data-set-item_id="<?= $rv_id ?>"
+                                        data-set-rating="<?= $rv_rating ?>"
+                                        data-set-category_id="<?= $rv_cat ?>"
+                                        data-set-review_text="<?= htmlspecialchars($rv_text) ?>">
+                                    ویرایش
+                                </button>
+                            <?php endif; ?>
+                            <form method="POST" action="" data-confirm="این نظر حذف شود؟" style="display:inline;">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="form_action" value="delete">
+                                <input type="hidden" name="item_id" value="<?= $rv_id ?>">
+                                <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
+                            </form>
+                        </div>
+                    <?php endif; ?>
                 </div>
             <?php endforeach; ?>
         </div>
     <?php endif; ?>
 
-    <!-- فرم افزودن -->
-    <div id="add-form" class="card p-5 mt-6">
-        <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-            </svg>
-            ثبت نظر جدید
-        </h3>
-        <form method="POST" action="" class="space-y-4">
-            <div>
-                <label for="rating" class="form-label">امتیاز *</label>
-                <div class="flex gap-2">
-                    <?php for ($i = 1; $i <= 5; $i++): ?>
-                        <label class="cursor-pointer">
-                            <input type="radio" name="rating" value="<?= $i ?>" <?= $i === 5 ? 'checked' : '' ?> class="sr-only peer">
-                            <span class="text-2xl text-gray-300 peer-checked:text-amber-400 transition-colors">★</span>
-                        </label>
-                    <?php endfor; ?>
-                </div>
-            </div>
-            <div>
-                <label for="category_id" class="form-label">دسته‌بندی (اختیاری)</label>
-                <select id="category_id" name="category_id" class="form-input">
-                    <option value="">— بدون دسته‌بندی —</option>
-                    <?php foreach ($review_categories as $cat): ?>
-                        <option value="<?= (int) $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div>
-                <label for="review_text" class="form-label">متن نظر</label>
-                <textarea id="review_text" name="review_text" rows="3" class="form-input" placeholder="نظر خود را درباره مدیریت ساختمان بنویسید..."></textarea>
-            </div>
-            <button type="submit" class="btn-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                ثبت نظر
-            </button>
-        </form>
-    </div>
-
 </main>
 
-<?php require_once 'includes/page_tail.php'; ?>
+<?php modal_start('add-review', 'ثبت نظر جدید', 'امتیاز و بازخورد شما درباره مدیریت'); ?>
+    <form method="POST" action="" class="space-y-4" data-loading>
+        <?= csrf_field() ?>
+        <input type="hidden" name="form_action" value="create">
+        <?php $modal_uid = 'add'; include 'includes/_review_form_fields.php'; ?>
+        <button type="submit" class="btn-primary">ثبت نظر</button>
+    </form>
+<?php modal_end(); ?>
+
+<?php modal_start('edit-review', 'ویرایش نظر', 'اصلاح امتیاز یا متن نظر'); ?>
+    <form method="POST" action="" class="space-y-4" data-loading>
+        <?= csrf_field() ?>
+        <input type="hidden" name="form_action" value="update">
+        <input type="hidden" name="item_id" value="">
+        <?php $modal_uid = 'edit'; include 'includes/_review_form_fields.php'; ?>
+        <button type="submit" class="btn-primary">ذخیره تغییرات</button>
+    </form>
+<?php modal_end(); ?>
+
+<?php require_once 'includes/footer.php'; ?>

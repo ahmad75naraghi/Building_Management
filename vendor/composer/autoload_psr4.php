@@ -13,5 +13,6 @@ return array(
     'Firebase\\JWT\\' => array($vendorDir . '/firebase/php-jwt/src'),
     'DeepCopy\\' => array($vendorDir . '/myclabs/deep-copy/src/DeepCopy'),
     'App\\Tests\\' => array($baseDir . '/tests'),
+    'App\\Config\\' => array($baseDir . '/config'),
     'App\\' => array($baseDir . '/src'),
 );

@@ -14,6 +14,9 @@
  *   $alert_message  متن پیام خطا/موفقیت (اختیاری)
  *   $alert_type     error|success (پیش‌فرض: error)
  *   $standalone     اگر true باشد فقط <head> و <body> بدون هدر اپ (برای صفحات ورود/ثبت‌نام)
+ *   $reopen_modal   شناسه پاپ‌آپی که بعد از ارسال ناموفق فرم دوباره باز شود
+ *   $header_variant اگر 'home' باشد، هدر اصلی (زنگ + عنوان + دکمه پروفایل) به‌جای هدر
+ *                   صفحات داخلی (دکمه بازگشت) نمایش داده می‌شود.
  * ============================================================ */
 
 $page_title   = $page_title ?? 'مدیریت ساختمان';
@@ -23,6 +26,11 @@ $nav_active   = $nav_active ?? ($active_nav ?? 'none');
 $alert_message = $alert_message ?? '';
 $alert_type   = $alert_type ?? 'error';
 $standalone   = $standalone ?? false;
+$header_variant = $header_variant ?? 'subpage';
+$reopen_modal = $reopen_modal ?? '';
+
+// کامپوننت پاپ‌آپ مشترک در همه صفحات در دسترس باشد
+require_once __DIR__ . '/modal.php';
 
 // اگر تعداد اعلانات تعیین نشده بود، از API خوانده شود (نمایش نشان ناوبری و زنگ)
 if (!isset($unread_nav) && function_exists('callAPI')) {
@@ -55,13 +63,44 @@ if (!isset($unread_nav)) {
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
-<body class="app-body">
+<body class="app-body"<?= $reopen_modal !== '' ? ' data-reopen-modal="' . htmlspecialchars($reopen_modal) . '"' : '' ?>>
 
     <div class="app-container">
 
         <?php if (!$standalone): ?>
 
         <!-- هدر برنامه -->
+        <?php if ($header_variant === 'home'): ?>
+
+        <header class="app-header">
+            <div class="header-profile-section">
+                <a href="notifications.php" class="notification-bell" aria-label="اعلانات">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <?php if ($unread_nav > 0): ?>
+                        <span class="badge"><?= fa_digits($unread_nav) ?></span>
+                    <?php endif; ?>
+                </a>
+            </div>
+
+            <div class="header-title-text">
+                <h1><?= htmlspecialchars($page_title) ?></h1>
+                <?php if (!empty($header_sub)): ?>
+                    <p><?= htmlspecialchars($header_sub) ?></p>
+                <?php endif; ?>
+            </div>
+
+            <a href="profile.php" class="menu-hamburger" aria-label="پروفایل">
+                <span></span>
+                <span style="width: 14px; align-self: flex-start; margin-right: 12px;"></span>
+                <span></span>
+            </a>
+        </header>
+
+        <?php else: ?>
+
         <header class="app-header">
             <a href="<?= htmlspecialchars($back_url) ?>" class="subpage-back-btn" aria-label="بازگشت">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -86,6 +125,9 @@ if (!isset($unread_nav)) {
                 <?php endif; ?>
             </a>
         </header>
+
+
+        <?php endif; ?>
 
         <?php endif; ?>
 

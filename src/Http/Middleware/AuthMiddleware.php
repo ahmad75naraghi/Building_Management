@@ -21,10 +21,17 @@ final class AuthMiddleware implements MiddlewareInterface
             '/api/auth/register',
             '/api/auth/refresh',
             '/api/auth/logout',
+            // ورود/ثبت‌نام یکپارچه با شماره موبایل و کد یک‌بارمصرف
+            '/api/auth/check-phone',
+            '/api/auth/send-otp',
+            '/api/auth/verify-otp',
             '/b/api/auth/login',
             '/b/api/auth/register',
             '/b/api/auth/refresh',
             '/b/api/auth/logout',
+            '/b/api/auth/check-phone',
+            '/b/api/auth/send-otp',
+            '/b/api/auth/verify-otp',
         ];
 
         if (in_array($path, $publicPaths, true)) {

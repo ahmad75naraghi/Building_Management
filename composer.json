@@ -18,7 +18,8 @@
     },
     "autoload": {
         "psr-4": {
-            "App\\": "src/"
+            "App\\": "src/",
+            "App\\Config\\": "config/"
         }
     },
     "autoload-dev": {
@@ -27,8 +28,11 @@
         }
     },
     "scripts": {
-        "test": "vendor/bin/phpunit",
+        "test": "php tests/Integration/run.php",
+        "test:unit": "vendor/bin/phpunit",
+        "health": "php scripts/healthcheck.php",
         "migrate": "php scripts/migrator.php",
+        "migrate:status": "php scripts/migrator.php --status",
         "verify": "php scripts/verify.php",
         "serve": "php -S 0.0.0.0:8000 -t public/"
     },

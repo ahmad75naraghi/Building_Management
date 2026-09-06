@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Core\Logger;
 /**
  * ارسال پیامک از طریق پنل ملی‌پیامک (Melipayamak) با متد SendByBaseNumber.
  *
@@ -38,11 +39,11 @@ final class SmsService
     {
         $to = \App\Utilities\PhoneHelper::normalize($to);
         if (!\App\Utilities\PhoneHelper::isValid($to)) {
-            error_log("[SmsService] invalid phone: {$to}");
+            Logger::warning('SmsService', 'شماره مقصد پیامک معتبر نیست', ['to' => $to]);
             return false;
         }
         if (!class_exists(\SoapClient::class)) {
-            error_log('[SmsService] php-soap extension is not installed; SMS skipped.');
+            Logger::warning('SmsService', 'افزونه soap نصب نیست؛ ارسال پیامک انجام نشد', ['to' => $to]);
             return false;
         }
 
@@ -69,10 +70,13 @@ final class SmsService
                 // پاسخ موفق ملی‌پیامک معمولاً شناسه ارسال (عدد مثبت) است
                 return true;
             }
-            error_log("[SmsService] send failed to {$to}: " . var_export($result, true));
+            Logger::error('SmsService', 'ارسال پیامک ناموفق بود', [
+                'to' => $to,
+                'provider_result' => is_scalar($result) ? (string) $result : gettype($result),
+            ]);
             return is_string($result) && $result !== '';
         } catch (\Throwable $e) {
-            error_log('[SmsService] exception: ' . $e->getMessage());
+            Logger::error('SmsService', 'خطا در ارتباط با سامانه پیامک', ['to' => $to], $e);
             return false;
         }
     }
@@ -84,6 +88,16 @@ final class SmsService
     {
         $text = "کاربر گرامی {$name}، ثبت‌نام شما در سامانه مدیریت ساختمان با موفقیت انجام شد.";
         return $this->sendByBaseNumber($to, $text);
+    }
+
+    /**
+     * پیامک کد یک‌بارمصرف ورود/ثبت‌نام.
+     */
+    public function sendOtpSms(string $to, string $code): bool
+    {
+        $minutes = (int) ceil(\App\Services\OtpService::TTL_SECONDS / 60);
+        $text = "کد ورود شما به سامانه مدیریت ساختمان: {$code}\nاعتبار: {$minutes} دقیقه. این کد را در اختیار کسی قرار ندهید.";
+        return $this->sendByBaseNumber($to, $text, [$code]);
     }
 
     /**

@@ -35,6 +35,7 @@ class ComposerStaticInita504b18a6fd8ab609b549f157c028f5f
         'A' =>
         array (
             'App\\Tests\\' => 10,
+            'App\\Config\\' => 12,
             'App\\' => 4,
         ),
     );
@@ -68,6 +69,10 @@ class ComposerStaticInita504b18a6fd8ab609b549f157c028f5f
         array (
             0 => __DIR__ . '/../..' . '/tests',
         ),
+        'App\\Config\\' =>
+        array (
+            0 => __DIR__ . '/../..' . '/config',
+        ),
         'App\\' =>
         array (
             0 => __DIR__ . '/../..' . '/src',
@@ -75,6 +80,7 @@ class ComposerStaticInita504b18a6fd8ab609b549f157c028f5f
     );
 
     public static $classMap = array (
+        'App\\Config\\AppConfig' => __DIR__ . '/../..' . '/config/app.php',
         'App\\Core\\Container' => __DIR__ . '/../..' . '/src/Core/Container.php',
         'App\\Core\\Database' => __DIR__ . '/../..' . '/src/Core/Database.php',
         'App\\Core\\Kernel' => __DIR__ . '/../..' . '/src/Core/Kernel.php',

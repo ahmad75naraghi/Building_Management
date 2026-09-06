@@ -555,6 +555,117 @@ final class ExtraModulesService
         return $this->repo->updateModuleStatus($module, $id, $status);
     }
 
+    /**
+     * ستون «سازنده رکورد» در هر ماژول (برای کنترل دسترسی ویرایش/حذف).
+     */
+    private const MODULE_OWNER_COLUMN = [
+        'bookings' => 'user_id',
+        'announcements' => 'created_by',
+        'maintenance' => 'user_id',
+        'votes' => 'created_by',
+        'visitors' => 'user_id',
+        'documents' => 'uploaded_by',
+        'consumption' => 'created_by',
+        'emergency-contacts' => null, // رکورد ساختمانی؛ فقط مدیر
+        'meetings' => 'created_by',
+        'reviews' => 'user_id',
+    ];
+
+    /**
+     * ماژول‌هایی که فقط مدیر ساختمان اجازه ثبت/ویرایش/حذف دارد.
+     */
+    private const MANAGER_ONLY_MODULES = ['announcements', 'emergency-contacts', 'votes', 'meetings', 'documents'];
+
+    /**
+     * آیا کاربر اجازه ویرایش/حذف این رکورد را دارد؟
+     *
+     * قواعد (ساده و قابل پیش‌بینی):
+     *   • مدیر ساختمان: به همه‌چیز دسترسی دارد.
+     *   • سایر نقش‌ها (مالک/مستاجر/ساکن): فقط رکوردهایی که خودشان ثبت کرده‌اند.
+     *   • ماژول‌های سطح ساختمان (اطلاعیه، تماس اضطراری، رأی‌گیری، جلسه، مدرک):
+     *     فقط مدیر.
+     */
+    private function requireCanModify(string $module, int $id, int $userId, int $buildingId): void
+    {
+        $role = $this->repo->memberRole($userId, $buildingId);
+        if ($role === null) {
+            throw new AppException('You are not a member of this building');
+        }
+        if ($role === 'manager') {
+            return;
+        }
+
+        if (in_array($module, self::MANAGER_ONLY_MODULES, true)) {
+            throw new AppException('فقط مدیر ساختمان می‌تواند این مورد را تغییر دهد.');
+        }
+
+        $ownerColumn = self::MODULE_OWNER_COLUMN[$module] ?? null;
+        if ($ownerColumn === null) {
+            throw new AppException('فقط مدیر ساختمان می‌تواند این مورد را تغییر دهد.');
+        }
+
+        $row = $this->repo->findModuleEntity($module, $id);
+        if ($row === null) {
+            throw new AppException('Item not found');
+        }
+        if ((int) ($row[$ownerColumn] ?? 0) !== $userId) {
+            throw new AppException('شما فقط می‌توانید مواردی را که خودتان ثبت کرده‌اید تغییر دهید.');
+        }
+    }
+
+    /**
+     * ویرایش عمومی رکوردهای ماژول‌ها (اطلاعیه، تعمیرات، مهمان، جلسه و ...).
+     *
+     * @param array<string, mixed> $data
+     */
+    public function updateEntity(string $module, int $id, array $data, int $userId): array
+    {
+        $buildingId = $this->repo->getBuildingIdForModule($module, $id);
+        if ($buildingId === null) {
+            throw new AppException('Item not found');
+        }
+        $this->requireMember($userId, $buildingId);
+        $this->requireCanModify($module, $id, $userId, $buildingId);
+
+        $allowed = $this->repo->editableColumns($module);
+        if (empty($allowed)) {
+            throw new AppException('Editing is not supported for this module');
+        }
+
+        // فقط کلیدهای مجاز و ارسال‌شده را نگه می‌داریم
+        $payload = [];
+        foreach ($allowed as $column) {
+            if (array_key_exists($column, $data)) {
+                $value = $data[$column];
+                if (is_bool($value)) {
+                    $value = (int) $value;
+                }
+                if (is_string($value)) {
+                    $value = trim($value);
+                    if ($value === '') {
+                        $value = null;
+                    }
+                }
+                $payload[$column] = $value;
+            }
+        }
+        if (empty($payload)) {
+            throw new ValidationException('هیچ فیلد قابل ویرایشی ارسال نشده است.');
+        }
+
+        // فیلدهای اجباری نباید خالی شوند
+        foreach (['title', 'content', 'visitor_name', 'contact_name', 'phone'] as $required) {
+            if (array_key_exists($required, $payload) && ($payload[$required] === null || $payload[$required] === '')) {
+                throw new ValidationException('فیلدهای اجباری نمی‌توانند خالی باشند.');
+            }
+        }
+
+        $this->repo->updateModuleEntity($module, $id, $payload);
+
+        $updated = $this->repo->findModuleEntity($module, $id);
+        return $updated ?? [];
+    }
+
     public function deleteEntity(string $module, int $id, int $userId): bool
     {
         $buildingId = $this->repo->getBuildingIdForModule($module, $id);
@@ -562,6 +673,7 @@ final class ExtraModulesService
             throw new AppException('Item not found');
         }
         $this->requireMember($userId, $buildingId);
+        $this->requireCanModify($module, $id, $userId, $buildingId);
         return $this->repo->deleteModuleEntity($module, $id);
     }
 

@@ -359,6 +359,38 @@ final class ExtraModulesController
         }
     }
 
+    /**
+     * ویرایش عمومی رکورد یک ماژول (اطلاعیه، تعمیرات، مهمان، جلسه و ...).
+     */
+    private function updateEntity(Request $request, string $module): Response
+    {
+        $userId = $this->userIdOrReject($request);
+        if (!$userId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication required',
+            ]);
+        }
+        $id = (int) ($request->getAttribute('id') ?? 0);
+        if ($id <= 0) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => 'id is required',
+            ]);
+        }
+        $data = $request->getJsonBody() ?? [];
+        try {
+            $updated = $this->service->updateEntity($module, $id, $data, $userId);
+            return (new Response())->setJson([
+                'success' => true,
+                'message' => 'Item updated',
+                'data' => $updated,
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
     private function destroyEntity(Request $request, string $module): Response
     {
         $userId = $this->userIdOrReject($request);
@@ -393,12 +425,22 @@ final class ExtraModulesController
         return $this->changeEntityStatus($request, 'bookings', ['pending', 'confirmed', 'cancelled', 'completed']);
     }
 
+    public function updateBooking(Request $request): Response
+    {
+        return $this->updateEntity($request, 'bookings');
+    }
+
     public function destroyBooking(Request $request): Response
     {
         return $this->destroyEntity($request, 'bookings');
     }
 
     // --- Announcements ---
+
+    public function updateAnnouncement(Request $request): Response
+    {
+        return $this->updateEntity($request, 'announcements');
+    }
 
     public function destroyAnnouncement(Request $request): Response
     {
@@ -410,6 +452,11 @@ final class ExtraModulesController
     public function updateMaintenanceStatus(Request $request): Response
     {
         return $this->changeEntityStatus($request, 'maintenance', ['pending', 'in_progress', 'resolved', 'closed']);
+    }
+
+    public function updateMaintenance(Request $request): Response
+    {
+        return $this->updateEntity($request, 'maintenance');
     }
 
     public function destroyMaintenance(Request $request): Response
@@ -424,12 +471,22 @@ final class ExtraModulesController
         return $this->changeEntityStatus($request, 'visitors', ['entered', 'exited']);
     }
 
+    public function updateVisitor(Request $request): Response
+    {
+        return $this->updateEntity($request, 'visitors');
+    }
+
     public function destroyVisitor(Request $request): Response
     {
         return $this->destroyEntity($request, 'visitors');
     }
 
     // --- Documents ---
+
+    public function updateDocument(Request $request): Response
+    {
+        return $this->updateEntity($request, 'documents');
+    }
 
     public function destroyDocument(Request $request): Response
     {
@@ -438,12 +495,22 @@ final class ExtraModulesController
 
     // --- Consumption ---
 
+    public function updateConsumption(Request $request): Response
+    {
+        return $this->updateEntity($request, 'consumption');
+    }
+
     public function destroyConsumption(Request $request): Response
     {
         return $this->destroyEntity($request, 'consumption');
     }
 
     // --- Emergency contacts ---
+
+    public function updateEmergencyContact(Request $request): Response
+    {
+        return $this->updateEntity($request, 'emergency-contacts');
+    }
 
     public function destroyEmergencyContact(Request $request): Response
     {
@@ -457,12 +524,22 @@ final class ExtraModulesController
         return $this->changeEntityStatus($request, 'meetings', ['scheduled', 'completed', 'cancelled']);
     }
 
+    public function updateMeeting(Request $request): Response
+    {
+        return $this->updateEntity($request, 'meetings');
+    }
+
     public function destroyMeeting(Request $request): Response
     {
         return $this->destroyEntity($request, 'meetings');
     }
 
     // --- Reviews ---
+
+    public function updateReview(Request $request): Response
+    {
+        return $this->updateEntity($request, 'reviews');
+    }
 
     public function destroyReview(Request $request): Response
     {
@@ -474,6 +551,11 @@ final class ExtraModulesController
     public function updateVoteStatus(Request $request): Response
     {
         return $this->changeEntityStatus($request, 'votes', ['active', 'closed']);
+    }
+
+    public function updateVote(Request $request): Response
+    {
+        return $this->updateEntity($request, 'votes');
     }
 
     public function destroyVote(Request $request): Response

@@ -38,6 +38,7 @@ class Migration_023_phone_auth
         try {
             $db->exec("ALTER TABLE users DROP INDEX idx_phone_unique");
         } catch (Throwable $e) {
+            error_log('[023] rollback step skipped: ' . $e->getMessage());
         }
     }
 }

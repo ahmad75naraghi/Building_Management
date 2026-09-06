@@ -3,7 +3,7 @@ require_once 'includes/api_helper.php';
 
 // بررسی لاگین
 if (!isset($_SESSION['token']) || empty($_SESSION['token'])) {
-    header("Location: login.php");
+    header("Location: auth.php");
     exit;
 }
 
@@ -45,13 +45,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'address' => $address,
             'custom_name' => trim($_POST['custom_name'] ?? ''),
             'theme_color' => trim($_POST['theme_color'] ?? '#1a73e8'),
-            'total_units' => trim($_POST['total_units'] ?? '') !== '' ? (int) $_POST['total_units'] : null,
-            'total_floors' => trim($_POST['total_floors'] ?? '') !== '' ? (int) $_POST['total_floors'] : null,
+            'total_units' => en_digits($_POST['total_units'] ?? '') !== '' ? max(0, (int) en_digits($_POST['total_units'])) : null,
+            'total_floors' => en_digits($_POST['total_floors'] ?? '') !== '' ? max(0, (int) en_digits($_POST['total_floors'])) : null,
             'has_blocks' => isset($_POST['has_blocks']) && $_POST['has_blocks'] === '1',
             'default_image' => in_array(($_POST['default_image'] ?? 'b1'), ['b1', 'b2', 'b3', 'b4'], true) ? $_POST['default_image'] : 'b1',
-            'parking_spots' => max(0, (int) ($_POST['parking_spots'] ?? 0)),
-            'monthly_charge' => max(0, (float) ($_POST['monthly_charge'] ?? 0)),
+            'parking_spots' => max(0, (int) en_digits($_POST['parking_spots'] ?? 0)),
+            'monthly_charge' => max(0, (float) en_digits($_POST['monthly_charge'] ?? 0)),
             'monthly_charge_enabled' => !empty($_POST['monthly_charge_enabled']),
+            'charge_mode' => in_array(($_POST['charge_mode'] ?? 'fixed'), ['fixed', 'per_person', 'custom'], true) ? $_POST['charge_mode'] : 'fixed',
+            'charge_per_person' => max(0, (float) en_digits($_POST['charge_per_person'] ?? 0)),
         ];
         $response = callAPI('PUT', '/buildings/' . $building_id, $payload);
         if (isset($response['success']) && $response['success'] === true) {
@@ -66,6 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $has_blocks_checked = !empty($building['has_blocks']) ? 'checked' : '';
 $monthly_checked = !empty($building['monthly_charge_enabled']) ? 'checked' : '';
+$charge_mode = $building['charge_mode'] ?? 'fixed';
 $current_image = $building['default_image'] ?? 'b1';
 
 $page_title = 'ویرایش ساختمان';
@@ -85,6 +88,8 @@ require_once 'includes/page_head.php';
             ویرایش اطلاعات ساختمان
         </h3>
         <form method="POST" action="" class="space-y-4">
+            <?= csrf_field() ?>
+            <input type="hidden" name="form_action" value="update">
             <div>
                 <label for="name" class="form-label">نام ساختمان *</label>
                 <input type="text" id="name" name="name" required class="form-input" value="<?= htmlspecialchars($building['name'] ?? '') ?>" placeholder="مثال: برج آسمان">
@@ -101,11 +106,11 @@ require_once 'includes/page_head.php';
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label for="total_units" class="form-label">تعداد واحد</label>
-                    <input type="number" id="total_units" name="total_units" min="1" class="form-input" value="<?= htmlspecialchars((string) ($building['total_units'] ?? '')) ?>" placeholder="مثال: ۲۰">
+                    <input type="number" id="total_units" name="total_units" min="0" inputmode="numeric" class="form-input" value="<?= htmlspecialchars((string) ($building['total_units'] ?? '')) ?>" placeholder="مثال: 20">
                 </div>
                 <div>
                     <label for="total_floors" class="form-label">تعداد طبقه</label>
-                    <input type="number" id="total_floors" name="total_floors" min="1" class="form-input" value="<?= htmlspecialchars((string) ($building['total_floors'] ?? '')) ?>" placeholder="مثال: ۵">
+                    <input type="number" id="total_floors" name="total_floors" min="0" inputmode="numeric" class="form-input" value="<?= htmlspecialchars((string) ($building['total_floors'] ?? '')) ?>" placeholder="مثال: 5">
                 </div>
             </div>
 
@@ -145,15 +150,50 @@ require_once 'includes/page_head.php';
                 <input type="number" id="parking_spots" name="parking_spots" min="0" class="form-input" value="<?= (int) ($building['parking_spots'] ?? 0) ?>">
             </div>
 
-            <div class="card bg-emerald-50 border border-emerald-100 p-4">
+            <div class="card p-4" style="background:#ecfdf5;border:1px solid #d1fae5;">
                 <label class="flex items-center gap-2 text-sm font-bold text-gray-700">
                     <input type="checkbox" name="monthly_charge_enabled" value="1" class="rounded" <?= $monthly_checked ?>>
-                    شارژ ثابت ماهیانه فعال باشد
+                    شارژ ماهیانه فعال باشد
                 </label>
-                <div class="mt-3">
+
+                <p class="text-xs font-bold text-gray-500" style="margin:14px 0 8px;">روش محاسبه شارژ</p>
+                <div class="choice-list">
+                    <label class="choice-item">
+                        <input type="radio" name="charge_mode" value="fixed" data-charge-mode <?= $charge_mode === 'fixed' ? 'checked' : '' ?>>
+                        <span>
+                            <strong>شارژ ثابت</strong>
+                            <small>همه واحدها ماهانه مبلغ یکسانی پرداخت می‌کنند.</small>
+                        </span>
+                    </label>
+                    <label class="choice-item">
+                        <input type="radio" name="charge_mode" value="per_person" data-charge-mode <?= $charge_mode === 'per_person' ? 'checked' : '' ?>>
+                        <span>
+                            <strong>بر اساس تعداد نفرات</strong>
+                            <small>شارژ هر واحد = نرخ هر نفر × تعداد ساکنین آن واحد.</small>
+                        </span>
+                    </label>
+                    <label class="choice-item">
+                        <input type="radio" name="charge_mode" value="custom" data-charge-mode <?= $charge_mode === 'custom' ? 'checked' : '' ?>>
+                        <span>
+                            <strong>دلخواه</strong>
+                            <small>برای هر واحد مبلغ اختصاصی در صفحه «واحدها» تعیین می‌شود.</small>
+                        </span>
+                    </label>
+                </div>
+
+                <div class="mt-3" data-charge-field="fixed">
                     <label for="monthly_charge" class="form-label">مبلغ شارژ ثابت هر ماه (تومان)</label>
-                    <input type="number" id="monthly_charge" name="monthly_charge" min="0" step="1000" class="form-input" value="<?= htmlspecialchars((string) ($building['monthly_charge'] ?? 0)) ?>">
-                    <p class="text-[11px] text-gray-500 mt-1">هر ماه به‌صورت خودکار به بدهکاری واحدها اضافه می‌شود.</p>
+                    <input type="number" id="monthly_charge" name="monthly_charge" min="0" step="1000" inputmode="numeric" class="form-input" value="<?= htmlspecialchars((string) ($building['monthly_charge'] ?? 0)) ?>">
+                </div>
+
+                <div class="mt-3" data-charge-field="per_person">
+                    <label for="charge_per_person" class="form-label">نرخ شارژ هر نفر (تومان)</label>
+                    <input type="number" id="charge_per_person" name="charge_per_person" min="0" step="1000" inputmode="numeric" class="form-input" value="<?= htmlspecialchars((string) ($building['charge_per_person'] ?? 0)) ?>">
+                    <p class="text-[11px] text-gray-500 mt-1">تعداد نفرات هر واحد را در صفحه «واحدها» وارد کنید.</p>
+                </div>
+
+                <div class="mt-3 hint-card" data-charge-field="custom">
+                    مبلغ اختصاصی هر واحد را از صفحه «مدیریت واحدها» وارد کنید.
                 </div>
             </div>
 
@@ -174,6 +214,8 @@ require_once 'includes/page_head.php';
         <h3 class="font-bold text-red-600 mb-2">حذف ساختمان</h3>
         <p class="text-xs text-gray-500 mb-4">با حذف ساختمان، دسترسی شما به آن برای همیشه از بین می‌رود. این عملیات قابل بازگشت نیست.</p>
         <form method="POST" action="building_delete.php" data-confirm="آیا مطمئن هستید؟ این ساختمان و تمام داده‌های آن حذف می‌شود.">
+            <?= csrf_field() ?>
+            <input type="hidden" name="form_action" value="delete">
             <input type="hidden" name="id" value="<?= $building_id ?>">
             <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2.5 rounded-xl transition-all active:scale-[0.98]">
                 حذف ساختمان
@@ -182,5 +224,23 @@ require_once 'includes/page_head.php';
     </div>
 
 </main>
+
+<script>
+    /* نمایش فیلد مناسب بر اساس روش محاسبه شارژ */
+    (function () {
+        var modes = document.querySelectorAll('[data-charge-mode]');
+        var fields = document.querySelectorAll('[data-charge-field]');
+        if (!modes.length) { return; }
+        function sync() {
+            var selected = document.querySelector('[data-charge-mode]:checked');
+            var value = selected ? selected.value : 'fixed';
+            fields.forEach(function (field) {
+                field.style.display = field.getAttribute('data-charge-field') === value ? '' : 'none';
+            });
+        }
+        modes.forEach(function (m) { m.addEventListener('change', sync); });
+        sync();
+    })();
+</script>
 
 <?php require_once 'includes/page_tail.php'; ?>

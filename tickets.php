@@ -3,7 +3,7 @@ require_once 'includes/api_helper.php';
 
 // بررسی لاگین
 if (!isset($_SESSION['token']) || empty($_SESSION['token'])) {
-    header("Location: login.php");
+    header("Location: auth.php");
     exit;
 }
 
@@ -11,6 +11,7 @@ $building_id = (int) ($_GET['building_id'] ?? $_SESSION['active_building_id'] ??
 
 $alert_message = '';
 $alert_type = 'error';
+$reopen_modal = '';
 
 // ثبت تیکت جدید
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -21,6 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $description = trim($_POST['description'] ?? '');
         if ($title === '' || $description === '') {
             $alert_message = 'عنوان و توضیحات تیکت را وارد کنید.';
+            $reopen_modal = 'add-ticket';
         } else {
             $payload = [
                 'building_id' => $building_id,
@@ -36,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $alert_type = 'success';
             } else {
                 $alert_message = $response['message'] ?? 'خطا در ثبت تیکت. لطفاً دوباره تلاش کنید.';
+                $reopen_modal = 'add-ticket';
             }
         }
     }
@@ -67,30 +70,24 @@ $category_labels = [
 
 $page_title = 'تیکت‌ها';
 $header_sub = $building_name ?: 'پشتیبانی و درخواست‌ها';
-$back_url = $building_id > 0 ? 'building_view.php?id=' . $building_id : 'index.php';
-$active_nav = 'tickets';
-require_once 'includes/page_head.php';
+$back_url = $building_id > 0 ? 'dashboard.php?building_id=' . $building_id : 'index.php';
+$nav_active = 'tickets';
+$nav_building_id = $building_id;
+require_once 'includes/header.php';
 ?>
 
 <main class="p-5">
 
-    <!-- دکمه افزودن -->
-    <a href="#add-ticket"
-       class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg shadow-blue-600/25 transition-all active:scale-[0.98]">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-        </svg>
-        <span>ثبت تیکت جدید</span>
-    </a>
+    <?php modal_open_button('add-ticket', 'ثبت تیکت جدید'); ?>
 
-    <!-- لیست تیکت‌ها -->
-    <h2 class="section-title">تیکت‌های من و ساختمان</h2>
+    <div class="section-header-row" style="margin: 18px 0 12px;">
+        <h2 class="section-title">تیکت‌های من و ساختمان (<?= fa_digits(count($tickets)) ?>)</h2>
+    </div>
 
     <?php if (empty($tickets)): ?>
-        <div class="card empty-state">
-            <div class="text-4xl mb-3">🎫</div>
-            تیکتی ثبت نشده است.<br>
-            اولین تیکت خود را با دکمه بالا ثبت کنید.
+        <div class="empty-state">
+            <div style="font-size: 34px; margin-bottom: 8px;">🎫</div>
+            تیکتی ثبت نشده است.
         </div>
     <?php else: ?>
         <div class="space-y-3">
@@ -120,57 +117,47 @@ require_once 'includes/page_head.php';
         </div>
     <?php endif; ?>
 
-    <!-- فرم ثبت تیکت -->
-    <div id="add-ticket" class="card p-5 mt-6">
-        <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-            </svg>
-            ثبت تیکت جدید
-        </h3>
-        <form method="POST" action="" class="space-y-4">
-            <div>
-                <label for="title" class="form-label">عنوان *</label>
-                <input type="text" id="title" name="title" required class="form-input" placeholder="مثال: خرابی آسانسور">
-            </div>
-            <div>
-                <label for="description" class="form-label">شرح مشکل *</label>
-                <textarea id="description" name="description" rows="3" required class="form-input" placeholder="توضیح کامل مشکل را بنویسید..."></textarea>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label for="category" class="form-label">دسته‌بندی</label>
-                    <select id="category" name="category" class="form-input">
-                        <option value="technical">فنی</option>
-                        <option value="financial">مالی</option>
-                        <option value="management">مدیریتی</option>
-                        <option value="complaint">شکایت</option>
-                        <option value="suggestion">پیشنهاد</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="priority" class="form-label">اولویت</label>
-                    <select id="priority" name="priority" class="form-input">
-                        <option value="low">کم</option>
-                        <option value="normal" selected>عادی</option>
-                        <option value="high">زیاد</option>
-                        <option value="urgent">فوری</option>
-                    </select>
-                </div>
-            </div>
-            <label class="flex items-center gap-3 cursor-pointer bg-gray-50 border border-gray-200 rounded-xl p-3.5">
-                <input type="checkbox" id="is_anonymous" name="is_anonymous" value="1" class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                <span class="text-sm font-medium text-gray-700">ثبت ناشناس (نام من نمایش داده نشود)</span>
-            </label>
-            <button type="submit" class="btn-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                ثبت تیکت
-            </button>
-        </form>
-    </div>
-
 </main>
 
-<?php require_once 'includes/page_tail.php'; ?>
+<?php modal_start('add-ticket', 'ثبت تیکت جدید', 'درخواست یا شکایت خود را ثبت کنید'); ?>
+    <form method="POST" action="" class="space-y-4" data-loading>
+        <?= csrf_field() ?>
+        <input type="hidden" name="form_action" value="create">
+        <div>
+            <label class="form-label">عنوان *</label>
+            <input type="text" name="title" required class="form-input" placeholder="مثال: خرابی آسانسور">
+        </div>
+        <div>
+            <label class="form-label">شرح مشکل *</label>
+            <textarea name="description" rows="4" required class="form-input" placeholder="توضیح کامل مشکل را بنویسید..."></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="form-label">دسته‌بندی</label>
+                <select name="category" class="form-input">
+                    <option value="technical">فنی</option>
+                    <option value="financial">مالی</option>
+                    <option value="management">مدیریتی</option>
+                    <option value="complaint">شکایت</option>
+                    <option value="suggestion">پیشنهاد</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label">اولویت</label>
+                <select name="priority" class="form-input">
+                    <option value="low">کم</option>
+                    <option value="normal" selected>عادی</option>
+                    <option value="high">زیاد</option>
+                    <option value="urgent">فوری</option>
+                </select>
+            </div>
+        </div>
+        <label class="flex items-center gap-3 cursor-pointer" style="background:#f8fafc;border:1px solid #e9eef5;border-radius:12px;padding:12px 14px;">
+            <input type="checkbox" name="is_anonymous" value="1" class="rounded">
+            <span class="text-sm font-medium text-gray-700">ثبت ناشناس (نام من نمایش داده نشود)</span>
+        </label>
+        <button type="submit" class="btn-primary">ثبت تیکت</button>
+    </form>
+<?php modal_end(); ?>
+
+<?php require_once 'includes/footer.php'; ?>

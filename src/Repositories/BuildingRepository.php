@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Core\Logger;
 use App\Core\Database;
 use App\Models\Building;
 use PDO;
@@ -14,22 +15,55 @@ final class BuildingRepository
     private static array $columnsCache = [];
 
     /**
+     * تعریف ستون‌های اختیاری جدول buildings برای ساخت خودکار در دیتابیس‌های قدیمی.
+     * @var array<string,string>
+     */
+    private const OPTIONAL_COLUMNS = [
+        'total_units' => 'INT NULL DEFAULT NULL',
+        'total_floors' => 'INT NULL DEFAULT NULL',
+        'has_blocks' => 'TINYINT(1) NOT NULL DEFAULT 1',
+        'default_image' => "VARCHAR(50) NULL DEFAULT 'b1'",
+        'parking_spots' => 'INT NOT NULL DEFAULT 0',
+        'monthly_charge' => 'DECIMAL(15,2) NOT NULL DEFAULT 0',
+        'monthly_charge_enabled' => 'TINYINT(1) NOT NULL DEFAULT 0',
+        'charge_mode' => "VARCHAR(20) NOT NULL DEFAULT 'fixed'",
+        'charge_per_person' => 'DECIMAL(15,2) NOT NULL DEFAULT 0',
+    ];
+
+    /**
      * آیا ستون در جدول buildings وجود دارد؟ (سازگاری با دیتابیس قدیمی بدون مایگریت جدید)
+     * اگر ستون وجود نداشته باشد و تعریف آن شناخته‌شده باشد، به‌صورت خودکار ساخته می‌شود
+     * تا اطلاعاتی مثل «تعداد واحد» و «تعداد طبقه» بی‌صدا حذف نشوند.
      */
     private function hasColumn(string $column): bool
     {
         if (array_key_exists($column, self::$columnsCache)) {
             return self::$columnsCache[$column];
         }
+        $exists = false;
         try {
             $db = Database::getConnection();
             $stmt = $db->prepare("SHOW COLUMNS FROM buildings LIKE ?");
             $stmt->execute([$column]);
-            self::$columnsCache[$column] = (bool) $stmt->fetch();
+            $exists = (bool) $stmt->fetch();
+
+            // خودترمیمی: ستون گمشده را (در صورت شناخته‌شدن) بساز
+            if (!$exists && isset(self::OPTIONAL_COLUMNS[$column])) {
+                try {
+                    $db->exec("ALTER TABLE buildings ADD COLUMN `{$column}` " . self::OPTIONAL_COLUMNS[$column]);
+                    $exists = true;
+                } catch (\Throwable $e) {
+                    Logger::warning('BuildingRepository', 'افزودن ستون به جدول ساختمان‌ها ناموفق بود', [
+                'column' => $column,
+                'reason' => $e->getMessage(),
+            ]);
+                }
+            }
         } catch (\Throwable $e) {
-            self::$columnsCache[$column] = false;
+            $exists = false;
         }
-        return self::$columnsCache[$column];
+        self::$columnsCache[$column] = $exists;
+        return $exists;
     }
 
     public function create(Building $building): ?int
@@ -52,6 +86,8 @@ final class BuildingRepository
             'parking_spots' => $building->parking_spots,
             'monthly_charge' => $building->monthly_charge,
             'monthly_charge_enabled' => (int) $building->monthly_charge_enabled,
+            'charge_mode' => $building->charge_mode,
+            'charge_per_person' => $building->charge_per_person,
         ];
         foreach ($extra as $col => $val) {
             if ($this->hasColumn($col)) {
@@ -123,6 +159,9 @@ final class BuildingRepository
         $building->parking_spots = isset($row['parking_spots']) ? (int) $row['parking_spots'] : 0;
         $building->monthly_charge = isset($row['monthly_charge']) ? (float) $row['monthly_charge'] : 0.0;
         $building->monthly_charge_enabled = isset($row['monthly_charge_enabled']) ? (bool) $row['monthly_charge_enabled'] : false;
+        $building->charge_mode = isset($row['charge_mode']) && $row['charge_mode'] !== null
+            ? (string) $row['charge_mode'] : 'fixed';
+        $building->charge_per_person = isset($row['charge_per_person']) ? (float) $row['charge_per_person'] : 0.0;
         $building->my_role = $row['member_role'] ?? null;
         $building->created_at = $row['created_at'];
         return $building;
@@ -131,29 +170,37 @@ final class BuildingRepository
     public function update(Building $building): bool
     {
         $db = Database::getConnection();
-        $stmt = $db->prepare("
-            UPDATE buildings
-            SET name = ?, address = ?, custom_name = ?, theme_color = ?, hierarchy_settings = ?,
-                total_units = ?, total_floors = ?, has_blocks = ?, default_image = ?,
-                parking_spots = ?, monthly_charge = ?, monthly_charge_enabled = ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        ");
-        return $stmt->execute([
-            $building->name,
-            $building->address,
-            $building->custom_name,
-            $building->theme_color,
-            $building->hierarchy_settings ? json_encode($building->hierarchy_settings) : null,
-            $building->total_units,
-            $building->total_floors,
-            (int) $building->has_blocks,
-            $building->default_image,
-            $building->parking_spots,
-            $building->monthly_charge,
-            (int) $building->monthly_charge_enabled,
-            $building->id,
-        ]);
+        $sets = [
+            'name' => $building->name,
+            'address' => $building->address,
+            'custom_name' => $building->custom_name,
+            'theme_color' => $building->theme_color,
+            'hierarchy_settings' => $building->hierarchy_settings ? json_encode($building->hierarchy_settings) : null,
+        ];
+        $optional = [
+            'total_units' => $building->total_units,
+            'total_floors' => $building->total_floors,
+            'has_blocks' => (int) $building->has_blocks,
+            'default_image' => $building->default_image,
+            'parking_spots' => $building->parking_spots,
+            'monthly_charge' => $building->monthly_charge,
+            'monthly_charge_enabled' => (int) $building->monthly_charge_enabled,
+            'charge_mode' => $building->charge_mode,
+            'charge_per_person' => $building->charge_per_person,
+        ];
+        foreach ($optional as $col => $val) {
+            if ($this->hasColumn($col)) {
+                $sets[$col] = $val;
+            }
+        }
+
+        $assignments = implode(', ', array_map(static fn($c) => "`{$c}` = ?", array_keys($sets)));
+        $stmt = $db->prepare(
+            "UPDATE buildings SET {$assignments}, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+        );
+        $values = array_values($sets);
+        $values[] = $building->id;
+        return $stmt->execute($values);
     }
 
     public function delete(int $id): bool
