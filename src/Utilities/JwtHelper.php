@@ -19,7 +19,7 @@ final class JwtHelper
         return AppConfig::jwtSecret();
     }
 
-    public static function generate(array $payload, int $expiry = null): string
+    public static function generate(array $payload, ?int $expiry = null): string
     {
         $now = time();
         $payload['iat'] = $now;
