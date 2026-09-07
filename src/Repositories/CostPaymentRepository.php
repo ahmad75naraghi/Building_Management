@@ -14,19 +14,45 @@ final class CostPaymentRepository
     {
         $db = Database::getConnection();
         $stmt = $db->prepare("
-            INSERT INTO cost_payments (cost_id, user_id, amount_paid, status, receipt_path, receipt_is_public, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO cost_payments (cost_id, user_id, amount_paid, share_amount, status, receipt_path, receipt_is_public, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $payment->cost_id,
             $payment->user_id,
             $payment->amount_paid,
+            $payment->share_amount,
             $payment->status,
             $payment->receipt_path,
             (int) $payment->receipt_is_public,
             $payment->notes,
         ]);
         return (int) $db->lastInsertId();
+    }
+
+    /**
+     * به‌روزرسانی پرداختِ صادرشده وقتی ساکن مبلغ/یادداشت را ثبت می‌کند
+     * (به‌جای ساخت ردیف تکراری برای همان هزینه و کاربر).
+     */
+    public function updateSubmission(int $id, ?float $amountPaid, ?string $notes, string $status): bool
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "UPDATE cost_payments SET amount_paid = ?, notes = ?, status = ? WHERE id = ?"
+        );
+        return $stmt->execute([$amountPaid, $notes, $status, $id]);
+    }
+
+    /** حذف پرداخت‌های صادرشده‌ای که هنوز اقدامی رویشان انجام نشده (برای صدور مجدد) */
+    public function deleteUnactioned(int $costId): int
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "DELETE FROM cost_payments
+             WHERE cost_id = ? AND status = 'pending' AND amount_paid IS NULL AND receipt_path IS NULL"
+        );
+        $stmt->execute([$costId]);
+        return $stmt->rowCount();
     }
 
     public function findByCostAndUser(int $costId, int $userId): ?CostPayment
@@ -77,6 +103,8 @@ final class CostPaymentRepository
         $p->cost_id = (int) $row['cost_id'];
         $p->user_id = (int) $row['user_id'];
         $p->amount_paid = $row['amount_paid'] !== null ? (float) $row['amount_paid'] : null;
+        $p->share_amount = isset($row['share_amount']) && $row['share_amount'] !== null
+            ? (float) $row['share_amount'] : null;
         $p->status = $row['status'];
         $p->receipt_path = $row['receipt_path'];
         $p->receipt_is_public = (bool) $row['receipt_is_public'];

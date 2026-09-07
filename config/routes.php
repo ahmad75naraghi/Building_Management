@@ -62,12 +62,15 @@ final class Routes
         'GET /api/buildings/{building_id}/members' => ['App\Http\Controllers\BuildingController', 'members'],
         'POST /api/invitations/accept' => ['App\Http\Controllers\BuildingController', 'acceptInvitation'],
         'POST /api/invitations/{id}/resend' => ['App\Http\Controllers\BuildingController', 'resendInvitation'],
+        'DELETE /api/invitations/{id}' => ['App\Http\Controllers\BuildingController', 'revokeInvitation'],
         'GET /api/invitations/info' => ['App\Http\Controllers\BuildingController', 'invitationInfo'],
 
         // Phase 4: Tickets & Notifications
         'GET /api/tickets' => ['App\Http\Controllers\TicketController', 'index'],
         'POST /api/tickets' => ['App\Http\Controllers\TicketController', 'store'],
         'GET /api/tickets/{id}' => ['App\Http\Controllers\TicketController', 'show'],
+        'PUT /api/tickets/{id}' => ['App\Http\Controllers\TicketController', 'update'],
+        'DELETE /api/tickets/{id}' => ['App\Http\Controllers\TicketController', 'destroy'],
         'PUT /api/tickets/{id}/status' => ['App\Http\Controllers\TicketController', 'updateStatus'],
         'POST /api/tickets/{ticket_id}/comments' => ['App\Http\Controllers\TicketController', 'addComment'],
         'GET /api/tickets/{id}/comments' => ['App\Http\Controllers\TicketController', 'comments'],
@@ -81,6 +84,7 @@ final class Routes
         'POST /api/costs' => ['App\Http\Controllers\CostController', 'store'],
         'POST /api/costs/monthly-charge' => ['App\Http\Controllers\CostController', 'monthlyCharge'],
         'GET /api/costs/charge-preview' => ['App\Http\Controllers\CostController', 'chargePreview'],
+        'POST /api/costs/{id}/issue' => ['App\Http\Controllers\CostController', 'issue'],
         'PUT /api/costs/{id}' => ['App\Http\Controllers\CostController', 'update'],
         'DELETE /api/costs/{id}' => ['App\Http\Controllers\CostController', 'destroy'],
         'GET /api/payments' => ['App\Http\Controllers\CostController', 'indexPayments'],
@@ -88,6 +92,9 @@ final class Routes
         'POST /api/payments/{payment_id}/upload-receipt' => ['App\Http\Controllers\CostController', 'uploadReceipt'],
         'POST /api/payments/{payment_id}/confirm' => ['App\Http\Controllers\CostController', 'confirmPayment'],
         'POST /api/penalty-settings' => ['App\Http\Controllers\CostController', 'createPenaltySetting'],
+        'GET /api/penalty-settings' => ['App\Http\Controllers\CostController', 'indexPenaltySettings'],
+        'PUT /api/penalty-settings/{id}' => ['App\Http\Controllers\CostController', 'updatePenaltySetting'],
+        'DELETE /api/penalty-settings/{id}' => ['App\Http\Controllers\CostController', 'destroyPenaltySetting'],
 
         // Phase 6+: Extra Professional Modules
         'GET /api/bookings' => ['App\Http\Controllers\ExtraModulesController', 'indexBookings'],

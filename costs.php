@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action'])) {
     $action = $_POST['form_action'];
 
     // ---- اقدامات مدیریتی ----
-    $manager_actions = ['create_cost', 'update_cost', 'delete_cost', 'confirm_payment', 'create_monthly', 'save_charge_settings', 'create_penalty_setting'];
+    $manager_actions = ['create_cost', 'update_cost', 'delete_cost', 'issue_cost', 'confirm_payment', 'create_monthly', 'save_charge_settings', 'create_penalty_setting', 'update_penalty_setting', 'delete_penalty_setting'];
     if (in_array($action, $manager_actions, true) && !$is_manager) {
         $alert_message = 'این عملیات فقط برای مدیر ساختمان مجاز است.';
     } elseif ($action === 'save_charge_settings') {
@@ -66,6 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action'])) {
                 'division_method' => $_POST['division_method'] ?? 'fixed_share',
                 'due_date' => !empty($_POST['due_date']) ? $_POST['due_date'] : null,
                 'target_audience' => $_POST['target_audience'] ?? 'all',
+                'target_unit_ids' => array_values(array_map('intval', $_POST['unit_ids'] ?? [])),
             ];
             if ($action === 'update_cost') {
                 $cost_id = (int) ($_POST['cost_id'] ?? 0);
@@ -74,8 +75,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action'])) {
                 $err_modal = 'edit-cost';
             } else {
                 $payload['building_id'] = $building_id;
+                $payload['auto_issue'] = !empty($_POST['auto_issue']);
                 $response = callAPI('POST', '/costs', $payload);
-                $ok_msg = 'هزینه با موفقیت ثبت شد.';
+                $issued_count = (int) ($response['data']['issue']['issued'] ?? 0);
+                $ok_msg = $issued_count > 0
+                    ? 'هزینه ثبت و برای ' . $issued_count . ' نفر صادر شد.'
+                    : 'هزینه با موفقیت ثبت شد.';
                 $err_modal = 'add-cost';
             }
             if (!empty($response['success'])) {
@@ -84,6 +89,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action'])) {
             } else {
                 $alert_message = $response['message'] ?? 'خطا در ثبت هزینه.';
                 $reopen_modal = $err_modal;
+            }
+        }
+    } elseif ($action === 'issue_cost') {
+        // صدور هزینه برای مخاطبان انتخاب‌شده: ایجاد درخواست پرداخت + اعلان
+        $cost_id = (int) ($_POST['cost_id'] ?? 0);
+        if ($cost_id > 0) {
+            $response = callAPI('POST', '/costs/' . $cost_id . '/issue');
+            if (!empty($response['success'])) {
+                $issued = (int) ($response['data']['issued'] ?? 0);
+                $alert_message = $issued > 0
+                    ? 'هزینه برای ' . $issued . ' نفر صادر شد و اعلان پرداخت دریافت کردند.'
+                    : 'این هزینه قبلاً برای مخاطبان صادر شده است.';
+                $alert_type = 'success';
+            } else {
+                $alert_message = $response['message'] ?? 'خطا در صدور هزینه.';
             }
         }
     } elseif ($action === 'delete_cost') {
@@ -163,6 +183,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action'])) {
                 $reopen_modal = 'penalty-settings';
             }
         }
+    } elseif ($action === 'update_penalty_setting') {
+        $penalty_id = (int) ($_POST['penalty_id'] ?? 0);
+        $penalty_type = ($_POST['penalty_type'] ?? 'percentage') === 'fixed' ? 'fixed' : 'percentage';
+        $penalty_value = en_digits($_POST['penalty_value'] ?? '');
+        $delay_days = (int) en_digits($_POST['delay_days'] ?? '1');
+        if ($penalty_id <= 0 || $penalty_value === '' || (float) $penalty_value < 0 || $delay_days < 0) {
+            $alert_message = 'مقدار جریمه و روز تأخیر را به‌درستی وارد کنید.';
+            $reopen_modal = 'penalty-settings';
+        } else {
+            $response = callAPI('PUT', '/penalty-settings/' . $penalty_id, [
+                'type' => $penalty_type,
+                'amount' => (float) $penalty_value,
+                'delay_days' => $delay_days,
+                'is_active' => isset($_POST['is_active']),
+            ]);
+            if (!empty($response['success'])) {
+                $alert_message = 'تنظیم جریمه دیرکرد به‌روزرسانی شد.';
+                $alert_type = 'success';
+            } else {
+                $alert_message = $response['message'] ?? 'خطا در ویرایش تنظیم جریمه.';
+            }
+            $reopen_modal = 'penalty-settings';
+        }
+    } elseif ($action === 'delete_penalty_setting') {
+        $penalty_id = (int) ($_POST['penalty_id'] ?? 0);
+        if ($penalty_id > 0) {
+            $response = callAPI('DELETE', '/penalty-settings/' . $penalty_id);
+            if (!empty($response['success'])) {
+                $alert_message = 'تنظیم جریمه حذف شد.';
+                $alert_type = 'success';
+            } else {
+                $alert_message = $response['message'] ?? 'خطا در حذف تنظیم جریمه.';
+            }
+            $reopen_modal = 'penalty-settings';
+        }
     }
 }
 
@@ -170,6 +225,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action'])) {
 $financial = [];
 $costs = [];
 $payments = [];
+$penalty_settings = [];
+$units = [];
 $building = [];
 $building_name = '';
 $charge_preview = ['mode' => 'fixed', 'total' => 0, 'units' => []];
@@ -197,8 +254,36 @@ if ($building_id > 0) {
         if (!empty($preview_response['success'])) {
             $charge_preview = $preview_response['data'] ?? $charge_preview;
         }
+        $penalty_response = callAPI('GET', '/penalty-settings', ['building_id' => $building_id]);
+        if (!empty($penalty_response['success'])) {
+            $penalty_settings = $penalty_response['data'] ?? [];
+        }
+        $units_response = callAPI('GET', '/buildings/' . $building_id . '/units');
+        if (!empty($units_response['success'])) {
+            $units = $units_response['data']['units'] ?? [];
+        }
     }
 }
+
+// شمارش پرداخت‌های هر هزینه (برای نمایش وضعیت صدور) و سهم کاربر جاری
+$payments_by_cost = [];
+$my_shares_by_cost = [];
+foreach ($payments as $p) {
+    $cid = (int) ($p['cost_id'] ?? 0);
+    $payments_by_cost[$cid][] = $p;
+    if ((int) ($p['user_id'] ?? 0) === $current_user_id && isset($p['share_amount'])) {
+        $my_shares_by_cost[$cid] = (float) $p['share_amount'];
+    }
+}
+
+// برچسب فارسی مخاطبان هزینه
+$audience_labels = [
+    'all' => 'همه اعضا',
+    'residents' => 'ساکنین',
+    'owners' => 'مالکین',
+    'tenants' => 'مستأجرین',
+    'specific_units' => 'واحدهای خاص',
+];
 
 $charge_mode = $building['charge_mode'] ?? 'fixed';
 $charge_mode_labels = [
@@ -305,7 +390,7 @@ require_once 'includes/header.php';
                 <?= csrf_field() ?>
                 <input type="hidden" name="form_action" value="create_monthly">
                 <button type="submit" class="btn-chip btn-chip-success" style="width:100%;justify-content:center;padding:10px;">
-                    ثبت شارژ ماه جاری (<?= fa_digits(date('Y-m')) ?>)
+                    ثبت شارژ ماه جاری (<?= jdate('F Y') ?>)
                 </button>
             </form>
         </div>
@@ -348,6 +433,13 @@ require_once 'includes/header.php';
                 // توضیح داخلی شارژ خودکار برای کاربر نمایش داده نشود
                 $is_auto = str_starts_with((string) $c_desc, 'auto:monthly:');
                 $c_amount = (float) ($cost['amount'] ?? 0);
+                $c_audience = $cost['target_audience'] ?? 'all';
+                $c_issued = !empty($cost['issued_at']);
+                $c_payments = $payments_by_cost[$c_id] ?? [];
+                $c_payer_count = count($c_payments);
+                $c_target_units = $cost['target_unit_ids'] ?? [];
+                // مبلغ پیشنهادی پرداخت کاربر جاری: سهم صادرشده او، وگرنه کل مبلغ
+                $c_my_share = $my_shares_by_cost[$c_id] ?? null;
                 ?>
                 <div class="card p-4">
                     <div class="flex items-start justify-between gap-3">
@@ -364,12 +456,21 @@ require_once 'includes/header.php';
 
                     <div class="building-list-chips" style="margin-top:10px;">
                         <span class="chip chip-gray"><?= ($cost['cost_type'] ?? '') === 'one_time' ? 'یک‌باره' : 'دوره‌ای' ?></span>
-                        <span class="chip chip-gray"><?= htmlspecialchars($division_labels[$cost['division_method'] ?? 'fixed_share'] ?? 'سهم ثابت') ?></span>
+                        <span class="chip chip-gray"><?= htmlspecialchars($division_labels[$cost['division_method'] ?? 'fixed_share'] ?? 'سهم مساوی') ?></span>
+                        <?php if (!$is_auto): ?>
+                            <span class="chip chip-gray">👥 <?= htmlspecialchars($audience_labels[$c_audience] ?? 'همه اعضا') ?><?php
+                                if ($c_audience === 'specific_units' && is_array($c_target_units) && $c_target_units) {
+                                    echo ' (' . fa_digits(count($c_target_units)) . ' واحد)';
+                                }
+                            ?></span>
+                        <?php endif; ?>
                         <?php if ($is_auto): ?>
                             <span class="chip chip-green">شارژ خودکار</span>
+                        <?php elseif ($c_issued): ?>
+                            <span class="chip chip-green">✓ صادر شده برای <?= fa_digits($c_payer_count) ?> نفر</span>
                         <?php endif; ?>
                         <?php if (!empty($cost['due_date'])): ?>
-                            <span class="chip chip-amber">مهلت: <?= fa_digits($cost['due_date']) ?></span>
+                            <span class="chip chip-amber">مهلت: <?= fa_date($cost['due_date']) ?></span>
                         <?php endif; ?>
                     </div>
 
@@ -377,11 +478,20 @@ require_once 'includes/header.php';
                         <button type="button" class="btn-chip btn-chip-success"
                                 data-modal-open="pay-cost"
                                 data-set-cost_id="<?= $c_id ?>"
-                                data-set-amount_paid="<?= (int) $c_amount ?>">
-                            پرداخت
+                                data-set-amount_paid="<?= (int) ($c_my_share ?? $c_amount) ?>">
+                            پرداخت<?= $c_my_share !== null ? ' سهم من' : '' ?>
                         </button>
 
                         <?php if ($is_manager): ?>
+                            <?php if (!$is_auto && !$c_issued): ?>
+                                <form method="POST" action="" style="display:inline;"
+                                      data-confirm="این هزینه برای مخاطبان انتخاب‌شده صادر شود؟ درخواست پرداخت و اعلان برای آن‌ها ارسال می‌شود.">
+                                    <?= csrf_field() ?>
+                                    <input type="hidden" name="form_action" value="issue_cost">
+                                    <input type="hidden" name="cost_id" value="<?= $c_id ?>">
+                                    <button type="submit" class="btn-chip btn-chip-edit">📨 صدور برای مخاطبان</button>
+                                </form>
+                            <?php endif; ?>
                             <button type="button" class="btn-chip btn-chip-edit"
                                     data-modal-open="edit-cost"
                                     data-set-cost_id="<?= $c_id ?>"
@@ -390,7 +500,8 @@ require_once 'includes/header.php';
                                     data-set-amount="<?= (int) $c_amount ?>"
                                     data-set-cost_type="<?= htmlspecialchars($cost['cost_type'] ?? 'periodic') ?>"
                                     data-set-division_method="<?= htmlspecialchars($cost['division_method'] ?? 'fixed_share') ?>"
-                                    data-set-target_audience="<?= htmlspecialchars($cost['target_audience'] ?? 'all') ?>"
+                                    data-set-target_audience="<?= htmlspecialchars($c_audience) ?>"
+                                    data-set-target_unit_ids="<?= is_array($c_target_units) ? htmlspecialchars(implode(',', array_map('intval', $c_target_units))) : '' ?>"
                                     data-set-due_date="<?= htmlspecialchars($cost['due_date'] ?? '') ?>">
                                 ویرایش
                             </button>
@@ -434,8 +545,12 @@ require_once 'includes/header.php';
                             <h3 class="font-bold text-gray-800 text-sm"><?= htmlspecialchars($payment['user_name'] ?? 'کاربر') ?></h3>
                             <p class="text-xs text-gray-500 mt-0.5 truncate"><?= htmlspecialchars($payment['cost_title'] ?? '') ?></p>
                         </div>
+                        <?php
+                        $p_paid = ($payment['amount_paid'] ?? null) !== null;
+                        $p_amount = $p_paid ? (float) $payment['amount_paid'] : (float) ($payment['share_amount'] ?? 0);
+                        ?>
                         <div class="text-left flex-shrink-0">
-                            <p class="font-bold text-gray-800"><?= fa_number($payment['amount_paid'] ?? 0) ?> <span class="text-[10px] font-normal text-gray-400">تومان</span></p>
+                            <p class="font-bold text-gray-800"><?= fa_number($p_amount) ?> <span class="text-[10px] font-normal text-gray-400">تومان<?= $p_paid ? '' : ' (سهم)' ?></span></p>
                             <span class="chip <?= ($payment['status'] ?? '') === 'confirmed' ? 'chip-green' : 'chip-amber' ?>" style="margin-top:6px;display:inline-block;">
                                 <?= htmlspecialchars(payment_status_label($payment['status'] ?? '')) ?>
                             </span>
@@ -550,16 +665,20 @@ require_once 'includes/header.php';
         </form>
     <?php modal_end(); ?>
 
-    <?php modal_start('add-cost', 'ثبت هزینه جدید', 'هزینه یا شارژ موردی'); ?>
+    <?php modal_start('add-cost', 'ثبت هزینه جدید', 'هزینه موردی مثل رنگ‌آمیزی، تعمیرات و…'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
             <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="create_cost">
             <?php include 'includes/_cost_form_fields.php'; ?>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dark);cursor:pointer;">
+                <input type="checkbox" name="auto_issue" value="1" checked>
+                <span>پس از ثبت، برای مخاطبان انتخاب‌شده صادر شود (اعلان + درخواست پرداخت)</span>
+            </label>
             <button type="submit" class="btn-primary">ثبت هزینه</button>
         </form>
     <?php modal_end(); ?>
 
-    <?php modal_start('edit-cost', 'ویرایش هزینه', 'تغییر عنوان، مبلغ و مهلت'); ?>
+    <?php modal_start('edit-cost', 'ویرایش هزینه', 'تغییر عنوان، مبلغ، مخاطبان و مهلت'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>
             <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="update_cost">
@@ -569,7 +688,55 @@ require_once 'includes/header.php';
         </form>
     <?php modal_end(); ?>
 
+    <?php
+    $penalty_type_labels = ['percentage' => 'درصد از مبلغ', 'fixed_amount' => 'مبلغ ثابت', 'fixed' => 'مبلغ ثابت'];
+    ?>
     <?php modal_start('penalty-settings', 'جریمه دیرکرد', 'به‌ازای تأخیر از مهلت پرداخت'); ?>
+
+        <?php if (!empty($penalty_settings)): ?>
+            <p class="form-label" style="margin-bottom:8px;">تنظیم‌های فعلی (<?= fa_digits(count($penalty_settings)) ?>)</p>
+            <div class="space-y-2" style="margin-bottom:18px;">
+                <?php foreach ($penalty_settings as $ps): ?>
+                    <?php
+                    $ps_id = (int) ($ps['id'] ?? 0);
+                    $ps_type = (string) ($ps['penalty_type'] ?? 'percentage');
+                    $ps_value = (float) ($ps['penalty_value'] ?? 0);
+                    $ps_delay = (int) ($ps['delay_days'] ?? 0);
+                    $ps_active = !empty($ps['is_active']);
+                    $value_label = $ps_type === 'percentage' ? fa_digits($ps_value) . '٪' : fa_number($ps_value) . ' تومان';
+                    ?>
+                    <div class="flex items-center gap-2" style="background:#f8fafc;border:1px solid #e9eef5;border-radius:12px;padding:10px 12px;">
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-bold text-gray-700">
+                                <?= htmlspecialchars($penalty_type_labels[$ps_type] ?? $ps_type) ?>: <?= $value_label ?>
+                            </p>
+                            <p class="text-[11px] text-gray-400">
+                                بعد از <?= fa_digits($ps_delay) ?> روز تأخیر
+                                • <?= $ps_active ? '<span style="color:var(--green-success);">فعال</span>' : '<span style="color:var(--text-gray);">غیرفعال</span>' ?>
+                            </p>
+                        </div>
+                        <button type="button" class="btn-chip btn-chip-edit"
+                                data-modal-open="edit-penalty"
+                                data-set-penalty_id="<?= $ps_id ?>"
+                                data-set-penalty_type="<?= $ps_type === 'fixed_amount' ? 'fixed' : htmlspecialchars($ps_type) ?>"
+                                data-set-penalty_value="<?= htmlspecialchars((string) $ps_value) ?>"
+                                data-set-delay_days="<?= $ps_delay ?>"
+                                data-set-is_active="<?= $ps_active ? '1' : '0' ?>">
+                            ویرایش
+                        </button>
+                        <form method="POST" action="" data-confirm="این تنظیم جریمه حذف شود؟" style="display:inline;">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="form_action" value="delete_penalty_setting">
+                            <input type="hidden" name="penalty_id" value="<?= $ps_id ?>">
+                            <button type="submit" class="btn-chip btn-chip-danger">حذف</button>
+                        </form>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <hr style="border:none;border-top:1px solid #e9eef5;margin-bottom:16px;">
+            <p class="form-label" style="margin-bottom:8px;">افزودن تنظیم جدید</p>
+        <?php endif; ?>
+
         <form method="POST" action="" class="space-y-4" data-loading>
             <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="create_penalty_setting">
@@ -592,6 +759,34 @@ require_once 'includes/header.php';
         </form>
     <?php modal_end(); ?>
 
+    <?php modal_start('edit-penalty', 'ویرایش جریمه دیرکرد', 'تغییر نوع، مقدار و آستانه تأخیر'); ?>
+        <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
+            <input type="hidden" name="form_action" value="update_penalty_setting">
+            <input type="hidden" name="penalty_id" value="">
+            <div>
+                <label class="form-label">نوع جریمه</label>
+                <select name="penalty_type" class="form-input">
+                    <option value="percentage">درصد از مبلغ</option>
+                    <option value="fixed">مبلغ ثابت (تومان)</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label">مقدار جریمه *</label>
+                <input type="number" name="penalty_value" required min="0" step="1000" inputmode="numeric" class="form-input">
+            </div>
+            <div>
+                <label class="form-label">آستانه تأخیر (روز) *</label>
+                <input type="number" name="delay_days" required min="1" inputmode="numeric" class="form-input">
+            </div>
+            <label class="flex items-center gap-3 cursor-pointer" style="background:#f8fafc;border:1px solid #e9eef5;border-radius:12px;padding:12px 14px;">
+                <input type="checkbox" name="is_active" value="1" class="rounded">
+                <span class="text-sm font-medium text-gray-700">این جریمه فعال باشد</span>
+            </label>
+            <button type="submit" class="btn-primary">ذخیره تغییرات</button>
+        </form>
+    <?php modal_end(); ?>
+
     <script>
         /* نمایش فیلد مربوط به روش شارژ انتخاب‌شده */
         (function () {
@@ -605,6 +800,40 @@ require_once 'includes/header.php';
             }
             radios.forEach(function (r) { r.addEventListener('change', sync); });
             sync();
+        })();
+
+        /* نمایش جعبه انتخاب واحدها فقط وقتی مخاطب «واحدهای خاص» باشد */
+        (function () {
+            function syncAudienceBoxes() {
+                ['add-cost', 'edit-cost'].forEach(function (id) {
+                    var overlay = document.getElementById(id);
+                    if (!overlay) { return; }
+                    var checked = overlay.querySelector('[data-cost-audience]:checked');
+                    var box = overlay.querySelector('.audience-units-box');
+                    if (box) {
+                        box.style.display = checked && checked.value === 'specific_units' ? '' : 'none';
+                    }
+                });
+            }
+            document.querySelectorAll('[data-cost-audience]').forEach(function (r) {
+                r.addEventListener('change', syncAudienceBoxes);
+            });
+
+            /* پیش‌پر کردن چک‌باکس واحدهای انتخاب‌شده هنگام ویرایش */
+            document.querySelectorAll('[data-modal-open="add-cost"], [data-modal-open="edit-cost"]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var overlay = document.getElementById(btn.getAttribute('data-modal-open'));
+                    if (!overlay) { return; }
+                    var raw = btn.getAttribute('data-set-target_unit_ids') || '';
+                    var wanted = raw.split(',').map(function (v) { return v.trim(); }).filter(Boolean);
+                    overlay.querySelectorAll('input[name="unit_ids[]"]').forEach(function (cb) {
+                        cb.checked = wanted.indexOf(cb.value) !== -1;
+                    });
+                    /* پس از اعمال، وضعیت نمایش جعبه واحدها به‌روز شود */
+                    syncAudienceBoxes();
+                });
+            });
+            syncAudienceBoxes();
         })();
     </script>
 

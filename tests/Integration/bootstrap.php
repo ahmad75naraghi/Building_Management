@@ -230,11 +230,13 @@ function test_db(): PDO
         target_audience TEXT DEFAULT 'all',
         division_method TEXT DEFAULT 'fixed_share',
         division_details TEXT,
+        target_unit_ids TEXT DEFAULT NULL,
         due_date TEXT DEFAULT NULL,
         status TEXT DEFAULT 'pending',
         is_recurring INTEGER DEFAULT 0,
         recurring_interval TEXT DEFAULT NULL,
         created_by INTEGER,
+        issued_at TEXT DEFAULT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
         deleted_at TEXT DEFAULT NULL
@@ -245,11 +247,53 @@ function test_db(): PDO
         cost_id INTEGER NOT NULL,
         unit_id INTEGER DEFAULT NULL,
         user_id INTEGER DEFAULT NULL,
-        amount REAL NOT NULL,
+        amount REAL DEFAULT NULL,
+        amount_paid REAL DEFAULT NULL,
+        share_amount REAL DEFAULT NULL,
+        receipt_path TEXT DEFAULT NULL,
+        receipt_is_public INTEGER DEFAULT 0,
+        notes TEXT DEFAULT NULL,
         status TEXT DEFAULT 'pending',
         payment_date TEXT DEFAULT NULL,
         confirmed_by INTEGER DEFAULT NULL,
+        confirmed_at TEXT DEFAULT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )");
+
+    $pdo->exec("CREATE TABLE notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        building_id INTEGER DEFAULT NULL,
+        notification_type TEXT DEFAULT 'general',
+        title TEXT NOT NULL,
+        message TEXT DEFAULT NULL,
+        data TEXT DEFAULT NULL,
+        is_read INTEGER DEFAULT 0,
+        is_email_sent INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        read_at TEXT DEFAULT NULL
+    )");
+
+    $pdo->exec("CREATE TABLE penalty_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        penalty_type TEXT DEFAULT 'percentage',
+        penalty_value REAL NOT NULL,
+        delay_days INTEGER DEFAULT 1,
+        applies_to TEXT DEFAULT 'unconfirmed_payments',
+        is_active INTEGER DEFAULT 1,
+        created_by INTEGER NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )");
+
+    $pdo->exec("CREATE TABLE penalties (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cost_payment_id INTEGER NOT NULL,
+        building_id INTEGER NOT NULL,
+        penalty_amount REAL NOT NULL,
+        applied_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        reason TEXT DEFAULT NULL,
+        created_by INTEGER DEFAULT NULL
     )");
 
     // تزریق اتصال به Database از طریق Reflection

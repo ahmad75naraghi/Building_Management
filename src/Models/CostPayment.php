@@ -10,6 +10,8 @@ final class CostPayment
     public int $cost_id;
     public int $user_id;
     public ?float $amount_paid = null;
+    /** سهم درخواست‌شده از این پرداخت‌کننده هنگام صدور هزینه */
+    public ?float $share_amount = null;
     public string $status = 'pending';
     public ?string $receipt_path = null;
     public bool $receipt_is_public = false;
@@ -25,6 +27,7 @@ final class CostPayment
             'cost_id' => $this->cost_id,
             'user_id' => $this->user_id,
             'amount_paid' => $this->amount_paid,
+            'share_amount' => $this->share_amount,
             'status' => $this->status,
             'receipt_is_public' => $this->receipt_is_public,
             'notes' => $this->notes,

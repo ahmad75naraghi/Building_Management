@@ -29,10 +29,55 @@ final class CostController
         $data = $request->getJsonBody() ?? [];
         try {
             $cost = $this->service->createCost($data, (int) $userId);
+
+            // صدور فوری برای مخاطبان (پیش‌فرض روشن است؛ با ارسال صریح «خیر» قابل غیرفعال‌شدن)
+            $autoIssue = !array_key_exists('auto_issue', $data) || filter_var($data['auto_issue'], FILTER_VALIDATE_BOOLEAN);
+            $issueInfo = null;
+            if ($autoIssue) {
+                try {
+                    $issueInfo = $this->service->issueCost((int) $cost->id, (int) $userId);
+                    $cost = $this->service->getCost((int) $cost->id) ?? $cost;
+                } catch (\Exception $issueException) {
+                    // خطای صدور نباید مانع ثبت خود هزینه شود
+                    $issueInfo = ['issued' => 0, 'skipped' => 0, 'error' => $issueException->getMessage()];
+                }
+            }
+
             return (new Response())->setStatusCode(201)->setJson([
                 'success' => true,
                 'message' => 'Cost created',
-                'data' => $cost->toArray(),
+                'data' => ['cost' => $cost->toArray(), 'issue' => $issueInfo],
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * صدور هزینه برای مخاطبان انتخاب‌شده: ایجاد ردیف پرداخت + اعلان.
+     * POST /api/costs/{id}/issue
+     */
+    public function issue(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        if (!$userId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false,
+                'message' => 'Authentication required',
+            ]);
+        }
+        $id = (int) ($request->getAttribute('id') ?? 0);
+        try {
+            $result = $this->service->issueCost($id, (int) $userId);
+            return (new Response())->setJson([
+                'success' => true,
+                'message' => $result['issued'] > 0
+                    ? sprintf('هزینه برای %d نفر صادر شد.', $result['issued'])
+                    : 'این هزینه قبلاً برای مخاطبان صادر شده است.',
+                'data' => $result,
             ]);
         } catch (\Exception $e) {
             return (new Response())->setStatusCode(400)->setJson([
@@ -351,6 +396,98 @@ final class CostController
             return (new Response())->setStatusCode(400)->setJson([
                 'success' => false,
                 'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /** لیست تنظیم‌های جریمه ساختمان — ?building_id= */
+    public function indexPenaltySettings(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        if (!$userId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication required',
+            ]);
+        }
+        $buildingId = (int) ($request->getQueryParam('building_id') ?? 0);
+        if ($buildingId <= 0) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => 'building_id is required',
+            ]);
+        }
+        try {
+            $settings = $this->service->listPenaltySettings($buildingId, (int) $userId);
+            return (new Response())->setJson([
+                'success' => true,
+                'data' => array_map(fn($s) => $s->toArray(), $settings),
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /** ویرایش تنظیم جریمه — فقط مدیر ساختمان */
+    public function updatePenaltySetting(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        if (!$userId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication required',
+            ]);
+        }
+        $id = (int) ($request->getAttribute('id') ?? 0);
+        if ($id <= 0) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => 'id is required',
+            ]);
+        }
+        $data = $request->getJsonBody() ?? [];
+        try {
+            $setting = $this->service->updatePenaltySetting($id, $data, (int) $userId);
+            return (new Response())->setJson([
+                'success' => true,
+                'message' => 'Penalty setting updated',
+                'data' => $setting->toArray(),
+            ]);
+        } catch (\App\Exceptions\ValidationException $e) {
+            return (new Response())->setStatusCode(422)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        } catch (\Exception $e) {
+            $status = $e->getMessage() === 'Penalty setting not found' ? 404 : 400;
+            return (new Response())->setStatusCode($status)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /** حذف تنظیم جریمه — فقط مدیر ساختمان */
+    public function destroyPenaltySetting(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        if (!$userId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication required',
+            ]);
+        }
+        $id = (int) ($request->getAttribute('id') ?? 0);
+        if ($id <= 0) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => 'id is required',
+            ]);
+        }
+        try {
+            $deleted = $this->service->deletePenaltySetting($id, (int) $userId);
+            return (new Response())->setJson([
+                'success' => $deleted,
+                'message' => $deleted ? 'Penalty setting deleted' : 'Failed to delete penalty setting',
+            ]);
+        } catch (\Exception $e) {
+            $status = $e->getMessage() === 'Penalty setting not found' ? 404 : 400;
+            return (new Response())->setStatusCode($status)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
             ]);
         }
     }

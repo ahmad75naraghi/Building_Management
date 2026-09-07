@@ -547,6 +547,141 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "بررسی وضعیت شماره (Check Phone)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"phone\": \"09123456789\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/check-phone",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "check-phone"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ارسال کد یک‌بارمصرف (Send OTP)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"phone\": \"09123456789\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/send-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "send-otp"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "تأیید کد یک‌بارمصرف (Verify OTP)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"phone\": \"09123456789\",\n    \"code\": \"12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/verify-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "verify-otp"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "تکمیل نام (Complete Name)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"کاربر جدید\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/complete-name",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "complete-name"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "تعیین رمز عبور (Set Password)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"password\": \"NewPass123!\",\n    \"password_confirmation\": \"NewPass123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/set-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "set-password"
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },
@@ -1947,7 +2082,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"unit_number\": \"101\",\n    \"type\": \"residential\",\n    \"area\": 120,\n    \"block_id\": 1,\n    \"floor_id\": 1,\n    \"owner_user_id\": 1,\n    \"tenant_user_id\": 2,\n    \"owner_resident\": 0\n}"
+              "raw": "{\n    \"unit_number\": \"101\",\n    \"type\": \"residential\",\n    \"area\": 120,\n    \"block_id\": 1,\n    \"floor_id\": 1,\n    \"owner_user_id\": 1,\n    \"tenant_user_id\": 2,\n    \"owner_resident\": 0,\n    \"parking_no\": \"12\",\n    \"storage_no\": \"3\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/buildings/2/units",
@@ -1969,7 +2104,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    \"unit_number\": \"101\",\n    \"type\": \"residential\",\n    \"area\": 120,\n    \"block_id\": 1,\n    \"floor_id\": 1,\n    \"owner_user_id\": 1,\n    \"tenant_user_id\": 2,\n    \"owner_resident\": 0\n}"
+                  "raw": "{\n    \"unit_number\": \"101\",\n    \"type\": \"residential\",\n    \"area\": 120,\n    \"block_id\": 1,\n    \"floor_id\": 1,\n    \"owner_user_id\": 1,\n    \"tenant_user_id\": 2,\n    \"owner_resident\": 0,\n    \"parking_no\": \"12\",\n    \"storage_no\": \"3\"\n}"
                 },
                 "url": {
                   "raw": "{{base_url}}/buildings/2/units",
@@ -2054,7 +2189,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"unit_number\": \"101\",\n    \"type\": \"residential\",\n    \"area\": 125.5,\n    \"block_id\": 1,\n    \"floor_id\": 1,\n    \"owner_user_id\": 1,\n    \"tenant_user_id\": null,\n    \"owner_resident\": 1\n}"
+              "raw": "{\n    \"unit_number\": \"101\",\n    \"type\": \"residential\",\n    \"area\": 125.5,\n    \"block_id\": 1,\n    \"floor_id\": 1,\n    \"owner_user_id\": 1,\n    \"tenant_user_id\": null,\n    \"owner_resident\": 1,\n    \"parking_no\": \"12\",\n    \"storage_no\": \"3\"\n}"
             }
           },
           "response": [
@@ -2065,7 +2200,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    \"unit_number\": \"101\",\n    \"type\": \"residential\",\n    \"area\": 125.5,\n    \"block_id\": 1,\n    \"floor_id\": 1,\n    \"owner_user_id\": 1,\n    \"tenant_user_id\": null,\n    \"owner_resident\": 1\n}"
+                  "raw": "{\n    \"unit_number\": \"101\",\n    \"type\": \"residential\",\n    \"area\": 125.5,\n    \"block_id\": 1,\n    \"floor_id\": 1,\n    \"owner_user_id\": 1,\n    \"tenant_user_id\": null,\n    \"owner_resident\": 1,\n    \"parking_no\": \"12\",\n    \"storage_no\": \"3\"\n}"
                 },
                 "url": {
                   "raw": "{{base_url}}/units/1",
@@ -2314,6 +2449,141 @@
               "body": "{\n    \"success\": true,\n    \"message\": \"Common area created (Phase 2 extension)\"\n}"
             }
           ]
+        },
+        {
+          "name": "ویرایش بلوک (Edit Block)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"بلوک A\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/blocks/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "blocks",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "حذف بلوک (Delete Block)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/blocks/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "blocks",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ویرایش طبقه (Edit Floor)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"floor_number\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/floors/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "floors",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "حذف طبقه (Delete Floor)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/floors/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "floors",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ویرایش مشاعات (Edit Common Area)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"سالن اجتماعات\",\n    \"is_bookable\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/common-areas/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "common-areas",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "حذف مشاعات (Delete Common Area)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/common-areas/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "common-areas",
+                "1"
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },
@@ -2644,6 +2914,52 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "ارسال مجدد دعوت‌نامه (Resend Invitation)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"building_id\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/invitations/1/resend",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "invitations",
+                "1",
+                "resend"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "لغو دعوت‌نامه (Revoke Invitation)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/invitations/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "invitations",
+                "1"
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },
@@ -2657,7 +2973,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"building_id\": 2,\n    \"title\": \"شارژ ماهیانه مرداد\",\n    \"amount\": 500000,\n    \"cost_type\": \"periodic\",\n    \"division_method\": \"fixed_share\"\n}"
+              "raw": "{\n    \"building_id\": 2,\n    \"title\": \"رنگ‌آمیزی راه‌پله‌ها\",\n    \"description\": \"رنگ‌آمیزی دیوارهای راه‌پله طبقه اول تا سوم\",\n    \"amount\": 1200000,\n    \"cost_type\": \"one_time\",\n    \"division_method\": \"fixed_share\",\n    \"target_audience\": \"owners\",\n    \"target_unit_ids\": [\n        1,\n        2\n    ],\n    \"due_date\": \"2026-09-30\",\n    \"auto_issue\": true\n}"
             },
             "url": {
               "raw": "{{base_url}}/costs",
@@ -3249,6 +3565,194 @@
                 }
               ]
             }
+          },
+          "response": []
+        },
+        {
+          "name": "ویرایش هزینه (Edit Cost)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"هزینه نظافت\",\n    \"amount\": 500000,\n    \"due_date\": \"2026-10-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/costs/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "costs",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "حذف هزینه (Delete Cost)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/costs/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "costs",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ثبت شارژ ماه جاری (Monthly Charge)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"building_id\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/costs/monthly-charge",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "costs",
+                "monthly-charge"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "پیش‌نمایش شارژ (Charge Preview)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/costs/charge-preview?building_id=2",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "costs",
+                "charge-preview"
+              ],
+              "query": [
+                {
+                  "key": "building_id",
+                  "value": "2"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "لیست تنظیم‌های جریمه (Penalty Settings List)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/penalty-settings?building_id=2",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "penalty-settings"
+              ],
+              "query": [
+                {
+                  "key": "building_id",
+                  "value": "2"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ویرایش تنظیم جریمه (Edit Penalty Setting)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"type\": \"percentage\",\n    \"amount\": 3,\n    \"delay_days\": 7,\n    \"is_active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/penalty-settings/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "penalty-settings",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "حذف تنظیم جریمه (Delete Penalty Setting)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/penalty-settings/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "penalty-settings",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "صدور هزینه برای مخاطبان (Issue Cost)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{base_url}}/costs/1/issue",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "costs",
+                "1",
+                "issue"
+              ]
+            },
+            "description": "صدور هزینه برای مخاطبان انتخاب‌شده: برای هر پرداخت‌کننده ردیف پرداخت در انتظار با سهم مشخص ساخته می‌شود و اعلان پرداخت می‌گیرد. فقط مدیر. ایدمپوتنت است (صدور مجدد ردیف تکراری نمی‌سازد)."
           },
           "response": []
         }
@@ -3859,6 +4363,51 @@
                 "notifications",
                 "1",
                 "read"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ویرایش تیکت (Edit Ticket)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"خرابی آسانسور\",\n    \"description\": \"آسانسور بلوک A کار نمی‌کند\",\n    \"category\": \"technical\",\n    \"priority\": \"high\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "حذف تیکت (Delete Ticket)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tickets/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "1"
               ]
             }
           },
@@ -5653,6 +6202,276 @@
               ],
               "path": [
                 "review-categories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ویرایش رزرو (Edit Booking)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"date\": \"2026-09-20\",\n    \"start_time\": \"18:00\",\n    \"end_time\": \"20:00\",\n    \"status\": \"confirmed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/bookings/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "bookings",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ویرایش اطلاعیه (Edit Announcement)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"اطلاعیه جدید\",\n    \"content\": \"متن اصلاح‌شده\",\n    \"is_pinned\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/announcements/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "announcements",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ویرایش درخواست تعمیر (Edit Maintenance)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"نشتی آب پارکینگ\",\n    \"description\": \"اصلاح‌شده\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/maintenance/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "maintenance",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ویرایش مهمان (Edit Visitor)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"visitor_name\": \"مهمان اصلاح‌شده\",\n    \"visitor_car_plate\": \"12ب345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/visitors/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "visitors",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ویرایش سند (Edit Document)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"اساسنامه ساختمان\",\n    \"document_type\": \"rules\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/documents/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "documents",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ویرایش قرائت مصرف (Edit Consumption)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"amount\": 1450,\n    \"reading_date\": \"2026-09-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/consumption/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "consumption",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ویرایش مخاطب اضطراری (Edit Emergency Contact)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"آتش‌نشانی\",\n    \"phone\": \"125\",\n    \"role\": \"emergency\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/emergency-contacts/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "emergency-contacts",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ویرایش جلسه (Edit Meeting)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"جلسه هیئت مدیره\",\n    \"meeting_date\": \"2026-09-25 18:00:00\",\n    \"location\": \"لابی\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/meetings/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "meetings",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ویرایش نظر (Edit Review)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"rating\": 4,\n    \"comment\": \"نظر اصلاح‌شده\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/reviews/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reviews",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ویرایش رأی‌گیری (Edit Vote)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"نصب دوربین مداربسته\",\n    \"description\": \"اصلاح‌شده\",\n    \"end_date\": \"2026-10-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/votes/2",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "votes",
+                "2"
               ]
             }
           },

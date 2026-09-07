@@ -14,8 +14,8 @@ final class CostRepository
     {
         $db = Database::getConnection();
         $stmt = $db->prepare("
-            INSERT INTO costs (building_id, title, description, amount, cost_type, target_audience, division_method, division_details, due_date, status, is_recurring, recurring_interval, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO costs (building_id, title, description, amount, cost_type, target_audience, division_method, division_details, target_unit_ids, due_date, status, is_recurring, recurring_interval, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $cost->building_id,
@@ -26,6 +26,7 @@ final class CostRepository
             $cost->target_audience,
             $cost->division_method,
             $cost->division_details ? json_encode($cost->division_details) : null,
+            $cost->target_unit_ids ? json_encode(array_values($cost->target_unit_ids)) : null,
             $cost->due_date,
             $cost->status,
             (int) $cost->is_recurring,
@@ -53,7 +54,7 @@ final class CostRepository
         $stmt = $db->prepare(
             "UPDATE costs SET
                 title = ?, description = ?, amount = ?, cost_type = ?,
-                target_audience = ?, division_method = ?, due_date = ?
+                target_audience = ?, division_method = ?, target_unit_ids = ?, due_date = ?
              WHERE id = ?"
         );
         return $stmt->execute([
@@ -63,9 +64,26 @@ final class CostRepository
             $cost->cost_type,
             $cost->target_audience,
             $cost->division_method,
+            $cost->target_unit_ids ? json_encode(array_values($cost->target_unit_ids)) : null,
             $cost->due_date,
             $cost->id,
         ]);
+    }
+
+    /** ثبت زمان صدور هزینه برای مخاطبان */
+    public function markIssued(int $costId): bool
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare("UPDATE costs SET issued_at = NOW() WHERE id = ?");
+        return $stmt->execute([$costId]);
+    }
+
+    /** پاک‌کردن وضعیت صدور (هنگام تغییر مخاطبان پیش از صدور مجدد) */
+    public function clearIssued(int $costId): bool
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare("UPDATE costs SET issued_at = NULL WHERE id = ?");
+        return $stmt->execute([$costId]);
     }
 
     public function delete(int $id): bool
@@ -95,12 +113,16 @@ final class CostRepository
         $cost->target_audience = $row['target_audience'];
         $cost->division_method = $row['division_method'];
         $cost->division_details = $row['division_details'] ? json_decode($row['division_details'], true) : null;
+        $cost->target_unit_ids = isset($row['target_unit_ids']) && $row['target_unit_ids']
+            ? array_map('intval', (array) json_decode((string) $row['target_unit_ids'], true))
+            : null;
         $cost->due_date = $row['due_date'];
         $cost->status = $row['status'];
         $cost->is_recurring = (bool) $row['is_recurring'];
         $cost->recurring_interval = $row['recurring_interval'];
         $cost->created_by = (int) $row['created_by'];
         $cost->created_at = $row['created_at'];
+        $cost->issued_at = $row['issued_at'] ?? null;
         return $cost;
     }
 }

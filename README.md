@@ -6,7 +6,7 @@
 
 سیستم کامل و حرفه‌ای مدیریت ساختمان شامل **REST API** (برای اپ موبایل و فرانت‌اندها) + **پنل وب ریسپانسیو فارسی** (موبایل‌فرست) برای مدیر و ساکنان ساختمان.
 
-- 📦 کالکشن کامل Postman (۸۸ درخواست) در فایل `Building Management Pro - Master.postman_collection`
+- 📦 کالکشن کامل Postman (۱۲۴ درخواست) در فایل `Building Management Pro - Master.postman_collection`
 - 🗄️ اسکریپت جامع دیتابیس: `all_migrations.sql` (۳۲ جدول)
 - 📚 مستندات کامل پروژه در پوشه `docs/`
 
@@ -27,7 +27,7 @@
 ### ۳. ساختار و سلسله مراتب
 - بلوک‌ها (Blocks) — داینامیک
 - طبقه‌ها (Floors) — متصل به بلوک یا مستقیم به ساختمان
-- واحدها (Units) — با نوع (مسکونی/تجاری)، متراژ، مالک، مستاجر و وضعیت سکونت (مالک ساکن / مستاجر ساکن / خالی)
+- واحدها (Units) — با نوع (مسکونی/تجاری)، متراژ، مالک، مستاجر، وضعیت سکونت (مالک ساکن / مستاجر ساکن / خالی) و **قطعه پارکینگ/انباری اختصاصی**
 - مشاعات (Common Areas) — پارکینگ، سالن، استخر و... با قابلیت رزرو
 
 ### ۴. اعضا و دعوت‌نامه‌ها
@@ -50,7 +50,7 @@
 - کامنت‌های داخلی (فقط مدیر) و خارجی
 - اعلانات با نوع، ساختمان، وضعیت خوانده‌شده
 
-### ۷. ماژول‌های حرفه‌ای (فاز ۶+) — ۱۰ ماژول
+### ۷. ماژول‌های حرفه‌ای (فاز ۶+) — ۱۱ ماژول
 | ماژول | توضیح |
 |---|---|
 | رزرو مشاعات (Bookings) | رزرو سالن، پارکینگ، استخر |
@@ -63,6 +63,7 @@
 | سیستم اضطراری (Emergency) | شماره‌های اضطراری و هشدار سریع |
 | جلسات ساختمان (Meetings) | برنامه‌ریزی و صورت‌جلسه |
 | امتیازدهی و نظرات (Reviews) | امتیاز به خدمات مدیریت |
+| یادآوری رویدادها (Reminders) | یادآوری خودکار جلسه‌ها و رزروها با اعلان درون‌اپ + پیامک (کران `scripts/reminders.php`) |
 
 ---
 
@@ -197,6 +198,7 @@ API_BASE_URL=http://localhost:8000/b/api php -S 0.0.0.0:8080
 
 - نام‌کاربری هر کاربر **شماره موبایل** است (ثبت‌نام و ورود با موبایل + رمز عبور).
 - پس از ثبت‌نام، **پیامک خوش‌آمد** و هنگام دعوت عضو، **پیامک حاوی لینک دعوت** ارسال می‌شود (ملی‌پیامک، متد `SendByBaseNumber`).
+- اسکریپت یادآوری رویدادها (`scripts/reminders.php`) نیز **پیامک یادآوری جلسه/رزرو** ارسال می‌کند.
 - نیاز به افزونه `php-soap` دارد؛ اگر نباشد، خطا فقط لاگ می‌شود و جریان ثبت‌نام/دعوت متوقف نمی‌شود.
 
 | متغیر محیطی | پیش‌فرض | توضیح |
@@ -204,6 +206,7 @@ API_BASE_URL=http://localhost:8000/b/api php -S 0.0.0.0:8080
 | `MELIPAYAMAK_USERNAME` | `9905367498` | نام‌کاربری پنل پیامک |
 | `MELIPAYAMAK_PASSWORD` | `96R3Q` | رمز پنل پیامک |
 | `MELIPAYAMAK_BODY_ID` | `530743` | شناسه بدنه (پترن) |
+| `MELIPAYAMAK_REMINDER_BODY_ID` | — | پترن جداگانه پیامک یادآوری رویدادها (اختیاری؛ آرگومان‌ها به‌ترتیب: نام، عنوان رویداد، زمان، نام ساختمان). اگر تنظیم نشود، متن کامل با پترن پیش‌فرض ارسال می‌شود |
 | `APP_URL` | `https://file.falnic.com/b` | آدرس پایه اپ برای ساخت لینک دعوت در پیامک |
 
 ### شارژ ثابت ماهیانه (خودکار)
@@ -216,6 +219,27 @@ API_BASE_URL=http://localhost:8000/b/api php -S 0.0.0.0:8080
 php scripts/monthly_charges.php
 # کرون ماهانه: 0 1 1 * * /usr/bin/php /path/to/scripts/monthly_charges.php
 ```
+
+### یادآوری رویدادها (خودکار)
+
+- اسکریپت `scripts/reminders.php` جلسه‌ها و رزروهایی که در پنجره یادآوری
+  (پیش‌فرض ۲۴ ساعت آینده) قرار دارند پیدا می‌کند و برایشان:
+  - **اعلان درون‌اپ** می‌سازد (جلسه → همه اعضای فعال ساختمان، رزرو → خود رزروکننده)
+  - **پیامک یادآوری** ارسال می‌کند (به شماره‌های معتبر)
+- ارسال‌ها در جدول `event_reminders` (مایگریشن 028) با کلید یکتا ثبت می‌شوند؛
+  اجرای مکرر کران باعث ارسال تکراری **نمی‌شود**.
+- زمان رویداد در اعلان و پیامک به‌صورت **شمسی** نمایش داده می‌شود.
+
+```bash
+php scripts/reminders.php
+# کرون ساعتی (پیشنهادی):
+# 0 * * * * /usr/bin/php /path/to/scripts/reminders.php >> /var/log/bm_reminders.log 2>&1
+```
+
+| متغیر محیطی | پیش‌فرض | توضیح |
+|---|---|---|
+| `REMINDER_WINDOW_HOURS` | `24` | پنجره یادآوری بر حسب ساعت |
+| `MELIPAYAMAK_REMINDER_BODY_ID` | — | پترن جداگانه پیامک یادآوری در ملی‌پیامک (اختیاری؛ آرگومان‌ها: نام، عنوان رویداد، زمان، نام ساختمان) |
 
 ### اجرای مایگریت‌های جدید
 
@@ -311,6 +335,14 @@ Migrationها از `001` تا `020` در `database/migrations/` و نسخه SQL 
 | 020 | `consumption_readings`, `emergency_contacts`, `emergency_alerts`, `meetings`, `meeting_minutes`, `review_categories`, `reviews` | ماژول‌های فاز ۶ (بخش ۳) |
 | 021 | `units.owner_resident` | ستون مالک ساکن (تفکیک سناریوهای سکونت) |
 | 022 | `invitations.unit_id` | ستون واحد هدف دعوت‌نامه |
+| 023 | `users.phone` | ورود با شماره موبایل (اینکس یکتا) |
+| 024 | مشخصات ساختمان و نام دعوت‌شونده | فیلدهای تکمیلی ساختمان + `invitations.invited_name` |
+| 025 | حالت‌های شارژ | `fixed` / `per_person` / `custom` + تعداد نفرات و شارژ اختصاصی واحد |
+| 026 | `otp_codes` | کدهای یک‌بارمصرف ورود (هش‌شده، با انقضا و سقف تلاش) |
+| 027 | `rate_limits` | محدودیت نرخ ورود (کلید SHA-256) |
+| 028 | `event_reminders` | ردیابی یادآوری رویدادها (اعلان/پیامک) با کلید یکتای ضدتکرار |
+| 029 | `units.parking_no`, `units.storage_no` | قطعه پارکینگ و قطعه انباری اختصاصی هر واحد |
+| 030 | `costs.target_unit_ids`, `costs.issued_at`, `cost_payments.share_amount` | صدور هزینه برای مخاطبان انتخابی (ساکنین/مالکین/مستأجرین/واحدهای خاص) |
 
 ویژگی‌های دیتابیس: **Foreign Key** با `ON DELETE CASCADE / SET NULL`، ایندکس‌های ترکیبی، `utf8mb4_unicode_ci`، ستون‌های JSON برای تنظیمات داینامیک.
 
@@ -321,7 +353,7 @@ Migrationها از `001` تا `020` در `database/migrations/` و نسخه SQL 
 - **Base URL (محیط توسعه):** `https://file.falnic.com/b/api`
 - **احراز هویت:** هدر `Authorization: Bearer <token>` (به‌جز register/login/refresh)
 - **فرمت پاسخ:** JSON با ساختار `{ "success": bool, "message"?: string, "data"?: ... }`
-- **کالکشن Postman:** فایل `Building Management Pro - Master.postman_collection` — شامل ۸۸ درخواست در ۷ پوشه، متغیر `base_url`، ذخیره خودکار توکن بعد از Login و هدرهای خودکار `Accept` و `Content-Type: application/json`
+- **کالکشن Postman:** فایل `Building Management Pro - Master.postman_collection` — شامل ۱۲۴ درخواست در ۷ پوشه، متغیر `base_url`، ذخیره خودکار توکن بعد از Login و هدرهای خودکار `Accept` و `Content-Type: application/json`
 
 ### ۱. احراز هویت (Auth)
 
@@ -350,7 +382,7 @@ Migrationها از `001` تا `020` در `database/migrations/` و نسخه SQL 
 | PUT | `/buildings/{id}/hierarchy/settings` | آپدیت تنظیمات — `{ "has_blocks", "has_floors", ... }` |
 | GET/POST | `/buildings/{id}/blocks` | لیست / افزودن بلوک — `{ "name" }` |
 | GET/POST | `/buildings/{id}/floors` | لیست / افزودن طبقه — `{ "floor_number", "block_id" }` |
-| GET/POST | `/buildings/{id}/units` | لیست / افزودن واحد — `{ "unit_number", "type", "area", "block_id", "floor_id", "owner_user_id", "tenant_user_id", "owner_resident" }` |
+| GET/POST | `/buildings/{id}/units` | لیست / افزودن واحد — `{ "unit_number", "type", "area", "block_id", "floor_id", "owner_user_id", "tenant_user_id", "owner_resident", "parking_no", "storage_no" }` |
 | PUT/DELETE | `/units/{id}` | ویرایش / حذف واحد (با مالک/مستاجر/ساکن) |
 | GET/POST | `/buildings/{id}/common-areas` | لیست / افزودن مشاعات — `{ "name", "is_bookable" }` |
 
@@ -361,6 +393,8 @@ Migrationها از `001` تا `020` در `database/migrations/` و نسخه SQL 
 | GET | `/buildings/{id}/members` | لیست اعضای ساختمان (با واحدهای مرتبط و رابطه: owner / owner_resident / tenant) |
 | POST | `/buildings/{id}/invitations` | ایجاد دعوت‌نامه — `{ "invited_phone", "invited_email", "role", "unit_id" }` |
 | POST | `/invitations/accept` | پذیرش دعوت — `{ "token" }` — اگر دعوت‌نامه unit_id داشته باشد، کاربر خودکار مالک/مستاجر آن واحد می‌شود |
+| POST | `/invitations/{id}/resend` | ارسال مجدد پیامک دعوت — `{ "building_id" }` |
+| DELETE | `/invitations/{id}` | لغو دعوت‌نامه (فقط مدیر، فقط دعوت‌های در انتظار پذیرش) — لینک دعوت باطل می‌شود |
 
 ### ۵. هزینه‌ها و مالی (Costs & Payments)
 
@@ -368,12 +402,16 @@ Migrationها از `001` تا `020` در `database/migrations/` و نسخه SQL 
 |---|---|---|
 | GET | `/costs?building_id=` | لیست هزینه‌های ساختمان |
 | GET | `/costs/summary?building_id=` | خلاصه مالی (مجموع، وصولی، مانده، درصد) |
-| POST | `/costs` | ثبت هزینه — `{ "building_id", "title", "amount", "cost_type", "division_method" }` |
+| POST | `/costs` | ثبت هزینه — `{ "building_id", "title", "amount", "cost_type", "division_method", "target_audience", "target_unit_ids", "auto_issue" }` |
+| POST | `/costs/{id}/issue` | صدور هزینه برای مخاطبان انتخابی (ساخت ردیف پرداخت + اعلان) — فقط مدیر |
 | GET | `/payments?building_id=` | لیست پرداخت‌های ساختمان (با نام هزینه و کاربر) |
-| POST | `/payments/submit` | ارسال درخواست پرداخت — `{ "cost_id", "unit_id" }` |
+| POST | `/payments/submit` | ارسال درخواست پرداخت — `{ "cost_id", "amount_paid", "notes" }` |
 | POST | `/payments/{id}/upload-receipt` | آپلود رسید (multipart/form-data — فیلد `receipt`) |
 | POST | `/payments/{id}/confirm` | تایید پرداخت توسط مدیر — `{ "status": "confirmed" }` |
 | POST | `/penalty-settings` | تنظیم جریمه — `{ "building_id", "type", "amount", "delay_days" }` |
+| GET | `/penalty-settings?building_id=` | لیست تنظیم‌های جریمه ساختمان (برای همه اعضا) |
+| PUT | `/penalty-settings/{id}` | ویرایش تنظیم جریمه — `{ "type", "amount", "delay_days", "is_active" }` — فقط مدیر |
+| DELETE | `/penalty-settings/{id}` | حذف تنظیم جریمه — فقط مدیر |
 
 ### ۶. تیکت‌ها و اعلانات (Tickets & Notifications)
 
@@ -381,6 +419,8 @@ Migrationها از `001` تا `020` در `database/migrations/` و نسخه SQL 
 |---|---|---|
 | GET/POST | `/tickets` | لیست / ثبت تیکت — `{ "building_id", "title", "description", "category", "priority" }` |
 | GET | `/tickets/{id}` | نمایش تیکت |
+| PUT | `/tickets/{id}` | ویرایش تیکت — `{ "title", "description", "category", "priority" }` — فقط صاحب تیکت یا مدیر ساختمان |
+| DELETE | `/tickets/{id}` | حذف تیکت (با کامنت‌ها) — صاحب تیکت فقط در وضعیت باز/ردشده، مدیر همیشه |
 | GET | `/tickets/{id}/comments` | لیست کامنت‌های تیکت |
 | PUT | `/tickets/{id}/status` | تغییر وضعیت — `{ "status": "in_progress" }` |
 | POST | `/tickets/{id}/comments` | ثبت کامنت — `{ "comment", "is_internal" }` |
@@ -456,7 +496,7 @@ Migrationها از `001` تا `020` در `database/migrations/` و نسخه SQL 
 | اعضا | `members.php` | لیست اعضا + ارسال دعوت‌نامه |
 | اطلاعیه‌ها / تعمیرات / رزرو / رأی‌گیری | `announcements.php` / `maintenance.php` / `bookings.php` / `votes.php` | ماژول‌های اطلاع‌رسانی و مشارکت |
 | مهمان‌ها / اسناد / مصرف انرژی / اضطراری / جلسات / نظرات | `visitors.php` / `documents.php` / `consumption.php` / `emergency_contacts.php` / `meetings.php` / `reviews.php` | ماژول‌های حرفه‌ای فاز ۶ |
-| تقویم / گزارش‌ها | `calendar.php` / `reports.php` | تقویم رویدادها (جلسات + رزروها) و نمای کلی عملکرد |
+| تقویم / گزارش‌ها | `calendar.php` / `reports.php` | **تقویم شمسی** رویدادها (جلسات + رزروها) با جزئیات هر روز و فهرست رویدادهای پیشِ رو؛ نمای کلی عملکرد |
 | ویرایش/حذف ساختمان | `building_edit.php` / `building_delete.php` | ویرایش اطلاعات (PUT) و حذف ساختمان (DELETE) |
 | پذیرش دعوتنامه | `invite.php?token=...` | مشاهده اطلاعات دعوت (نقش/واحد) و پذیرش (`POST /invitations/accept`) |
 | اعلانات | `notifications.php` | لیست اعلانات کاربر + علامت‌گذاری خوانده‌شده |
@@ -501,7 +541,7 @@ Migrationها از `001` تا `020` در `database/migrations/` و نسخه SQL 
 ## 🧪 تست و ابزارها
 
 ```bash
-composer test            # ۳۰۸ تست یکپارچه (بدون نیاز به دیتابیس یا افزونه خاص)
+composer test            # ۳۵۶ تست یکپارچه (بدون نیاز به دیتابیس یا افزونه خاص)
 composer test:unit       # تست‌های قدیمی PHPUnit (tests/Unit)
 composer health          # بررسی سلامت و آمادگی استقرار
 composer migrate:status  # نمایش مایگریشن‌های در انتظار
@@ -528,7 +568,9 @@ composer serve           # سرور توسعه روی پورت 8000
 | فاز ۶ — ماژول‌های حرفه‌ای (۱۰ ماژول) | ✅ تکمیل — GET/POST + تغییر وضعیت (PUT) + حذف (DELETE) + رأی‌گیری کامل با گزینه/رأی/نتیجه |
 | ورود یکپارچه با موبایل و کد یک‌بارمصرف | ✅ تکمیل |
 | رابط مودال‌محور + ویرایش کامل + نقش‌ها + سه حالت شارژ | ✅ تکمیل |
-| لاگ‌گیر مرکزی و ۳۰۸ تست یکپارچه | ✅ تکمیل |
+| لاگ‌گیر مرکزی و ۳۵۶ تست یکپارچه | ✅ تکمیل |
+| تقویم شمسی رویدادها + یادآوری خودکار (اعلان + پیامک) | ✅ تکمیل |
+| هزینه موردی با انتخاب مخاطب (ساکنین/مالکین/مستأجرین/واحدهای خاص) و صدور سهم | ✅ تکمیل |
 | سخت‌سازی امنیتی (اسرار، CSRF، محدودیت نرخ) | ✅ تکمیل |
 | تست و بهینه‌سازی (PHPStan, OpenAPI) | 🟡 تست‌ها کامل؛ PHPStan و OpenAPI باقی‌مانده |
 | استقرار production (OPcache, .env, Backup) | 🟡 `.env` و healthcheck آماده؛ OPcache و Backup باقی‌مانده |

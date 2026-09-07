@@ -21,6 +21,12 @@ use App\Utilities\Validator;
 
 final class CostService
 {
+    /** مخاطبان مجاز برای هزینه: همه اعضا، ساکنین، مالکین، مستأجرین یا واحدهای خاص */
+    public const AUDIENCES = ['all', 'residents', 'owners', 'tenants', 'specific_units'];
+
+    /** تقسیم وزنی فقط بر اساس مساحت یا تعداد نفرات معنا دارد */
+    private const WEIGHTED_DIVISION_METHODS = ['area', 'people_count'];
+
     public function __construct(
         private CostRepository $costRepo = new CostRepository(),
         private CostPaymentRepository $paymentRepo = new CostPaymentRepository(),
@@ -39,15 +45,35 @@ final class CostService
             throw new ValidationException(implode(', ', $errors));
         }
 
+        $audience = $data['target_audience'] ?? 'all';
+        if (!in_array($audience, self::AUDIENCES, true)) {
+            throw new ValidationException('Invalid target_audience');
+        }
+
+        // هزینه‌های «واحدهای خاص» حتماً باید حداقل یک واحد هدف داشته باشند
+        $targetUnitIds = null;
+        if ($audience === 'specific_units') {
+            $targetUnitIds = $this->normalizeTargetUnitIds($data['target_unit_ids'] ?? null);
+            if (!$targetUnitIds) {
+                throw new ValidationException('target_unit_ids must list at least one unit for specific_units audience');
+            }
+        }
+
+        $divMethod = $data['division_method'] ?? 'fixed_share';
+        if (!in_array($divMethod, ['fixed_share', 'area', 'people_count', 'custom'], true)) {
+            throw new ValidationException('Invalid division_method');
+        }
+
         $cost = new Cost();
         $cost->building_id = (int) $data['building_id'];
         $cost->title = $data['title'];
         $cost->description = $data['description'] ?? null;
         $cost->amount = (float) $data['amount'];
         $cost->cost_type = $data['cost_type'] ?? 'periodic';
-        $cost->target_audience = $data['target_audience'] ?? 'all';
-        $cost->division_method = $data['division_method'] ?? 'fixed_share';
+        $cost->target_audience = $audience;
+        $cost->division_method = $divMethod;
         $cost->division_details = $data['division_details'] ?? null;
+        $cost->target_unit_ids = $targetUnitIds;
         $cost->due_date = $data['due_date'] ?? null;
         $cost->status = $data['status'] ?? 'pending';
         $cost->is_recurring = (bool) ($data['is_recurring'] ?? false);
@@ -193,12 +219,56 @@ final class CostService
             $cost->division_method = in_array($data['division_method'], ['fixed_share', 'area', 'people_count', 'custom'], true)
                 ? $data['division_method'] : $cost->division_method;
         }
-        if (array_key_exists('target_audience', $data)) {
-            $cost->target_audience = in_array($data['target_audience'], ['all', 'owners', 'tenants', 'residents'], true)
-                ? $data['target_audience'] : $cost->target_audience;
+        $oldAmount = $cost->amount;
+        $oldDivision = $cost->division_method;
+        if (array_key_exists('target_audience', $data) || array_key_exists('target_unit_ids', $data)) {
+            $newAudience = in_array($data['target_audience'] ?? $cost->target_audience, self::AUDIENCES, true)
+                ? ($data['target_audience'] ?? $cost->target_audience) : $cost->target_audience;
+            $newUnitIds = $newAudience === 'specific_units'
+                ? $this->normalizeTargetUnitIds(array_key_exists('target_unit_ids', $data) ? $data['target_unit_ids'] : $cost->target_unit_ids)
+                : null;
+            if ($newAudience === 'specific_units' && !$newUnitIds) {
+                throw new ValidationException('برای مخاطب «واحدهای خاص» باید حداقل یک واحد انتخاب شود.');
+            }
+
+            // مقایسه بدون توجه به ترتیب شناسه‌ها
+            $storedUnitIds = $cost->target_unit_ids;
+            if (is_array($newUnitIds)) {
+                sort($newUnitIds);
+            }
+            if (is_array($storedUnitIds)) {
+                sort($storedUnitIds);
+            }
+
+            if ($newAudience !== $cost->target_audience || $newUnitIds !== $storedUnitIds) {
+                // اگر پرداختی انجام/ثبت شده باشد، تغییر مخاطب مجاز نیست
+                $hasAction = false;
+                foreach ($this->paymentRepo->findByCostId($costId) as $p) {
+                    if ($p->status !== 'pending' || $p->amount_paid !== null || $p->receipt_path !== null) {
+                        $hasAction = true;
+                        break;
+                    }
+                }
+                if ($hasAction) {
+                    throw new AppException('مخاطبان این هزینه قابل تغییر نیستند چون پرداخت ثبت شده است.');
+                }
+                // ردیف‌های صادرشدهٔ بدون اقدام حذف می‌شوند تا با مخاطبان جدید دوباره صادر شود
+                $this->paymentRepo->deleteUnactioned($costId);
+                $this->costRepo->clearIssued($costId);
+                $cost->target_audience = $newAudience;
+                $cost->target_unit_ids = $newUnitIds;
+                $cost->issued_at = null;
+            }
         }
         if (array_key_exists('due_date', $data)) {
             $cost->due_date = !empty($data['due_date']) ? (string) $data['due_date'] : null;
+        }
+
+        // اگر مبلغ یا روش تقسیم تغییر کرد، ردیف‌های صادرشدهٔ بدون اقدام ناسازگارند و حذف می‌شوند
+        if (($cost->amount !== $oldAmount || $cost->division_method !== $oldDivision)) {
+            $this->paymentRepo->deleteUnactioned($costId);
+            $this->costRepo->clearIssued($costId);
+            $cost->issued_at = null;
         }
 
         $this->costRepo->update($cost);
@@ -325,6 +395,269 @@ final class CostService
         return $this->paymentRepo->findByBuildingId($buildingId);
     }
 
+    /** دریافت یک هزینه بر اساس شناسه */
+    public function getCost(int $costId): ?Cost
+    {
+        return $this->costRepo->findById($costId);
+    }
+
+    /**
+     * صدور هزینه برای مخاطبان انتخاب‌شده (جدا از شارژ ماهیانه).
+     *
+     * برای هر پرداخت‌کننده یک ردیف پرداخت با وضعیت «در انتظار» و سهم مشخص
+     * ساخته می‌شود و اعلان پرداخت برای او ارسال می‌گردد. صدور، ایدمپوتنت است:
+     * اگر برای کاربری از قبل ردیفی وجود داشته باشد، ردیف تکراری ساخته نمی‌شود.
+     *
+     * @return array{issued: int, skipped: int, total: float}
+     */
+    public function issueCost(int $costId, int $userId): array
+    {
+        $cost = $this->costRepo->findById($costId);
+        if (!$cost) {
+            throw new AppException('Cost not found');
+        }
+        if (!$this->isManager($userId, $cost->building_id)) {
+            throw new AppException('فقط مدیر ساختمان می‌تواند هزینه را صادر کند.');
+        }
+
+        $payers = $this->resolvePayers($cost);
+        if (!$payers) {
+            throw new AppException('هیچ پرداخت‌کننده‌ای برای مخاطبان انتخاب‌شده پیدا نشد.');
+        }
+
+        $shares = $this->calculateShares($cost, $payers);
+
+        $issued = 0;
+        $skipped = 0;
+        $notifications = new NotificationService();
+        foreach ($shares as $payerUserId => $shareAmount) {
+            // کاربری که از قبل ردیف پرداخت دارد دوباره برایش ردیف ساخته نمی‌شود
+            if ($this->paymentRepo->findByCostAndUser($costId, $payerUserId)) {
+                $skipped++;
+                continue;
+            }
+            $payment = new CostPayment();
+            $payment->cost_id = $costId;
+            $payment->user_id = $payerUserId;
+            $payment->share_amount = round($shareAmount, 2);
+            $payment->status = 'pending';
+            $this->paymentRepo->create($payment);
+            $issued++;
+
+            try {
+                $notifications->createNotification([
+                    'user_id' => $payerUserId,
+                    'building_id' => $cost->building_id,
+                    'notification_type' => 'payment',
+                    'title' => 'هزینه جدید: ' . $cost->title,
+                    'message' => sprintf(
+                        'هزینه «%s» به مبلغ %s برای شما ثبت شده است. لطفاً پرداخت را از بخش هزینه‌ها انجام دهید.',
+                        $cost->title,
+                        number_format($shareAmount) . ' تومان'
+                    ),
+                    'data' => ['cost_id' => $costId],
+                ]);
+            } catch (\Throwable $e) {
+                // خطای اعلان نباید مانع صدور هزینه شود
+                Logger::error('costs', 'خطا در ارسال اعلان صدور هزینه: ' . $e->getMessage());
+            }
+        }
+
+        if ($issued > 0 || $cost->issued_at === null) {
+            $this->costRepo->markIssued($costId);
+        }
+
+        return [
+            'issued' => $issued,
+            'skipped' => $skipped,
+            'total' => (float) $cost->amount,
+        ];
+    }
+
+    /**
+     * تعیین پرداخت‌کنندگان یک هزینه بر اساس مخاطب انتخاب‌شده.
+     *
+     * @return array<int, array{user_id: int, unit_ids: list<int>, weight: float}> فهرست با کلید = شناسه کاربر
+     */
+    private function resolvePayers(Cost $cost): array
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "SELECT id, unit_number, owner_user_id, tenant_user_id, owner_resident,
+                    COALESCE(area, 0) AS area, COALESCE(residents_count, 0) AS residents_count
+             FROM units WHERE building_id = ?"
+        );
+        $stmt->execute([$cost->building_id]);
+        $units = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        // فیلتر واحدهای هدف برای حالت «واحدهای خاص»
+        if ($cost->target_audience === 'specific_units') {
+            $wanted = array_fill_keys($cost->target_unit_ids ?: [], true);
+            $units = array_values(array_filter($units, static fn($u) => isset($wanted[(int) $u['id']])));
+        }
+
+        $payers = [];
+        $addPayer = function (int $userId, array $unit) use (&$payers, $cost) {
+            $weight = match ($cost->division_method) {
+                'area' => (float) $unit['area'],
+                'people_count' => (float) $unit['residents_count'],
+                default => 1.0,
+            };
+            if (!isset($payers[$userId])) {
+                $payers[$userId] = ['user_id' => $userId, 'unit_ids' => [], 'weight' => 0.0];
+            }
+            $payers[$userId]['unit_ids'][] = (int) $unit['id'];
+            $payers[$userId]['weight'] += $weight;
+        };
+
+        foreach ($units as $unit) {
+            $owner = (int) ($unit['owner_user_id'] ?? 0);
+            $tenant = (int) ($unit['tenant_user_id'] ?? 0);
+
+            switch ($cost->target_audience) {
+                case 'owners':
+                    if ($owner > 0) {
+                        $addPayer($owner, $unit);
+                    }
+                    break;
+
+                case 'tenants':
+                    if ($tenant > 0) {
+                        $addPayer($tenant, $unit);
+                    }
+                    break;
+
+                case 'residents':
+                    // ساکن = مستأجر اگر هست، وگرنه مالکی که خودش ساکن واحد است
+                    if ($tenant > 0) {
+                        $addPayer($tenant, $unit);
+                    } elseif ($owner > 0 && (bool) $unit['owner_resident']) {
+                        $addPayer($owner, $unit);
+                    }
+                    break;
+
+                case 'specific_units':
+                    // ترجیح با مالک است؛ واحد بدون مالک به مستأجر منتسب می‌شود
+                    if ($owner > 0) {
+                        $addPayer($owner, $unit);
+                    } elseif ($tenant > 0) {
+                        $addPayer($tenant, $unit);
+                    }
+                    break;
+
+                default: // all
+                    if ($owner > 0) {
+                        $addPayer($owner, $unit);
+                    }
+                    if ($tenant > 0 && $tenant !== $owner) {
+                        $addPayer($tenant, $unit);
+                    }
+                    break;
+            }
+        }
+
+        // حالت «همه اعضا»: اگر واحدی پوشش نداد، همه اعضای فعال ساختمان سهم مساوی می‌گیرند
+        if ($cost->target_audience === 'all' && !$payers) {
+            $stmt = $db->prepare(
+                "SELECT user_id FROM building_members WHERE building_id = ? AND status = 'active'"
+            );
+            $stmt->execute([$cost->building_id]);
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $member) {
+                $uid = (int) $member['user_id'];
+                $payers[$uid] = ['user_id' => $uid, 'unit_ids' => [], 'weight' => 1.0];
+            }
+        }
+
+        return $payers;
+    }
+
+    /**
+     * محاسبه سهم هر پرداخت‌کننده.
+     *
+     * - تقسیم مساوی (پیش‌فرض): مبلغ کل ÷ تعداد پرداخت‌کنندگان
+     * - مساحت/نفرات: سهم وزنی بر اساس واحدهای مرتبط با پرداخت‌کننده
+     * - مبلغ سفارشی (custom): جمع مبالغ تعیین‌شده برای واحدهای پرداخت‌کننده
+     *
+     * @param array<int, array{user_id: int, unit_ids: list<int>, weight: float}> $payers
+     * @return array<int, float> سهم هر کاربر با کلید = شناسه کاربر
+     */
+    private function calculateShares(Cost $cost, array $payers): array
+    {
+        // مبلغ سفارشی هر واحد از جزئیات تقسیم خوانده می‌شود
+        if ($cost->division_method === 'custom' && is_array($cost->division_details)) {
+            $customAmounts = [];
+            foreach ($cost->division_details as $key => $value) {
+                if (is_array($value) && isset($value['unit_id'])) {
+                    $customAmounts[(int) $value['unit_id']] = (float) ($value['amount'] ?? 0);
+                } else {
+                    $customAmounts[(int) $key] = (float) $value;
+                }
+            }
+            $shares = [];
+            foreach ($payers as $userId => $payer) {
+                $total = 0.0;
+                foreach ($payer['unit_ids'] as $unitId) {
+                    $total += $customAmounts[$unitId] ?? 0.0;
+                }
+                $shares[$userId] = $total;
+            }
+            return $shares;
+        }
+
+        // تقسیم وزنی (مساحت یا تعداد نفرات)
+        if (in_array($cost->division_method, self::WEIGHTED_DIVISION_METHODS, true)) {
+            $totalWeight = 0.0;
+            foreach ($payers as $payer) {
+                $totalWeight += $payer['weight'];
+            }
+            if ($totalWeight > 0) {
+                $shares = [];
+                foreach ($payers as $userId => $payer) {
+                    $shares[$userId] = $cost->amount * ($payer['weight'] / $totalWeight);
+                }
+                return $shares;
+            }
+            // اگر داده‌ای برای وزن‌دهی نبود (مثلاً مساحت ثبت نشده)، به تقسیم مساوی برمی‌گردیم
+        }
+
+        // تقسیم مساوی
+        $count = count($payers);
+        $equal = $cost->amount / max(1, $count);
+        $shares = [];
+        foreach ($payers as $userId => $payer) {
+            $shares[$userId] = $equal;
+        }
+        return $shares;
+    }
+
+    /**
+     * نرمال‌سازی شناسه واحدهای هدف؛ آرایه یا رشته جداشده با کاما می‌پذیرد.
+     *
+     * @return list<int>|null
+     */
+    private function normalizeTargetUnitIds(mixed $raw): ?array
+    {
+        if (is_string($raw)) {
+            $raw = array_filter(explode(',', $raw), static fn($v) => trim((string) $v) !== '');
+        }
+        if (!is_array($raw)) {
+            return null;
+        }
+        $ids = [];
+        foreach ($raw as $value) {
+            $id = (int) $value;
+            if ($id > 0) {
+                $ids[$id] = true;
+            }
+        }
+        if (!$ids) {
+            return null;
+        }
+        $list = array_keys($ids);
+        sort($list);
+        return $list;
+    }
+
     public function submitPayment(array $data, int $userId): CostPayment
     {
         $costId = (int) ($data['cost_id'] ?? 0);
@@ -341,13 +674,26 @@ final class CostService
             throw new AppException('Payment already confirmed');
         }
 
+        $amountPaid = isset($data['amount_paid']) ? (float) $data['amount_paid']
+            : ($existing?->share_amount ?? $cost->amount);
+        $notes = $data['notes'] ?? null;
+
+        // اگر قبلاً ردیف صادرشده‌ای برای این کاربر وجود دارد، همان به‌روز می‌شود (ردیف تکراری ساخته نمی‌شود)
+        if ($existing) {
+            $this->paymentRepo->updateSubmission((int) $existing->id, $amountPaid, $notes, 'upload_receipt');
+            $existing->amount_paid = $amountPaid;
+            $existing->notes = $notes;
+            $existing->status = 'upload_receipt';
+            return $existing;
+        }
+
         $payment = new CostPayment();
         $payment->cost_id = (int) $data['cost_id'];
         $payment->user_id = $userId;
-        $payment->amount_paid = isset($data['amount_paid']) ? (float) $data['amount_paid'] : $cost->amount;
+        $payment->amount_paid = $amountPaid;
         $payment->status = 'upload_receipt';
         $payment->receipt_is_public = (bool) ($data['receipt_is_public'] ?? false);
-        $payment->notes = $data['notes'] ?? null;
+        $payment->notes = $notes;
 
         $id = $this->paymentRepo->create($payment);
         $payment->id = $id;
@@ -408,6 +754,20 @@ final class CostService
 
     public function confirmPayment(int $paymentId, int $managerId): bool
     {
+        // اگر مبلغ پرداختی ثبت نشده باشد (مثلاً ساکن فقط رسید آپلود کرده)،
+        // هنگام تأیید سهم صادرشده به‌عنوان مبلغ پرداختی لحاظ می‌شود
+        $payment = $this->getPaymentById($paymentId);
+        if ($payment && $payment->amount_paid === null) {
+            $fallback = $payment->share_amount;
+            if ($fallback === null) {
+                $cost = $this->costRepo->findById($payment->cost_id);
+                $fallback = $cost?->amount;
+            }
+            if ($fallback !== null) {
+                $this->paymentRepo->updateSubmission($paymentId, (float) $fallback, $payment->notes, $payment->status);
+            }
+        }
+
         $updated = $this->paymentRepo->updateStatus($paymentId, 'confirmed', $managerId);
         if ($updated) {
             // After confirmation, check for penalties
@@ -498,7 +858,11 @@ final class CostService
         $setting = new PenaltySetting();
         $setting->building_id = (int) $data['building_id'];
         // سازگاری با مستندات API: هم `penalty_type/penalty_value` و هم `type/amount` پذیرفته می‌شود
-        $setting->penalty_type = $data['penalty_type'] ?? $data['type'] ?? 'percentage';
+        $penaltyType = (string) ($data['penalty_type'] ?? $data['type'] ?? 'percentage');
+        if ($penaltyType === 'fixed') {
+            $penaltyType = 'fixed_amount'; // نام مستعار فرانت‌اند
+        }
+        $setting->penalty_type = $penaltyType;
         $setting->penalty_value = (float) ($data['penalty_value'] ?? $data['amount'] ?? 0);
         $setting->delay_days = (int) ($data['delay_days'] ?? 1);
         $setting->applies_to = $data['applies_to'] ?? 'unconfirmed_payments';
@@ -508,6 +872,88 @@ final class CostService
         $id = $this->penaltyRepo->create($setting);
         $setting->id = $id;
         return $setting;
+    }
+
+    /**
+     * لیست تنظیم‌های جریمه ساختمان — برای همه اعضای فعال ساختمان قابل مشاهده است.
+     */
+    public function listPenaltySettings(int $buildingId, int $userId): array
+    {
+        if (!$this->isBuildingMember($userId, $buildingId)) {
+            throw new AppException('You are not a member of this building');
+        }
+        return $this->penaltyRepo->findByBuildingId($buildingId);
+    }
+
+    /**
+     * ویرایش تنظیم جریمه — فقط مدیر ساختمان.
+     * مانند ثبت، هم کلیدهای اصلی (penalty_type/penalty_value) و هم نام‌های مستعار
+     * مستندات (type/amount) پذیرفته می‌شود.
+     */
+    public function updatePenaltySetting(int $settingId, array $data, int $userId): PenaltySetting
+    {
+        $setting = $this->penaltyRepo->findById($settingId);
+        if ($setting === null) {
+            throw new AppException('Penalty setting not found');
+        }
+        if (!$this->isManager($userId, $setting->building_id)) {
+            throw new AppException('فقط مدیر ساختمان می‌تواند تنظیم جریمه را تغییر دهد.');
+        }
+
+        if (isset($data['penalty_type']) || isset($data['type'])) {
+            $type = (string) ($data['penalty_type'] ?? $data['type']);
+            if ($type === 'fixed') {
+                $type = 'fixed_amount'; // نام مستعار سازگار با مستندات قدیمی
+            }
+            if (!in_array($type, ['percentage', 'fixed_amount'], true)) {
+                throw new ValidationException('نوع جریمه باید percentage یا fixed_amount باشد.');
+            }
+            $setting->penalty_type = $type;
+        }
+        if (isset($data['penalty_value']) || isset($data['amount'])) {
+            $value = (float) ($data['penalty_value'] ?? $data['amount']);
+            if ($value < 0) {
+                throw new ValidationException('مقدار جریمه نمی‌تواند منفی باشد.');
+            }
+            $setting->penalty_value = $value;
+        }
+        if (isset($data['delay_days'])) {
+            $setting->delay_days = max(0, (int) $data['delay_days']);
+        }
+        if (isset($data['applies_to'])) {
+            $setting->applies_to = (string) $data['applies_to'];
+        }
+        if (array_key_exists('is_active', $data)) {
+            $setting->is_active = (bool) $data['is_active'];
+        }
+
+        $this->penaltyRepo->update($setting);
+        return $setting;
+    }
+
+    /**
+     * حذف تنظیم جریمه — فقط مدیر ساختمان.
+     */
+    public function deletePenaltySetting(int $settingId, int $userId): bool
+    {
+        $setting = $this->penaltyRepo->findById($settingId);
+        if ($setting === null) {
+            throw new AppException('Penalty setting not found');
+        }
+        if (!$this->isManager($userId, $setting->building_id)) {
+            throw new AppException('فقط مدیر ساختمان می‌تواند تنظیم جریمه را حذف کند.');
+        }
+        return $this->penaltyRepo->delete($settingId);
+    }
+
+    private function isBuildingMember(int $userId, int $buildingId): bool
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "SELECT 1 FROM building_members WHERE user_id = ? AND building_id = ? AND status = 'active' LIMIT 1"
+        );
+        $stmt->execute([$userId, $buildingId]);
+        return (bool) $stmt->fetchColumn();
     }
 
     public function listCostsByBuilding(int $buildingId): array
