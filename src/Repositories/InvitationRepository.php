@@ -44,9 +44,15 @@ final class InvitationRepository
             return $cache[$column];
         }
         try {
-            $stmt = Database::getConnection()->prepare('SHOW COLUMNS FROM invitations LIKE ?');
+            $db = Database::getConnection();
+            // information_schema به‌جای SHOW COLUMNS LIKE ? — در حالت بومی آماده‌سازی
+            // (بدون شبیه‌سازی کلاینت) جای‌گیر در دستور SHOW پشتیبانی نمی‌شود
+            $stmt = $db->prepare(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'invitations' AND COLUMN_NAME = ?"
+            );
             $stmt->execute([$column]);
-            $cache[$column] = (bool) $stmt->fetch();
+            $cache[$column] = (int) $stmt->fetchColumn() > 0;
         } catch (\Exception $e) {
             $cache[$column] = false;
         }

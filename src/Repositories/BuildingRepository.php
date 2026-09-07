@@ -43,9 +43,14 @@ final class BuildingRepository
         $exists = false;
         try {
             $db = Database::getConnection();
-            $stmt = $db->prepare("SHOW COLUMNS FROM buildings LIKE ?");
+            // information_schema به‌جای SHOW COLUMNS LIKE ? — در حالت بومی آماده‌سازی
+            // (بدون شبیه‌سازی کلاینت) جای‌گیر در دستور SHOW پشتیبانی نمی‌شود
+            $stmt = $db->prepare(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'buildings' AND COLUMN_NAME = ?"
+            );
             $stmt->execute([$column]);
-            $exists = (bool) $stmt->fetch();
+            $exists = (int) $stmt->fetchColumn() > 0;
 
             // خودترمیمی: ستون گمشده را (در صورت شناخته‌شدن) بساز
             if (!$exists && isset(self::OPTIONAL_COLUMNS[$column])) {

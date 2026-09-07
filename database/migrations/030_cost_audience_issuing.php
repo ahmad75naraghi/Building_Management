@@ -28,10 +28,14 @@ class Migration_030_cost_audience_issuing
         ];
 
         foreach ($columns as $sql => [$table, $column]) {
-            // MySQL 8 از ADD COLUMN IF NOT EXISTS پشتیبانی نمی‌کند؛ اول وجود ستون بررسی می‌شود
-            $stmt = $db->prepare("SHOW COLUMNS FROM {$table} LIKE ?");
-            $stmt->execute([$column]);
-            if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+            // بررسی وجود ستون از information_schema (با پرس‌وجوی قابل‌پریپیر، سازگار با
+            // حالت بومی آماده‌سازی که در آن SHOW ... LIKE ? پشتیبانی نمی‌شود)
+            $stmt = $db->prepare(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?"
+            );
+            $stmt->execute([$table, $column]);
+            if ((int) $stmt->fetchColumn() === 0) {
                 $db->exec($sql);
             }
         }

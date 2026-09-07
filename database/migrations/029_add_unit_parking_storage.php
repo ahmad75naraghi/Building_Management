@@ -25,10 +25,14 @@ class Migration_029_add_unit_parking_storage
             'parking_no' => "ALTER TABLE units ADD COLUMN parking_no VARCHAR(255) DEFAULT NULL COMMENT 'شماره قطعه پارکینگ اختصاصی واحد'",
             'storage_no' => "ALTER TABLE units ADD COLUMN storage_no VARCHAR(255) DEFAULT NULL COMMENT 'شماره قطعه انباری اختصاصی واحد'",
         ] as $column => $sql) {
-            // MySQL 8 از ADD COLUMN IF NOT EXISTS پشتیبانی نمی‌کند؛ اول وجود ستون بررسی می‌شود
-            $stmt = $db->prepare("SHOW COLUMNS FROM units LIKE ?");
+            // بررسی وجود ستون از information_schema (با پرس‌وجوی قابل‌پریپیر، سازگار با
+            // حالت بومی آماده‌سازی که در آن SHOW ... LIKE ? پشتیبانی نمی‌شود)
+            $stmt = $db->prepare(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'units' AND COLUMN_NAME = ?"
+            );
             $stmt->execute([$column]);
-            if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+            if ((int) $stmt->fetchColumn() === 0) {
                 $db->exec($sql);
             }
         }
