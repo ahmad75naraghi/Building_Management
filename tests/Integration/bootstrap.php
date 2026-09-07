@@ -273,6 +273,47 @@ function test_db(): PDO
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )");
 
+    $pdo->exec("CREATE TABLE votes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT DEFAULT NULL,
+        start_date TEXT DEFAULT CURRENT_TIMESTAMP,
+        end_date TEXT DEFAULT NULL,
+        status TEXT DEFAULT 'active',
+        created_by INTEGER NOT NULL
+    )");
+
+    $pdo->exec("CREATE TABLE vote_options (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        vote_id INTEGER NOT NULL,
+        option_text TEXT NOT NULL
+    )");
+
+    $pdo->exec("CREATE TABLE vote_results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        vote_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        option_id INTEGER NOT NULL,
+        voted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (vote_id, user_id)
+    )");
+
+    $pdo->exec("CREATE TABLE review_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL
+    )");
+
+    $pdo->exec("CREATE TABLE reviews (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        category_id INTEGER DEFAULT NULL,
+        rating INTEGER DEFAULT 5,
+        review_text TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )");
+
     $pdo->exec("CREATE TABLE notifications (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -339,7 +380,7 @@ function test_db(): PDO
 function test_db_reset(): void
 {
     $db = test_db();
-    foreach (['audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
+    foreach (['reviews','vote_results','vote_options','votes','audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
               'building_members','buildings','otp_codes','users'] as $t) {
         $db->exec("DELETE FROM {$t}");
         $db->exec("DELETE FROM sqlite_sequence WHERE name = '{$t}'");

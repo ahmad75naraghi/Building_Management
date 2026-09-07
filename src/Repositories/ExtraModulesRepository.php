@@ -532,7 +532,13 @@ final class ExtraModulesRepository
     public function findReviewsByBuildingId(int $buildingId): array
     {
         $db = Database::getConnection();
-        $stmt = $db->prepare("SELECT * FROM reviews WHERE building_id = ? ORDER BY created_at DESC");
+        $stmt = $db->prepare(
+            "SELECT r.*, u.name AS user_name
+             FROM reviews r
+             LEFT JOIN users u ON r.user_id = u.id
+             WHERE r.building_id = ?
+             ORDER BY r.created_at DESC, r.id DESC"
+        );
         $stmt->execute([$buildingId]);
         return array_map(fn($r) => $this->mapReview($r), $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
@@ -542,6 +548,7 @@ final class ExtraModulesRepository
         $r = new Review();
         $r->id = (int) $row['id'];
         $r->building_id = (int) $row['building_id'];
+        $r->user_name = isset($row['user_name']) && $row['user_name'] !== null ? (string) $row['user_name'] : null;
         $r->user_id = (int) $row['user_id'];
         $r->category_id = $row['category_id'] !== null ? (int) $row['category_id'] : null;
         $r->rating = (int) $row['rating'];
@@ -581,7 +588,7 @@ final class ExtraModulesRepository
         'bookings' => ['booking_date', 'start_time', 'end_time', 'status', 'common_area_id'],
         'announcements' => ['title', 'content', 'is_pinned'],
         'maintenance' => ['title', 'description', 'status', 'assigned_technician_id'],
-        'votes' => ['title', 'description', 'end_date', 'status'],
+        'votes' => ['title', 'description', 'start_date', 'end_date', 'status'],
         'visitors' => ['visitor_name', 'visitor_car_plate', 'visit_date', 'entry_time', 'exit_time', 'status'],
         'documents' => ['title', 'document_type', 'file_path', 'is_visible_to_members'],
         'consumption' => ['consumption_type', 'reading_value', 'reading_date', 'notes', 'unit_id'],

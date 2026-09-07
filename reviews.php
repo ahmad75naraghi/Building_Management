@@ -141,7 +141,9 @@ require_once 'includes/header.php';
                 <div class="card p-4">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-amber-400 text-lg tracking-wider" dir="ltr"><?= review_stars($rv_rating) ?></span>
-                        <span class="text-[11px] text-gray-400"><?= fa_time_ago($review['created_at'] ?? '') ?></span>
+                        <span class="text-[11px] text-gray-400">
+                            👤 <?= htmlspecialchars($review['user_name'] ?? 'ساکن ساختمان') ?> • <?= fa_time_ago($review['created_at'] ?? '') ?>
+                        </span>
                     </div>
 
                     <?php if ($rv_cat > 0 && isset($category_labels[$rv_cat])): ?>

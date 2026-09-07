@@ -160,6 +160,7 @@ final class ExtraModulesService
     public function createVote(array $data, int $userId): Vote
     {
         $buildingId = $this->buildingIdOrThrow($data, $userId);
+        $this->requireManager($userId, $buildingId);
 
         $errors = Validator::validate($data, ['title' => 'required']);
         if (!empty($errors)) {
@@ -182,6 +183,10 @@ final class ExtraModulesService
         if (!empty($data['options']) && is_array($data['options'])) {
             $this->repo->createVoteOptions($id, $data['options']);
         }
+
+        \App\Core\Audit::log($userId, 'vote.create', 'vote', $id, $buildingId, [
+            'title' => $vote->title,
+        ]);
 
         return $this->enrichVote($vote, $userId);
     }
@@ -239,7 +244,10 @@ final class ExtraModulesService
         if ($vote->status !== 'active') {
             throw new AppException('Vote is closed');
         }
-        if ($vote->end_date && strtotime($vote->end_date) < time()) {
+        if ($vote->start_date && strtotime((string) $vote->start_date) > time()) {
+            throw new AppException('Voting has not started yet');
+        }
+        if ($vote->end_date && strtotime((string) $vote->end_date) < time()) {
             throw new AppException('Voting period has ended');
         }
         if (!$this->repo->optionBelongsToVote($optionId, $voteId)) {
@@ -249,7 +257,13 @@ final class ExtraModulesService
             throw new AppException('You have already voted in this poll');
         }
 
-        return $this->repo->castVote($voteId, $userId, $optionId);
+        $cast = $this->repo->castVote($voteId, $userId, $optionId);
+        if ($cast) {
+            \App\Core\Audit::log($userId, 'vote.cast', 'vote', $voteId, $vote->building_id, [
+                'option_id' => $optionId,
+            ]);
+        }
+        return $cast;
     }
 
     /**
@@ -632,6 +646,9 @@ final class ExtraModulesService
 
         $id = $this->repo->createReview($review);
         $review->id = $id;
+        \App\Core\Audit::log($userId, 'review.create', 'review', $id, $buildingId, [
+            'rating' => $review->rating,
+        ]);
         return $review;
     }
 
@@ -669,6 +686,11 @@ final class ExtraModulesService
             throw new AppException('Item not found');
         }
         $this->requireMember($userId, $buildingId);
+        $this->requireCanModify($module, $id, $userId, $buildingId);
+
+        \App\Core\Audit::log($userId, $module . '.status', $module, $id, $buildingId, [
+            'status' => $status,
+        ]);
 
         // خروج مهمان: علاوه بر وضعیت، زمان خروج هم ثبت می‌شود
         if ($module === 'visitors' && $status === 'exited') {
@@ -785,6 +807,8 @@ final class ExtraModulesService
 
         $this->repo->updateModuleEntity($module, $id, $payload);
 
+        \App\Core\Audit::log($userId, $module . '.update', $module, $id, $buildingId, []);
+
         $updated = $this->repo->findModuleEntity($module, $id);
         return $updated ?? [];
     }
@@ -802,6 +826,8 @@ final class ExtraModulesService
         $storedDocument = $module === 'documents' ? $this->repo->findDocumentById($id) : null;
 
         $deleted = $this->repo->deleteModuleEntity($module, $id);
+
+        \App\Core\Audit::log($userId, $module . '.delete', $module, $id, $buildingId, []);
 
         // حذف فایل سند از دیسک پس از حذف موفق رکورد
         if ($deleted && $storedDocument !== null && $storedDocument->stored_name !== null) {
