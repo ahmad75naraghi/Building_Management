@@ -14,6 +14,34 @@ if ($building_id <= 0) {
     exit;
 }
 
+// نقش کاربر جاری (برای اکشن‌های مدیریتی روی واحدها)
+$ctx = building_role_context($building_id);
+$is_manager = $ctx['is_manager'];
+
+// ---- حذف واحد از پاپ‌آپ نمای گرافیکی (فقط مدیر) — سپس ریدایرکت برای جلوگیری از ثبت مجدد ----
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form_action'] ?? '') === 'delete_unit') {
+    $unit_id = (int) ($_POST['unit_id'] ?? 0);
+    if (!$is_manager) {
+        header("Location: building_view.php?id={$building_id}&flash=forbidden");
+        exit;
+    }
+    $del_response = callAPI('DELETE', '/units/' . $unit_id);
+    header("Location: building_view.php?id={$building_id}&flash=" . (!empty($del_response['success']) ? 'unit_deleted' : 'unit_delete_failed'));
+    exit;
+}
+
+// پیام‌های ریدایرکت (PRG)
+$flash_messages = [
+    'unit_deleted' => ['واحد با موفقیت حذف شد.', 'success'],
+    'unit_delete_failed' => ['خطا در حذف واحد.', 'error'],
+    'forbidden' => ['این عملیات فقط برای مدیر ساختمان مجاز است.', 'error'],
+];
+$alert_message = '';
+$alert_type = 'error';
+if (isset($_GET['flash'], $flash_messages[$_GET['flash']])) {
+    [$alert_message, $alert_type] = $flash_messages[$_GET['flash']];
+}
+
 // ---------- دریافت دیتای واقعی از API ----------
 
 // اطلاعات ساختمان
@@ -87,6 +115,186 @@ if (isset($notifications_response['success']) && $notifications_response['succes
             $unread_nav++;
         }
     }
+}
+
+// ---------- ساختار گرافیکی ساختمان: بلوک ← طبقه ← واحد ----------
+
+$blocks_by_id = [];
+foreach ($blocks as $b) {
+    $blocks_by_id[(int) ($b['id'] ?? 0)] = $b;
+}
+$floors_by_id = [];
+foreach ($floors as $f) {
+    $floors_by_id[(int) ($f['id'] ?? 0)] = $f;
+}
+
+// گروه‌بندی واحدها بر اساس بلوک و طبقه
+$units_by_block_floor = [];
+foreach ($units as $u) {
+    $bid = (int) ($u['block_id'] ?? 0);
+    $fid = (int) ($u['floor_id'] ?? 0);
+    $units_by_block_floor[$bid][$fid][] = $u;
+}
+
+// برچسب طبقه: نام یا شماره
+$floor_label = static function (?array $floor): string {
+    if (!$floor) {
+        return 'بدون طبقه';
+    }
+    if (!empty($floor['name'])) {
+        return (string) $floor['name'];
+    }
+    $n = $floor['floor_number'] ?? null;
+    if ($n === null || $n === '') {
+        return 'بدون طبقه';
+    }
+    $n = (int) $n;
+    if ($n === 0) {
+        return 'همکف';
+    }
+    if ($n < 0) {
+        return 'زیرزمین ' . fa_digits(abs($n));
+    }
+    return 'طبقه ' . fa_digits($n);
+};
+
+// ساخت برج‌ها: هر بلوک معرفی‌شده + واحدهای بدون بلوک در یک برج جداگانه
+$towers = [];
+foreach ($blocks as $b) {
+    $bid = (int) $b['id'];
+    $towers[] = [
+        'id' => $bid,
+        'name' => $b['name'] ?? ('بلوک ' . fa_digits($bid)),
+        'subtitle' => $b['description'] ?? null,
+        'units_by_floor' => $units_by_block_floor[$bid] ?? [],
+    ];
+}
+if (!empty($units_by_block_floor[0])) {
+    $towers[] = [
+        'id' => 0,
+        'name' => count($towers) > 0 ? 'بدون بلوک' : ($building['name'] ?? 'ساختمان'),
+        'subtitle' => null,
+        'units_by_floor' => $units_by_block_floor[0],
+    ];
+}
+// ساختمانی که نه بلوک دارد نه طبقه: همه واحدها در یک برج تک‌ردیف
+if (!$towers && !empty($units)) {
+    $towers[] = [
+        'id' => 0,
+        'name' => $building['name'] ?? 'ساختمان',
+        'subtitle' => null,
+        'units_by_floor' => [0 => $units],
+    ];
+}
+
+// ردیف‌های هر برج: طبقات از بالا به پایین + ردیف واحدهای بدون طبقه
+$build_rows = static function (array $units_by_floor, array $floors_by_id, int $towerId, bool $ignoreBlock, int $towerCount) use ($floor_label): array {
+    $tower_floor_ids = array_map('intval', array_keys($units_by_floor));
+    $defined = [];
+    foreach ($floors_by_id as $fid => $floor) {
+        if (!in_array((int) $fid, $tower_floor_ids, true)) {
+            continue;
+        }
+        if (!$ignoreBlock) {
+            $floorBlock = (int) ($floor['block_id'] ?? 0);
+            $blockMatch = ($towerId === 0 && $floorBlock === 0) || ($towerId !== 0 && $floorBlock === $towerId);
+            if (!$blockMatch && $towerCount !== 1) {
+                continue;
+            }
+        }
+        $defined[(int) $fid] = $floor;
+    }
+    uasort($defined, static function ($a, $b) {
+        return ((int) ($b['floor_number'] ?? 0)) <=> ((int) ($a['floor_number'] ?? 0));
+    });
+    $rows = [];
+    $used = [];
+    foreach ($defined as $fid => $floor) {
+        $rows[] = ['label' => $floor_label($floor), 'units' => $units_by_floor[$fid]];
+        $used[] = (int) $fid;
+    }
+    $rest = [];
+    foreach ($units_by_floor as $fid => $list) {
+        if (!in_array((int) $fid, $used, true)) {
+            foreach ($list as $u) {
+                $rest[] = $u;
+            }
+        }
+    }
+    if ($rest) {
+        $rows[] = ['label' => 'بدون طبقه', 'units' => $rest];
+    }
+    return $rows;
+};
+
+foreach ($towers as $ti => $tower) {
+    if (empty($tower['units_by_floor'])) {
+        $towers[$ti]['rows'] = [];
+        continue;
+    }
+    $rows = $build_rows($tower['units_by_floor'], $floors_by_id, (int) $tower['id'], false, count($towers));
+    // اگر هیچ ردیف طبقه‌ای ساخته نشد (مثلاً طبقات به بلوک متصل نیستند)، اتصال بلوک نادیده گرفته می‌شود
+    $onlyRest = count($rows) === 1 && ($rows[0]['label'] ?? '') === 'بدون طبقه';
+    if ($onlyRest) {
+        $relaxed = $build_rows($tower['units_by_floor'], $floors_by_id, (int) $tower['id'], true, count($towers));
+        if (count($relaxed) > 1 || ($relaxed && ($relaxed[0]['label'] ?? '') !== 'بدون طبقه')) {
+            $rows = $relaxed;
+        }
+    }
+    $towers[$ti]['rows'] = $rows;
+}
+
+// برچسب و آیکون نوع واحد
+$unit_type_view = static function (?string $type): array {
+    $map = [
+        'residential' => ['مسکونی', '🏠'],
+        'commercial' => ['تجاری', '🏪'],
+        'office' => ['اداری', '💼'],
+        'parking' => ['پارکینگ', '🚗'],
+        'storage' => ['انباری', '📦'],
+    ];
+    return $map[$type] ?? ['مسکونی', '🏠'];
+};
+$occ_class_map = [
+    'owner_occupied' => 'occ-owner',
+    'tenant_occupied' => 'occ-tenant',
+    'vacant' => 'occ-vacant',
+    'no_owner' => 'occ-none',
+];
+$occ_label_map = [
+    'owner_occupied' => 'مالک ساکن است',
+    'tenant_occupied' => 'مستأجر ساکن است',
+    'vacant' => 'خالی از سکنه',
+    'no_owner' => 'بدون مالک',
+];
+
+// داده‌های پاپ‌آپ هر واحد (برای رندر سمت کلاینت)
+$unit_popup_data = [];
+foreach ($units as $u) {
+    $uid = (int) ($u['id'] ?? 0);
+    [$type_label, $type_icon] = $unit_type_view($u['type'] ?? 'residential');
+    $occ_status = $u['occupancy_status'] ?? 'no_owner';
+    $floor = $floors_by_id[(int) ($u['floor_id'] ?? 0)] ?? null;
+    $block = $blocks_by_id[(int) ($u['block_id'] ?? 0)] ?? null;
+    $unit_popup_data[$uid] = [
+        'number' => $u['unit_number'] ?? '',
+        'type_label' => $type_label,
+        'type_icon' => $type_icon,
+        'area' => $u['area'] ?? null,
+        'floor_label' => $floor_label($floor),
+        'block_label' => $block['name'] ?? null,
+        'occ_class' => $occ_class_map[$occ_status] ?? 'occ-none',
+        'occ_label' => $occ_label_map[$occ_status] ?? 'نامشخص',
+        'occupant_name' => $u['occupant_name'] ?? null,
+        'owner_name' => $u['owner_name'] ?? null,
+        'owner_phone' => $u['owner_phone'] ?? null,
+        'tenant_name' => $u['tenant_name'] ?? null,
+        'tenant_phone' => $u['tenant_phone'] ?? null,
+        'residents_count' => (int) ($u['residents_count'] ?? 0),
+        'parking_no' => $u['parking_no'] ?? null,
+        'storage_no' => $u['storage_no'] ?? null,
+        'custom_charge' => $u['custom_charge'] ?? null,
+    ];
 }
 
 $page_title = $building['name'] ?? 'پروفایل ساختمان';
@@ -274,6 +482,191 @@ require_once 'includes/dash_head.php';
                     <span class="tile-label">مشاعات</span>
                 </a>
             </div>
+        </section>
+
+        <!-- نمای گرافیکی ساختمان -->
+        <section class="quick-access-section">
+            <div class="section-header-row">
+                <span class="section-title">🏢 نمای ساختمان</span>
+                <a href="units.php?building_id=<?= $building_id ?>" class="widget-view-all-link"><?= fa_digits(count($units)) ?> واحد</a>
+            </div>
+
+            <?php if (empty($units)): ?>
+                <div class="bldg-card">
+                    <div class="bldg-empty">
+                        <div class="bldg-empty-ico">🏗️</div>
+                        <p style="font-size:12px;color:var(--text-gray);">هنوز بلوک، طبقه یا واحدی معرفی نشده است.<br>برای ساخت نمای ساختمان، ساختار را تعریف کنید.</p>
+                        <div class="bldg-empty-actions">
+                            <a href="blocks.php?building_id=<?= $building_id ?>" class="btn-chip btn-chip-edit">تعریف بلوک‌ها</a>
+                            <a href="floors.php?building_id=<?= $building_id ?>" class="btn-chip btn-chip-edit">تعریف طبقات</a>
+                            <a href="units.php?building_id=<?= $building_id ?>" class="btn-chip btn-chip-success">افزودن واحد</a>
+                        </div>
+                    </div>
+                </div>
+            <?php else: ?>
+                <div class="bldg-card">
+                    <div class="bldg-scene">
+                        <?php foreach ($towers as $tower): ?>
+                            <div class="bldg-tower">
+                                <div class="bldg-roof">
+                                    <?= htmlspecialchars($tower['name']) ?>
+                                    <?php if (!empty($tower['subtitle'])): ?>
+                                        <small><?= htmlspecialchars($tower['subtitle']) ?></small>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="bldg-body">
+                                    <?php if (empty($tower['rows'])): ?>
+                                        <div class="bldg-floor">
+                                            <div class="bldg-floor-label">—</div>
+                                            <div class="bldg-units"><div class="bldg-floor-empty">واحدی ندارد</div></div>
+                                        </div>
+                                    <?php endif; ?>
+                                    <?php foreach ($tower['rows'] as $row): ?>
+                                        <div class="bldg-floor">
+                                            <div class="bldg-floor-label"><?= htmlspecialchars($row['label']) ?></div>
+                                            <div class="bldg-units">
+                                                <?php foreach ($row['units'] as $u): ?>
+                                                    <?php
+                                                    $u_id = (int) ($u['id'] ?? 0);
+                                                    $u_occ = $occ_class_map[$u['occupancy_status'] ?? 'no_owner'] ?? 'occ-none';
+                                                    [$u_type_label, $u_type_icon] = $unit_type_view($u['type'] ?? 'residential');
+                                                    $u_tip = 'واحد ' . ($u['unit_number'] ?? '') . ' — ' . $u_type_label . ' — ' . ($occ_label_map[$u['occupancy_status'] ?? ''] ?? '');
+                                                    ?>
+                                                    <div class="bldg-unit <?= $u_occ ?>" role="button" tabindex="0"
+                                                         data-unit-open="<?= $u_id ?>"
+                                                         title="<?= htmlspecialchars($u_tip) ?>">
+                                                        <span class="bldg-occ-dot <?= $u_occ ?>"></span>
+                                                        <span class="bldg-num"><?= fa_digits(htmlspecialchars($u['unit_number'] ?? '')) ?></span>
+                                                        <span class="bldg-type-ico"><?= $u_type_icon ?></span>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                                <div class="bldg-ground">
+                                    <span class="bldg-shrub"></span>
+                                    <span class="bldg-door"></span>
+                                    <span class="bldg-shrub"></span>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <div class="bldg-legend">
+                        <span class="bldg-legend-item"><i style="background:#10b981;"></i> مالک ساکن</span>
+                        <span class="bldg-legend-item"><i style="background:#0ea5e9;"></i> مستأجر ساکن</span>
+                        <span class="bldg-legend-item"><i style="background:#f59e0b;"></i> خالی از سکنه</span>
+                        <span class="bldg-legend-item"><i style="background:#94a3b8;"></i> بدون مالک</span>
+                    </div>
+                    <div class="bldg-hint">💡 برای مشاهده اطلاعات و اقدامات، روی هر واحد بزنید.</div>
+                </div>
+
+                <!-- پاپ‌آپ اطلاعات واحد -->
+                <?php modal_start('unit-popup', 'اطلاعات واحد', ''); ?>
+                    <div id="unit-popup-body"></div>
+                <?php modal_end(); ?>
+
+                <script>
+                    /* داده واحدها برای پاپ‌آپ + رندر محتوا هنگام کلیک */
+                    (function () {
+                        var UNITS = <?= json_encode($unit_popup_data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+                        var IS_MANAGER = <?= $is_manager ? 'true' : 'false' ?>;
+                        var BUILDING_ID = <?= (int) $building_id ?>;
+
+                        function esc(s) {
+                            return String(s === null || s === undefined ? '' : s)
+                                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                        }
+                        function faNum(v) {
+                            return String(v).replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; });
+                        }
+                        function fmtMoney(v) {
+                            return faNum(Number(v).toLocaleString('en-US'));
+                        }
+
+                        function renderUnit(id) {
+                            var u = UNITS[id];
+                            if (!u) { return; }
+                            var rows = [];
+                            function addRow(icon, label, value) {
+                                if (value === null || value === undefined || value === '') { return; }
+                                rows.push('<div class="unit-info-row"><span class="lbl">' + icon + ' ' + esc(label) + '</span><span class="val">' + value + '</span></div>');
+                            }
+
+                            var occDot = u.occ_class.replace('occ-', '');
+                            addRow('📐', 'مساحت', u.area ? faNum(u.area) + ' متر مربع' : null);
+                            addRow('👥', 'ساکنین', u.residents_count > 0 ? faNum(u.residents_count) + ' نفر' : null);
+
+                            var ownerVal = null;
+                            if (u.owner_name) {
+                                ownerVal = esc(u.owner_name) + (u.owner_phone ? ' — <a href="tel:' + esc(u.owner_phone) + '">' + faNum(u.owner_phone) + '</a>' : '');
+                            }
+                            addRow('🔑', 'مالک', ownerVal);
+
+                            var tenantVal = null;
+                            if (u.tenant_name) {
+                                tenantVal = esc(u.tenant_name) + (u.tenant_phone ? ' — <a href="tel:' + esc(u.tenant_phone) + '">' + faNum(u.tenant_phone) + '</a>' : '');
+                            }
+                            addRow('🧳', 'مستأجر', tenantVal);
+
+                            addRow('🅿️', 'قطعه پارکینگ', u.parking_no ? esc(faNum(u.parking_no)) : null);
+                            addRow('📦', 'قطعه انباری', u.storage_no ? esc(faNum(u.storage_no)) : null);
+                            addRow('💰', 'شارژ دلخواه', u.custom_charge ? fmtMoney(u.custom_charge) + ' تومان' : null);
+
+                            var chips =
+                                '<span class="chip chip-gray">' + esc(u.type_icon + ' ' + u.type_label) + '</span>' +
+                                '<span class="chip chip-gray">📍 ' + esc(u.floor_label) + '</span>' +
+                                (u.block_label ? '<span class="chip chip-gray">🧱 ' + esc(u.block_label) + '</span>' : '') +
+                                '<span class="chip ' + (occDot === 'owner' ? 'chip-green' : occDot === 'tenant' ? 'chip-blue' : 'chip-amber') + '">' + esc(u.occ_label) + '</span>';
+
+                            var actions = '';
+                            if (IS_MANAGER) {
+                                actions =
+                                    '<div class="unit-modal-actions">' +
+                                    '<a class="btn-chip btn-chip-edit" href="units.php?building_id=' + BUILDING_ID + '&focus=' + id + '">✏️ ویرایش واحد</a>' +
+                                    '<form method="POST" action="" style="flex:1;display:flex;" onsubmit="return confirm(\'این واحد حذف شود؟ این عملیات بازگشت‌پذیر نیست.\');">' +
+                                    '<input type="hidden" name="form_action" value="delete_unit">' +
+                                    '<input type="hidden" name="unit_id" value="' + id + '">' +
+                                    '<button type="submit" class="btn-chip btn-chip-danger" style="flex:1;justify-content:center;">🗑️ حذف واحد</button>' +
+                                    '</form>' +
+                                    '</div>';
+                            }
+
+                            document.getElementById('unit-popup-body').innerHTML =
+                                '<div class="unit-modal-head">' +
+                                '<div class="unit-modal-badge">' + u.type_icon + '</div>' +
+                                '<div><div class="unit-modal-title">واحد ' + esc(faNum(u.number)) + '</div>' +
+                                '<div class="unit-modal-sub">' + esc(u.occ_label) + (u.occupant_name ? ' — ' + esc(u.occupant_name) : '') + '</div></div>' +
+                                '</div>' +
+                                '<div class="unit-info-chips">' + chips + '</div>' +
+                                '<div class="unit-info-rows">' + rows.join('') + '</div>' +
+                                actions;
+                        }
+
+                        document.querySelectorAll('[data-unit-open]').forEach(function (cell) {
+                            function open() {
+                                var id = cell.getAttribute('data-unit-open');
+                                renderUnit(id);
+                                if (window.openModal) { window.openModal('unit-popup'); }
+                            }
+                            cell.addEventListener('click', open);
+                            cell.addEventListener('keydown', function (e) {
+                                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+                            });
+                        });
+
+                        /* بازشدن خودکار مودال واحد مشخص‌شده از طریق لینک (?unit=ID) */
+                        var params = new URLSearchParams(window.location.search);
+                        var focusUnit = params.get('unit');
+                        if (focusUnit && UNITS[focusUnit]) {
+                            renderUnit(focusUnit);
+                            if (window.openModal) { window.openModal('unit-popup'); }
+                        }
+                    })();
+                </script>
+            <?php endif; ?>
         </section>
 
         <!-- ماژول‌ها -->
