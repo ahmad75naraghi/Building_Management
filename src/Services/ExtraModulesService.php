@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Core\Logger;
 use App\Exceptions\AppException;
 use App\Exceptions\ValidationException;
 use App\Models\Announcement;
@@ -355,9 +356,23 @@ final class ExtraModulesService
     // Documents
     // ------------------------------------------------------------------
 
+    /** ثبت/ویرایش/حذف اسناد ساختمان فقط با مدیر ساختمان است. */
+    private function requireManager(int $userId, int $buildingId): void
+    {
+        if ($this->repo->memberRole($userId, $buildingId) !== 'manager') {
+            throw new AppException('فقط مدیر ساختمان می‌تواند اسناد را مدیریت کند.');
+        }
+    }
+
+    /**
+     * ثبت سند با «لینک خارجی» (بدون آپلود فایل) — فقط مدیر.
+     *
+     * @param array<string, mixed> $data
+     */
     public function createDocument(array $data, int $userId): Document
     {
         $buildingId = $this->buildingIdOrThrow($data, $userId);
+        $this->requireManager($userId, $buildingId);
 
         $errors = Validator::validate($data, [
             'title' => 'required',
@@ -371,18 +386,117 @@ final class ExtraModulesService
         $document->building_id = $buildingId;
         $document->title = $data['title'];
         $document->file_path = $data['file_path'];
-        $document->document_type = $data['document_type'] ?? 'general';
+        $document->document_type = Document::normalizeCategory($data['document_type'] ?? null);
         $document->uploaded_by = $userId;
+        $document->is_visible_to_members = self::flagFromInput($data['is_visible_to_members'] ?? 1);
 
         $id = $this->repo->createDocument($document);
         $document->id = $id;
         return $document;
     }
 
+    /**
+     * ثبت سند با آپلود فایل واقعی — فقط مدیر.
+     * فایل با نام تصادفی و خارج از دسترس مستقیم وب ذخیره می‌شود.
+     *
+     * @param array<string, mixed> $meta building_id, title, document_type, is_visible_to_members
+     */
+    public function uploadDocument(array $meta, int $userId, string $fileContent, string $originalName): Document
+    {
+        $buildingId = $this->buildingIdOrThrow($meta, $userId);
+        $this->requireManager($userId, $buildingId);
+
+        $title = trim((string) ($meta['title'] ?? ''));
+        if ($title === '') {
+            throw new ValidationException('title is required');
+        }
+
+        $stored = \App\Utilities\FileStorage::saveDocument($fileContent, $buildingId);
+
+        $document = new Document();
+        $document->building_id = $buildingId;
+        $document->title = $title;
+        // مسیر فیزیکی فقط برای مرجع داخلی؛ هرگز به کاربر نهایی نشان داده نمی‌شود
+        $document->file_path = 'upload://' . $stored['stored_name'];
+        $document->document_type = Document::normalizeCategory($meta['document_type'] ?? null);
+        $document->uploaded_by = $userId;
+        $document->stored_name = $stored['stored_name'];
+        $document->mime_type = $stored['mime_type'];
+        $document->file_size = $stored['file_size'];
+        $document->is_visible_to_members = self::flagFromInput($meta['is_visible_to_members'] ?? 1);
+
+        $id = $this->repo->createDocument($document);
+        $document->id = $id;
+        return $document;
+    }
+
+    /** تبدیل ورودی‌های مختلف (بولین/رشته/عدد) به پرچم ۰ یا ۱ */
+    private static function flagFromInput(mixed $value): int
+    {
+        if (is_bool($value)) {
+            return $value ? 1 : 0;
+        }
+        if (is_string($value)) {
+            return filter_var($value, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
+        }
+        return ((int) $value) !== 0 ? 1 : 0;
+    }
+
+    /**
+     * فهرست اسناد ساختمان بر اساس نقش:
+     * مدیر همه اسناد (حتی غیرقابل رویت) و اعضا فقط اسناد قابل رویت را می‌بینند.
+     */
     public function listDocuments(int $buildingId, int $userId): array
     {
         $this->requireMember($userId, $buildingId);
-        return $this->repo->findDocumentsByBuildingId($buildingId);
+        $isManager = $this->repo->memberRole($userId, $buildingId) === 'manager';
+        return $this->repo->findDocumentsByBuildingId($buildingId, $isManager);
+    }
+
+    /**
+     * دریافت یک سند با کنترل رویت: اعضای عادی فقط اسناد قابل رویت را می‌بینند.
+     */
+    public function getDocumentForUser(int $documentId, int $userId): Document
+    {
+        $document = $this->repo->findDocumentById($documentId);
+        if ($document === null) {
+            throw new AppException('سند پیدا نشد.');
+        }
+        $this->requireMember($userId, $document->building_id);
+        $isManager = $this->repo->memberRole($userId, $document->building_id) === 'manager';
+        if (!$isManager && $document->is_visible_to_members !== 1) {
+            throw new AppException('شما به این سند دسترسی ندارید.');
+        }
+        return $document;
+    }
+
+    /** تعویض فایل یک سند (فقط مدیر) — فایل قبلی از دیسک حذف می‌شود. */
+    public function replaceDocumentFile(int $documentId, int $userId, string $fileContent, string $originalName): Document
+    {
+        $document = $this->repo->findDocumentById($documentId);
+        if ($document === null) {
+            throw new AppException('سند پیدا نشد.');
+        }
+        $this->requireManager($userId, $document->building_id);
+
+        $stored = \App\Utilities\FileStorage::saveDocument($fileContent, $document->building_id);
+        $this->repo->updateDocumentFile($documentId, $stored['stored_name'], $stored['mime_type'], $stored['file_size']);
+
+        // حذف فایل قدیمی پس از موفقیت ذخیرهٔ فایل جدید
+        if ($document->stored_name !== null) {
+            try {
+                $oldPath = \App\Utilities\FileStorage::documentPath($document->building_id, $document->stored_name);
+                \App\Utilities\FileStorage::deleteFile($oldPath);
+            } catch (\Throwable $e) {
+                // فایل قدیمی وجود ندارد یا قابل حذف نیست؛ عملیات اصلی نباید شکست بخورد
+                Logger::warning('Documents', 'حذف فایل قدیمی سند ناموفق بود', ['document_id' => $documentId, 'error' => $e->getMessage()]);
+            }
+        }
+
+        $document->stored_name = $stored['stored_name'];
+        $document->mime_type = $stored['mime_type'];
+        $document->file_size = $stored['file_size'];
+        return $document;
     }
 
     // ------------------------------------------------------------------
@@ -674,7 +788,24 @@ final class ExtraModulesService
         }
         $this->requireMember($userId, $buildingId);
         $this->requireCanModify($module, $id, $userId, $buildingId);
-        return $this->repo->deleteModuleEntity($module, $id);
+
+        // برای اسناد، پیش از حذف رکورد، مشخصات فایل فیزیکی را می‌خوانیم
+        $storedDocument = $module === 'documents' ? $this->repo->findDocumentById($id) : null;
+
+        $deleted = $this->repo->deleteModuleEntity($module, $id);
+
+        // حذف فایل سند از دیسک پس از حذف موفق رکورد
+        if ($deleted && $storedDocument !== null && $storedDocument->stored_name !== null) {
+            try {
+                $path = \App\Utilities\FileStorage::documentPath($storedDocument->building_id, $storedDocument->stored_name);
+                \App\Utilities\FileStorage::deleteFile($path);
+            } catch (\Throwable $e) {
+                // نبودن فایل روی دیسک نباید حذف رکورد را خراب گزارش کند
+                Logger::warning('Documents', 'حذف فایل سند پس از حذف رکورد ناموفق بود', ['document_id' => $id, 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $deleted;
     }
 
     // ------------------------------------------------------------------

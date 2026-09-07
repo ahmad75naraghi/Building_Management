@@ -4940,7 +4940,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"building_id\": 1,\n    \"title\": \"اساسنامه ساختمان\"\n}",
+              "raw": "{\n    \"building_id\": 1,\n    \"title\": \"اساسنامه ساختمان\",\n    \"file_path\": \"https://example.com/rules.pdf\",\n    \"document_type\": \"rules\",\n    \"is_visible_to_members\": 1\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -6322,7 +6322,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"title\": \"اساسنامه ساختمان\",\n    \"document_type\": \"rules\"\n}",
+              "raw": "{\n    \"title\": \"اساسنامه ساختمان\",\n    \"document_type\": \"rules\",\n    \"is_visible_to_members\": 0\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -6337,6 +6337,102 @@
               "path": [
                 "documents",
                 "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "بارگذاری فایل سند (Upload Document)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "building_id",
+                  "value": "1",
+                  "description": "شناسه ساختمان"
+                },
+                {
+                  "key": "title",
+                  "value": "بیمه‌نامه ساختمان",
+                  "description": "عنوان نمایشی سند"
+                },
+                {
+                  "key": "document_type",
+                  "value": "insurance",
+                  "description": "legal|financial|meeting|contract|insurance|technical|rules|other"
+                },
+                {
+                  "key": "is_visible_to_members",
+                  "value": "1",
+                  "description": "1 = قابل رویت اعضا، 0 = فقط مدیران"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "فایل سند (PDF/تصویر/Word/Excel حداکثر 10MB)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/documents",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "documents"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "نمایش سند (Show Document)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/documents/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "documents",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "تعویض فایل سند (Replace Document File)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "فایل جایگزین"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/documents/1/replace-file",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "documents",
+                "1",
+                "replace-file"
               ]
             }
           },

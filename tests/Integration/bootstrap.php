@@ -296,6 +296,23 @@ function test_db(): PDO
         created_by INTEGER DEFAULT NULL
     )");
 
+    $pdo->exec("CREATE TABLE documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        document_type TEXT DEFAULT 'general',
+        uploaded_by INTEGER NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        stored_name TEXT DEFAULT NULL,
+        mime_type TEXT DEFAULT NULL,
+        file_size INTEGER DEFAULT NULL,
+        is_visible_to_members INTEGER NOT NULL DEFAULT 1,
+        updated_at TEXT DEFAULT NULL,
+        FOREIGN KEY (building_id) REFERENCES buildings(id),
+        FOREIGN KEY (uploaded_by) REFERENCES users(id)
+    )");
+
     // تزریق اتصال به Database از طریق Reflection
     $ref = new ReflectionClass(\App\Core\Database::class);
     $prop = $ref->getProperty('connection');
@@ -309,7 +326,7 @@ function test_db(): PDO
 function test_db_reset(): void
 {
     $db = test_db();
-    foreach (['cost_payments','costs','units','common_areas','floors','blocks',
+    foreach (['documents','cost_payments','costs','units','common_areas','floors','blocks',
               'building_members','buildings','otp_codes','users'] as $t) {
         $db->exec("DELETE FROM {$t}");
         $db->exec("DELETE FROM sqlite_sequence WHERE name = '{$t}'");

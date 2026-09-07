@@ -6,7 +6,7 @@
 
 سیستم کامل و حرفه‌ای مدیریت ساختمان شامل **REST API** (برای اپ موبایل و فرانت‌اندها) + **پنل وب ریسپانسیو فارسی** (موبایل‌فرست) برای مدیر و ساکنان ساختمان.
 
-- 📦 کالکشن کامل Postman (۱۲۴ درخواست) در فایل `Building Management Pro - Master.postman_collection`
+- 📦 کالکشن کامل Postman (۱۲۷ درخواست) در فایل `Building Management Pro - Master.postman_collection`
 - 🗄️ اسکریپت جامع دیتابیس: `all_migrations.sql` (۳۲ جدول)
 - 📚 مستندات کامل پروژه در پوشه `docs/`
 
@@ -343,6 +343,7 @@ Migrationها از `001` تا `020` در `database/migrations/` و نسخه SQL 
 | 028 | `event_reminders` | ردیابی یادآوری رویدادها (اعلان/پیامک) با کلید یکتای ضدتکرار |
 | 029 | `units.parking_no`, `units.storage_no` | قطعه پارکینگ و قطعه انباری اختصاصی هر واحد |
 | 030 | `costs.target_unit_ids`, `costs.issued_at`, `cost_payments.share_amount` | صدور هزینه برای مخاطبان انتخابی (ساکنین/مالکین/مستأجرین/واحدهای خاص) |
+| 031 | `documents.stored_name`, `mime_type`, `file_size`, `is_visible_to_members`, `updated_at` | آپلود امن اسناد ساختمان با نام تصادفی، دسته‌بندی و کنترل رویت اعضا |
 
 ویژگی‌های دیتابیس: **Foreign Key** با `ON DELETE CASCADE / SET NULL`، ایندکس‌های ترکیبی، `utf8mb4_unicode_ci`، ستون‌های JSON برای تنظیمات داینامیک.
 
@@ -353,7 +354,7 @@ Migrationها از `001` تا `020` در `database/migrations/` و نسخه SQL 
 - **Base URL (محیط توسعه):** `https://file.falnic.com/b/api`
 - **احراز هویت:** هدر `Authorization: Bearer <token>` (به‌جز register/login/refresh)
 - **فرمت پاسخ:** JSON با ساختار `{ "success": bool, "message"?: string, "data"?: ... }`
-- **کالکشن Postman:** فایل `Building Management Pro - Master.postman_collection` — شامل ۱۲۴ درخواست در ۷ پوشه، متغیر `base_url`، ذخیره خودکار توکن بعد از Login و هدرهای خودکار `Accept` و `Content-Type: application/json`
+- **کالکشن Postman:** فایل `Building Management Pro - Master.postman_collection` — شامل ۱۲۷ درخواست در ۷ پوشه، متغیر `base_url`، ذخیره خودکار توکن بعد از Login و هدرهای خودکار `Accept` و `Content-Type: application/json`
 
 ### ۱. احراز هویت (Auth)
 
@@ -495,7 +496,8 @@ Migrationها از `001` تا `020` در `database/migrations/` و نسخه SQL 
 | جزئیات تیکت | `ticket_view.php` | نمایش تیکت، تغییر وضعیت و گفتگو (کامنت) |
 | اعضا | `members.php` | لیست اعضا + ارسال دعوت‌نامه |
 | اطلاعیه‌ها / تعمیرات / رزرو / رأی‌گیری | `announcements.php` / `maintenance.php` / `bookings.php` / `votes.php` | ماژول‌های اطلاع‌رسانی و مشارکت |
-| مهمان‌ها / اسناد / مصرف انرژی / اضطراری / جلسات / نظرات | `visitors.php` / `documents.php` / `consumption.php` / `emergency_contacts.php` / `meetings.php` / `reviews.php` | ماژول‌های حرفه‌ای فاز ۶ |
+| مهمان‌ها / مصرف انرژی / اضطراری / جلسات / نظرات | `visitors.php` / `consumption.php` / `emergency_contacts.php` / `meetings.php` / `reviews.php` | ماژول‌های حرفه‌ای فاز ۶ |
+| اسناد ساختمان | `documents.php` + `document_download.php` | آپلود امن فایل با دسته‌بندی (۸ دسته)، نمایش نام و زمان شمسی، کنترل رویت اعضا/فقط مدیران، ویرایش و حذف فقط مدیر، دانلود از مسیر معتبرسازی‌شده بدون دسترسی مستقیم به فایل |
 | تقویم / گزارش‌ها | `calendar.php` / `reports.php` | **تقویم شمسی** رویدادها (جلسات + رزروها) با جزئیات هر روز و فهرست رویدادهای پیشِ رو؛ نمای کلی عملکرد |
 | ویرایش/حذف ساختمان | `building_edit.php` / `building_delete.php` | ویرایش اطلاعات (PUT) و حذف ساختمان (DELETE) |
 | پذیرش دعوتنامه | `invite.php?token=...` | مشاهده اطلاعات دعوت (نقش/واحد) و پذیرش (`POST /invitations/accept`) |
@@ -541,7 +543,7 @@ Migrationها از `001` تا `020` در `database/migrations/` و نسخه SQL 
 ## 🧪 تست و ابزارها
 
 ```bash
-composer test            # ۳۵۶ تست یکپارچه (بدون نیاز به دیتابیس یا افزونه خاص)
+composer test            # ۳۸۹ تست یکپارچه (بدون نیاز به دیتابیس یا افزونه خاص)
 composer test:unit       # تست‌های قدیمی PHPUnit (tests/Unit)
 composer health          # بررسی سلامت و آمادگی استقرار
 composer migrate:status  # نمایش مایگریشن‌های در انتظار
@@ -568,10 +570,12 @@ composer serve           # سرور توسعه روی پورت 8000
 | فاز ۶ — ماژول‌های حرفه‌ای (۱۰ ماژول) | ✅ تکمیل — GET/POST + تغییر وضعیت (PUT) + حذف (DELETE) + رأی‌گیری کامل با گزینه/رأی/نتیجه |
 | ورود یکپارچه با موبایل و کد یک‌بارمصرف | ✅ تکمیل |
 | رابط مودال‌محور + ویرایش کامل + نقش‌ها + سه حالت شارژ | ✅ تکمیل |
-| لاگ‌گیر مرکزی و ۳۵۶ تست یکپارچه | ✅ تکمیل |
+| لاگ‌گیر مرکزی و ۳۸۹ تست یکپارچه | ✅ تکمیل |
 | تقویم شمسی رویدادها + یادآوری خودکار (اعلان + پیامک) | ✅ تکمیل |
 | هزینه موردی با انتخاب مخاطب (ساکنین/مالکین/مستأجرین/واحدهای خاص) و صدور سهم | ✅ تکمیل |
 | نمای گرافیکی ساختمان (بلوک ← طبقه ← واحد) با پاپ‌آپ اطلاعات و اقدامات واحد | ✅ تکمیل |
+| اسناد ساختمان با آپلود امن فایل، دسته‌بندی، کنترل رویت اعضا و دانلود معتبرسازی‌شده | ✅ تکمیل |
+| اپلیکیشن وب پیش‌رونده (PWA) با بنر نصب هوشمند (رد = یادآوری یک‌هفته‌ای، نصب = مخفی همیشگی) | ✅ تکمیل |
 | سخت‌سازی امنیتی (اسرار، CSRF، محدودیت نرخ) | ✅ تکمیل |
 | تست و بهینه‌سازی (PHPStan, OpenAPI) | 🟡 تست‌ها کامل؛ PHPStan و OpenAPI باقی‌مانده |
 | استقرار production (OPcache, .env, Backup) | 🟡 `.env` و healthcheck آماده؛ OPcache و Backup باقی‌مانده |

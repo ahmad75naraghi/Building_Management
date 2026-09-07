@@ -1651,3 +1651,102 @@
         .unit-info-row .val a { color: var(--blue-info); text-decoration: none; font-weight: 700; }
         .unit-modal-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
         .unit-modal-actions .btn-chip { flex: 1; justify-content: center; padding: 10px 12px; }
+
+        /* ==================== اسناد ساختمان ==================== */
+        .doc-group { margin-bottom: 22px; }
+        .doc-group-title {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 13px; font-weight: 800; color: var(--text-dark);
+            margin: 0 2px 10px; padding-bottom: 7px;
+            border-bottom: 2px solid #eef2f7;
+        }
+        .doc-group-count {
+            background: #eef2ff; color: #4338ca; font-size: 11px; font-weight: 800;
+            border-radius: 999px; padding: 2px 9px; min-width: 22px; text-align: center;
+        }
+        .doc-icon {
+            width: 46px; height: 46px; border-radius: 14px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center; font-size: 21px;
+        }
+        .doc-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: var(--text-gray); margin-top: 4px; }
+        .doc-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .btn-chip-ghost { background: transparent; color: var(--text-gray); border: 1px dashed #cbd5e1; }
+        .btn-chip-ghost:hover { background: #f8fafc; color: var(--text-dark); }
+
+        /* تب‌های «فایل / لینک» */
+        .doc-tabs { display: flex; gap: 8px; }
+        .doc-tab {
+            flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+            border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 9px 8px;
+            font-size: 12px; font-weight: 700; color: var(--text-gray); cursor: pointer;
+            transition: all .15s ease; background: #fff;
+        }
+        .doc-tab input { position: absolute; opacity: 0; pointer-events: none; }
+        .doc-tab:has(input:checked) { border-color: var(--blue-info); color: #1d4ed8; background: #eff6ff; }
+
+        /* ناحیه انتخاب فایل (Drop zone) */
+        .doc-file-drop {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            border: 2px dashed #cbd5e1; border-radius: 14px; padding: 22px 14px;
+            text-align: center; cursor: pointer; background: #f8fafc; transition: all .15s ease;
+        }
+        .doc-file-drop:hover, .doc-file-drop:focus-within { border-color: var(--blue-info); background: #eff6ff; }
+        .doc-file-drop input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+        .doc-file-drop-icon { font-size: 26px; }
+        .doc-file-drop-text { font-size: 12.5px; font-weight: 700; color: var(--text-dark); }
+        .doc-file-drop-hint { font-size: 10.5px; color: var(--text-gray); }
+        .doc-file-drop:has(input[type="file"]:focus-visible) { outline: 2px solid var(--blue-info); }
+        .doc-file-drop-compact { padding: 14px; }
+        .doc-file-drop-compact .doc-file-drop-icon { font-size: 20px; }
+
+        /* کلید رویت سند برای اعضا */
+        .doc-vis-toggle {
+            display: flex; align-items: center; gap: 10px; cursor: pointer;
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 11px 12px;
+        }
+        .doc-vis-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+        .doc-vis-toggle strong { display: block; font-size: 12.5px; color: var(--text-dark); }
+        .doc-vis-toggle small { display: block; font-size: 10.5px; color: var(--text-gray); margin-top: 2px; }
+        .doc-vis-switch {
+            width: 38px; height: 22px; border-radius: 999px; background: #cbd5e1;
+            position: relative; flex-shrink: 0; transition: background .18s ease;
+        }
+        .doc-vis-switch::after {
+            content: ''; position: absolute; top: 3px; right: 3px; width: 16px; height: 16px;
+            border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25);
+            transition: transform .18s ease;
+        }
+        .doc-vis-toggle input:checked ~ .doc-vis-switch { background: #10b981; }
+        .doc-vis-toggle input:checked ~ .doc-vis-switch::after { transform: translateX(-16px); }
+
+        /* ==================== بنر نصب اپلیکیشن (PWA) ==================== */
+        .pwa-banner {
+            position: fixed; bottom: 86px; left: 50%; transform: translateX(-50%) translateY(20px);
+            width: min(430px, calc(100% - 24px));
+            background: linear-gradient(135deg, #111827 0%, #1e293b 100%);
+            color: #fff; border-radius: 18px; padding: 12px 14px;
+            display: flex; align-items: center; gap: 11px;
+            box-shadow: 0 14px 40px rgba(15, 23, 42, .35);
+            z-index: 900; opacity: 0; pointer-events: none;
+            transition: opacity .3s ease, transform .3s ease;
+        }
+        .pwa-banner.is-visible { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+        .pwa-banner-icon {
+            width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0;
+            background: rgba(59, 130, 246, .18); display: flex; align-items: center; justify-content: center;
+        }
+        .pwa-banner-icon img { width: 30px; height: 30px; border-radius: 7px; }
+        .pwa-banner-text { flex: 1; min-width: 0; }
+        .pwa-banner-title { font-size: 13px; font-weight: 800; margin-bottom: 2px; }
+        .pwa-banner-sub { font-size: 10.5px; color: #cbd5e1; line-height: 1.6; }
+        .pwa-banner-install {
+            background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; border: none;
+            font-family: inherit; font-size: 12px; font-weight: 800; border-radius: 11px;
+            padding: 9px 16px; cursor: pointer; flex-shrink: 0; transition: filter .15s ease;
+        }
+        .pwa-banner-install:hover { filter: brightness(1.1); }
+        .pwa-banner-close {
+            background: transparent; border: none; color: #94a3b8; font-size: 17px;
+            line-height: 1; cursor: pointer; padding: 4px; flex-shrink: 0; border-radius: 8px;
+        }
+        .pwa-banner-close:hover { color: #fff; background: rgba(255,255,255,.08); }

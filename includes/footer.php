@@ -82,8 +82,21 @@ $nav_last_label = $is_buildings ? 'ساختمان‌ها' : 'داشبورد';
 
     </div><!-- /.app-container -->
 
+    <!-- بنر کوچک نصب اپلیکیشن (PWA) — بعد از نصب یا ردِ یک‌هفته‌ای نمایش داده نمی‌شود -->
+    <div class="pwa-banner" id="pwa-banner" role="dialog" aria-label="نصب اپلیکیشن مدیریت ساختمان">
+        <div class="pwa-banner-icon"><img src="assets/icons/icon-192.png" alt=""></div>
+        <div class="pwa-banner-text">
+            <div class="pwa-banner-title">اپ «مدیریت ساختمان» را نصب کنید</div>
+            <div class="pwa-banner-sub" id="pwa-banner-sub">دسترسی سریع‌تر، شبیه یک اپ واقعی و بدون مرورگر</div>
+        </div>
+        <button type="button" class="pwa-banner-install" id="pwa-banner-install">نصب</button>
+        <button type="button" class="pwa-banner-close" id="pwa-banner-close" aria-label="بستن">×</button>
+    </div>
+
     <!-- اسکریپت مشترک همه صفحات -->
     <script src="assets/js/main.js"></script>
+    <!-- منطق نصب PWA و بنر -->
+    <script src="assets/js/pwa.js"></script>
 </body>
 
 </html>

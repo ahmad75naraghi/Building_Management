@@ -1,0 +1,56 @@
+{
+    "name": "مدیریت ساختمان",
+    "short_name": "ساختمان من",
+    "description": "سامانه هوشمند مدیریت ساختمان؛ شارژ و هزینه‌ها، تیکت‌ها، تقویم رویدادها، اسناد و اعلان‌ها",
+    "id": "./",
+    "dir": "rtl",
+    "lang": "fa",
+    "start_url": "./index.php",
+    "scope": "./",
+    "display": "standalone",
+    "display_override": ["standalone", "minimal-ui"],
+    "orientation": "portrait",
+    "theme_color": "#010a21",
+    "background_color": "#f6f8fb",
+    "categories": ["productivity", "utilities"],
+    "icons": [
+        {
+            "src": "assets/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "assets/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "assets/icons/icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "تقویم رویدادها",
+            "short_name": "تقویم",
+            "url": "./calendar.php",
+            "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "اسناد ساختمان",
+            "short_name": "اسناد",
+            "url": "./documents.php",
+            "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "تیکت‌ها و درخواست‌ها",
+            "short_name": "تیکت‌ها",
+            "url": "./tickets.php",
+            "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }]
+        }
+    ]
+}

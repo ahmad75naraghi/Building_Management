@@ -109,6 +109,8 @@ final class Routes
         'POST /api/visitors' => ['App\Http\Controllers\ExtraModulesController', 'storeVisitor'],
         'GET /api/documents' => ['App\Http\Controllers\ExtraModulesController', 'indexDocuments'],
         'POST /api/documents' => ['App\Http\Controllers\ExtraModulesController', 'storeDocument'],
+        'GET /api/documents/{id}' => ['App\Http\Controllers\ExtraModulesController', 'showDocument'],
+        'POST /api/documents/{id}/replace-file' => ['App\Http\Controllers\ExtraModulesController', 'replaceDocumentFile'],
         'GET /api/consumption' => ['App\Http\Controllers\ExtraModulesController', 'indexConsumption'],
         'POST /api/consumption' => ['App\Http\Controllers\ExtraModulesController', 'storeConsumption'],
         'GET /api/emergency-contacts' => ['App\Http\Controllers\ExtraModulesController', 'indexEmergencyContacts'],
