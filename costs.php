@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action'])) {
         $alert_message = 'این عملیات فقط برای مدیر ساختمان مجاز است.';
     } elseif ($action === 'save_charge_settings') {
         // تنظیمات شارژ ماهیانه: ثابت / نفری / دلخواه
-        $charge_mode = in_array(($_POST['charge_mode'] ?? 'fixed'), ['fixed', 'per_person', 'custom'], true)
+        $charge_mode = in_array(($_POST['charge_mode'] ?? 'fixed'), ['fixed', 'per_person', 'custom', 'combined'], true)
             ? $_POST['charge_mode'] : 'fixed';
         $payload = [
             'charge_mode' => $charge_mode,
@@ -309,6 +309,7 @@ $charge_mode = $building['charge_mode'] ?? 'fixed';
 $charge_mode_labels = [
     'fixed' => 'شارژ ثابت (همه واحدها یکسان)',
     'per_person' => 'بر اساس تعداد نفرات هر واحد',
+    'combined' => 'ترکیبی: مبلغ ثابت + هر نفر',
     'custom' => 'دلخواه برای هر واحد',
 ];
 
@@ -369,7 +370,9 @@ require_once 'includes/header.php';
                         روش فعلی: <span class="font-bold" style="color:var(--gold-primary);"><?= htmlspecialchars($charge_mode_labels[$charge_mode] ?? '') ?></span>
                     </p>
                     <p class="text-xs text-gray-500 mt-1">
-                        <?php if ($charge_mode === 'per_person'): ?>
+                        <?php if ($charge_mode === 'combined'): ?>
+                            هر واحد: <?= fa_number($building['monthly_charge'] ?? 0) ?> تومان + هر نفر: <?= fa_number($building['charge_per_person'] ?? 0) ?> تومان
+                        <?php elseif ($charge_mode === 'per_person'): ?>
                             هر نفر: <?= fa_number($building['charge_per_person'] ?? 0) ?> تومان
                         <?php elseif ($charge_mode === 'fixed'): ?>
                             هر واحد: <?= fa_number($building['monthly_charge'] ?? 0) ?> تومان
@@ -393,7 +396,7 @@ require_once 'includes/header.php';
                     <div class="charge-preview-list">
                         <?php foreach (array_slice($charge_preview['units'], 0, 4) as $pu): ?>
                             <div class="charge-preview-row">
-                                <span>واحد <?= fa_digits($pu['unit_number']) ?><?= $charge_mode === 'per_person' ? ' (' . fa_digits($pu['residents_count']) . ' نفر)' : '' ?></span>
+                                <span>واحد <?= fa_digits($pu['unit_number']) ?><?= in_array($charge_mode, ['per_person', 'combined'], true) ? ' (' . fa_digits($pu['residents_count']) . ' نفر)' : '' ?></span>
                                 <strong><?= fa_number($pu['amount']) ?></strong>
                             </div>
                         <?php endforeach; ?>
@@ -689,6 +692,13 @@ require_once 'includes/header.php';
                         </span>
                     </label>
                     <label class="choice-item">
+                        <input type="radio" name="charge_mode" value="combined" <?= $charge_mode === 'combined' ? 'checked' : '' ?> data-charge-mode>
+                        <span>
+                            <strong>ترکیبی: ثابت + نفری</strong>
+                            <small>هر واحد = مبلغ ثابت + (تعداد ساکنین × نرخ هر نفر).</small>
+                        </span>
+                    </label>
+                    <label class="choice-item">
                         <input type="radio" name="charge_mode" value="custom" <?= $charge_mode === 'custom' ? 'checked' : '' ?> data-charge-mode>
                         <span>
                             <strong>دلخواه برای هر واحد</strong>
@@ -698,13 +708,13 @@ require_once 'includes/header.php';
                 </div>
             </div>
 
-            <div data-charge-field="fixed">
+            <div data-charge-field="fixed,combined">
                 <label for="monthly_charge" class="form-label">مبلغ ثابت ماهیانه هر واحد (تومان)</label>
                 <input type="number" id="monthly_charge" name="monthly_charge" min="0" step="1000" inputmode="numeric" class="form-input"
                        value="<?= htmlspecialchars((string) ($building['monthly_charge'] ?? 0)) ?>">
             </div>
 
-            <div data-charge-field="per_person">
+            <div data-charge-field="per_person,combined">
                 <label for="charge_per_person" class="form-label">مبلغ به‌ازای هر نفر (تومان)</label>
                 <input type="number" id="charge_per_person" name="charge_per_person" min="0" step="1000" inputmode="numeric" class="form-input"
                        value="<?= htmlspecialchars((string) ($building['charge_per_person'] ?? 0)) ?>">
@@ -856,7 +866,8 @@ require_once 'includes/header.php';
                 var selected = document.querySelector('[data-charge-mode]:checked');
                 var mode = selected ? selected.value : 'fixed';
                 document.querySelectorAll('[data-charge-field]').forEach(function (el) {
-                    el.style.display = el.getAttribute('data-charge-field') === mode ? '' : 'none';
+                    var modes = el.getAttribute('data-charge-field').split(',');
+                    el.style.display = modes.indexOf(mode) !== -1 ? '' : 'none';
                 });
             }
             radios.forEach(function (r) { r.addEventListener('change', sync); });

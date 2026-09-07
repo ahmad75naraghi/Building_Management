@@ -301,3 +301,29 @@ TestLog::run('سهم‌ها واحد-محور و جمعشان دقیقاً بر�
     TestLog::assertSame('هر ردیف به واحد منتسب است', [], array_values(array_filter($unitIds, fn($v) => $v === null)));
     TestLog::assertSame('جمع سهم‌ها = مبلغ هزینه', 100000.0, round($sum, 2));
 });
+
+// ------------------------------------------------------------ شارژ ترکیبی (ثابت + نفری) در صدور ماهانه
+
+TestLog::run('شارژ ترکیبی: سهم هر واحد = ثابت + نفری در شارژ ماهانه', function () use ($svc, $manager) {
+    $b = make_building($manager, [
+        'charge_mode' => 'combined', 'monthly_charge' => 200000, 'charge_per_person' => 50000,
+        'monthly_charge_enabled' => 1,
+    ]);
+    $o1 = make_user('09132000060');
+    $o2 = make_user('09132000061');
+    $u1 = make_unit($b, '1', ['owner_user_id' => $o1, 'residents_count' => 2]);
+    $u2 = make_unit($b, '2', ['owner_user_id' => $o2, 'residents_count' => 0]);
+
+    $cost = $svc->createMonthlyCharge($b, $manager);
+    TestLog::assertSame('مبلغ کل: (200+100) + 200', 500000.0, (float) $cost->amount);
+
+    $svc->issueCost((int) $cost->id, $manager);
+    $rows = cost_payments_of((int) $cost->id);
+    TestLog::assertSame('دو ردیف پرداخت', 2, count($rows));
+    $byUnit = [];
+    foreach ($rows as $r) {
+        $byUnit[(int) $r['unit_id']] = (float) $r['share_amount'];
+    }
+    TestLog::assertSame('واحد ۲ نفره: ۲۰۰هزار + ۲×۵۰هزار', 300000.0, $byUnit[$u1] ?? 0.0);
+    TestLog::assertSame('واحد خالی: فقط ثابت', 200000.0, $byUnit[$u2] ?? 0.0);
+});

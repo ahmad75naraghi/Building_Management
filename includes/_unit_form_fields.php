@@ -113,13 +113,15 @@
     <div>
         <label class="form-label">
             تعداد نفرات ساکن
-            <?php if (($charge_mode ?? 'fixed') === 'per_person'): ?>
+            <?php if (in_array(($charge_mode ?? 'fixed'), ['per_person', 'combined'], true)): ?>
                 <span style="color:var(--red-danger);">*</span>
             <?php endif; ?>
         </label>
         <input type="number" name="residents_count" min="0" inputmode="numeric" class="form-input" placeholder="مثال: 3" value="0">
         <?php if (($charge_mode ?? 'fixed') === 'per_person'): ?>
             <p class="text-[11px] text-gray-400 mt-1">شارژ این واحد = تعداد نفرات × نرخ هر نفر.</p>
+        <?php elseif (($charge_mode ?? 'fixed') === 'combined'): ?>
+            <p class="text-[11px] text-gray-400 mt-1">شارژ این واحد = مبلغ ثابت + (تعداد نفرات × نرخ هر نفر).</p>
         <?php endif; ?>
     </div>
 

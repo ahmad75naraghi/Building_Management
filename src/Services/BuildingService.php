@@ -267,12 +267,12 @@ final class BuildingService
     }
 
     /**
-     * اعتبارسنجی حالت شارژ. مقادیر مجاز: fixed | per_person | custom
+     * اعتبارسنجی حالت شارژ. مقادیر مجاز: fixed | per_person | combined | custom
      */
     public static function normalizeChargeMode($mode): string
     {
         $mode = is_string($mode) ? $mode : 'fixed';
-        return in_array($mode, ['fixed', 'per_person', 'custom'], true) ? $mode : 'fixed';
+        return in_array($mode, ['fixed', 'per_person', 'custom', 'combined'], true) ? $mode : 'fixed';
     }
 
     public function deleteBuilding(int $buildingId, int $actorUserId = 0): bool

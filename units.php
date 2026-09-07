@@ -156,7 +156,11 @@ require_once 'includes/header.php';
     <?php if ($is_manager): ?>
         <?php modal_open_button('add-unit', 'افزودن واحد جدید'); ?>
 
-        <?php if ($charge_mode === 'per_person'): ?>
+        <?php if ($charge_mode === 'combined'): ?>
+            <div class="hint-card" style="margin-top:12px;">
+                💰 شارژ این ساختمان <strong>ترکیبی (ثابت + نفری)</strong> است؛ برای هر واحد تعداد ساکنین را وارد کنید تا سهم نفری محاسبه شود.
+            </div>
+        <?php elseif ($charge_mode === 'per_person'): ?>
             <div class="hint-card" style="margin-top:12px;">
                 👥 شارژ این ساختمان <strong>بر اساس تعداد نفرات</strong> محاسبه می‌شود؛ برای هر واحد تعداد ساکنین را وارد کنید.
             </div>

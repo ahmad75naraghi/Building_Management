@@ -21,7 +21,7 @@ final class Building
     public int $parking_spots = 0;
     public float $monthly_charge = 0.0;
     public bool $monthly_charge_enabled = false;
-    /** نحوه محاسبه شارژ ماهیانه: fixed | per_person | custom */
+    /** نحوه محاسبه شارژ ماهیانه: fixed | per_person | combined | custom */
     public string $charge_mode = 'fixed';
     /** نرخ شارژ به‌ازای هر نفر (حالت per_person) */
     public float $charge_per_person = 0.0;

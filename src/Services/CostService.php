@@ -152,6 +152,7 @@ final class CostService
         'fixed' => 'fixed_share',
         'per_person' => 'people_count',
         'custom' => 'custom',
+        'combined' => 'combined',
     ];
 
     /**
@@ -162,6 +163,8 @@ final class CostService
         switch ($mode) {
             case 'per_person':
                 return 'شارژ نفری محاسبه نشد. «مبلغ به‌ازای هر نفر» را تنظیم کنید و تعداد نفرات واحدها را در صفحه واحدها وارد کنید.';
+            case 'combined':
+                return 'شارژ ترکیبی محاسبه نشد. «مبلغ ثابت» و «مبلغ هر نفر» را تنظیم کنید و تعداد نفرات واحدها را در صفحه واحدها وارد کنید.';
             case 'custom':
                 return 'شارژ دلخواه محاسبه نشد. برای حداقل یک واحد «شارژ اختصاصی» تعیین کنید.';
             default:
@@ -311,6 +314,7 @@ final class CostService
      * حالت‌ها:
      *   fixed       مبلغ ثابت برای هر واحد (monthly_charge)
      *   per_person  تعداد نفرات ساکن واحد × نرخ هر نفر (charge_per_person)
+     *   combined    مبلغ ثابت + نفری:  monthly_charge + (تعداد نفرات × نرخ هر نفر)
      *   custom      مبلغ اختصاصی هر واحد (units.custom_charge)
      *
      * @return array{mode: string, total: float, units: list<array{unit_id:int, unit_number:string, residents_count:int, amount:float}>}
@@ -349,6 +353,11 @@ final class CostService
                 case 'per_person':
                     $amount = $residents * (float) $building->charge_per_person;
                     break;
+                case 'combined':
+                    // ترکیبی: هر واحد مبلغ ثابت + سهم نفرات ساکن را می‌پردازد
+                    $amount = (float) $building->monthly_charge
+                        + $residents * (float) $building->charge_per_person;
+                    break;
                 case 'custom':
                     $amount = $row['custom_charge'] !== null ? (float) $row['custom_charge'] : 0.0;
                     break;
@@ -367,8 +376,8 @@ final class CostService
             $total += $amount;
         }
 
-        // اگر هنوز واحدی ثبت نشده، در حالت ثابت دست‌کم مبلغ پایه لحاظ می‌شود
-        if (empty($units) && $mode === 'fixed' && $building->monthly_charge > 0) {
+        // اگر هنوز واحدی ثبت نشده، در حالت‌های دارای پایهٔ ثابت دست‌کم مبلغ پایه لحاظ می‌شود
+        if (empty($units) && in_array($mode, ['fixed', 'combined'], true) && $building->monthly_charge > 0) {
             $total = (float) $building->monthly_charge;
         }
 
@@ -517,7 +526,7 @@ final class CostService
     {
         $rows = [];
 
-        if ($cost->division_method === 'custom' && is_array($cost->division_details)) {
+        if (in_array($cost->division_method, ['custom', 'combined'], true) && is_array($cost->division_details)) {
             $customAmounts = [];
             foreach ($cost->division_details as $key => $value) {
                 if (is_array($value) && isset($value['unit_id'])) {
