@@ -118,6 +118,9 @@ require_once 'includes/header.php';
 
     <?php if ($is_manager): ?>
         <?php modal_open_button('invite-member', 'دعوت عضو جدید'); ?>
+        <a href="bulk_users.php?building_id=<?= $building_id ?>" class="btn-view-profile mt-3 inline-block text-center" style="text-decoration:none;">
+            👥➕ ساخت گروهی کاربران و اتصال به واحدها
+        </a>
     <?php else: ?>
         <div class="hint-card">👥 دعوت اعضای جدید فقط توسط مدیر ساختمان انجام می‌شود.</div>
     <?php endif; ?>

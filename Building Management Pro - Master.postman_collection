@@ -1207,6 +1207,35 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "ساخت گروهی کاربران و اتصال به واحدها (Bulk Users)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"force\": false,\n  \"default_password\": \"\",\n  \"rows\": [\n    {\n      \"name\": \"علی محمدی\",\n      \"phone\": \"09121112233\",\n      \"unit_number\": \"101\",\n      \"role\": \"owner\",\n      \"password\": \"\"\n    },\n    {\n      \"name\": \"مریم احمدی\",\n      \"phone\": \"09122223344\",\n      \"unit_number\": \"202\",\n      \"role\": \"tenant\",\n      \"password\": \"\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/buildings/{{building_id}}/bulk-users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "buildings",
+                "{{building_id}}",
+                "bulk-users"
+              ]
+            },
+            "description": "ساخت/اتصال گروهی کاربران ساختمان و انتساب به واحدها — فقط مدیر.\nنقش‌ها: owner | tenant | resident (فارسی هم پذیرفته می‌شود).\nشمارهٔ تکراری به کاربر موجود متصل می‌شود. واحد پُر بدون force رد می‌شود.\nخروجی: وضعیت هر ردیف (ساخته/متصل/رد/خطا) + خلاصه."
+          }
         }
       ]
     },

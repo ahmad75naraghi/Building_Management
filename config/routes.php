@@ -49,6 +49,7 @@ final class Routes
         'GET /api/buildings/{building_id}/units' => ['App\Http\Controllers\BuildingController', 'indexUnits'],
         'PUT /api/units/{id}' => ['App\Http\Controllers\BuildingController', 'updateUnit'],
         'DELETE /api/units/{id}' => ['App\Http\Controllers\BuildingController', 'destroyUnit'],
+        'POST /api/buildings/{building_id}/bulk-users' => ['App\Http\Controllers\BuildingController', 'bulkCreateUsers'],
 
         // Common Areas
         'POST /api/buildings/{building_id}/common-areas' => ['App\Http\Controllers\BuildingController', 'storeCommonArea'],

@@ -806,4 +806,68 @@ final class BuildingController
             'data' => $members,
         ]);
     }
+
+    /**
+     * ساخت/اتصال گروهی کاربران و انتساب به واحدها — فقط مدیر ساختمان.
+     * بدنه: { rows: [{name, phone, unit_number|unit_id, role, password?}], force?: bool }
+     */
+    public function bulkCreateUsers(Request $request): Response
+    {
+        $buildingId = (int) $request->getAttribute('building_id');
+        if ($guard = $this->managerOnlyGuard($request, $buildingId)) {
+            return $guard;
+        }
+        $managerId = (int) ($request->getAttribute('user_id') ?? 0);
+
+        $body = $request->getJsonBody() ?? [];
+        $rows = $body['rows'] ?? [];
+        if (!is_array($rows)) {
+            return (new Response())->setStatusCode(422)->setJson([
+                'success' => false,
+                'message' => 'فیلد rows باید آرایه‌ای از ردیف‌ها باشد.',
+            ]);
+        }
+
+        $force = !empty($body['force']);
+        $defaultPassword = trim((string) ($body['default_password'] ?? ''));
+        if ($defaultPassword !== '' && mb_strlen($defaultPassword) < 6) {
+            return (new Response())->setStatusCode(422)->setJson([
+                'success' => false,
+                'message' => 'رمز پیش‌فرض باید حداقل ۶ کاراکتر باشد.',
+            ]);
+        }
+
+        // اعمال رمز پیش‌فرض روی ردیف‌هایی که رمز ندارند
+        if ($defaultPassword !== '') {
+            foreach ($rows as &$r) {
+                if (is_array($r) && trim((string) ($r['password'] ?? '')) === '') {
+                    $r['password'] = $defaultPassword;
+                }
+            }
+            unset($r);
+        }
+
+        try {
+            $outcome = (new \App\Services\BulkUserService())
+                ->createBulk($buildingId, $rows, $managerId, $force);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        $allFailed = $outcome['summary']['failed'] === count($rows);
+        return (new Response())->setStatusCode($allFailed ? 422 : 200)->setJson([
+            'success' => true,
+            'message' => sprintf(
+                '%d ساخته شد، %d متصل شد، %d رد شد، %d خطا',
+                $outcome['summary']['created'],
+                $outcome['summary']['linked'],
+                $outcome['summary']['skipped'],
+                $outcome['summary']['failed']
+            ),
+            'data' => $outcome,
+        ]);
+    }
 }
