@@ -44,7 +44,7 @@ TestLog::run('ساخت کاربر جدید + عضویت + اتصال مالک/م
         ['name' => 'بدون واحد', 'phone' => '09137000333', 'role' => 'resident'],
     ], $manager, false);
 
-    TestLog::assertSame('دو کاربر ساخته شد', 2, $out['summary']['created']);
+    TestLog::assertSame('سه کاربر ساخته شد', 3, $out['summary']['created']);
     TestLog::assertSame('هیچ خطایی نبود', 0, $out['summary']['failed']);
 
     $results = $out['results'];
@@ -77,7 +77,7 @@ TestLog::run('اعتبارسنجی ردیف‌ها: موبایل، رمز، وا
         ['name' => '', 'phone' => '09137000777', 'role' => 'resident'],
     ], $manager, false);
 
-    TestLog::assertSame('چهار ردیف بد خطا خوردند', 4, $out['summary']['failed']);
+    TestLog::assertSame('پنج ردیف بد خطا خوردند', 5, $out['summary']['failed']);
     TestLog::assertSame('فقط نخستین شمارهٔ تکراری ساخته شد', 1, $out['summary']['created']);
     $msgs = array_map(fn($r) => $r['message'], $out['results']);
     TestLog::assertTrue('پیام خطای موبایل', (bool) preg_grep('/معتبر/', $msgs));
@@ -104,7 +104,8 @@ TestLog::run('واحد پُر بدون جایگزینی رد و با جایگز�
     $replaced = $svc->createBulk($b, [
         ['name' => 'مالک دوم', 'phone' => '09137000999', 'unit_number' => '1', 'role' => 'owner'],
     ], $manager, true);
-    TestLog::assertSame('با force ایجاد شد', 1, $replaced['summary']['created']);
+    // کاربر در فراخوان قبلی ساخته شده بود؛ حالا متصل و جایگزین می‌شود
+    TestLog::assertSame('با force متصل و ردیف موفق شد', 'linked', $replaced['results'][0]['status']);
     TestLog::assertSame('مالک جایگزین شد', (int) $replaced['results'][0]['user_id'], bulk_unit_owner($u1));
 });
 

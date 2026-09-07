@@ -162,9 +162,10 @@ final class BulkUserService
             $createdNow = true;
         }
 
-        // عضویت ساختمان (بدون خطا در تکرار)
+        // عضویت ساختمان (بدون خطا در تکرار) — سینتکس سازگار با هر دو موتور
         $db = Database::getConnection();
-        $stmt = $db->prepare(
+        $stmt = Database::prepareInsertIgnore(
+            $db,
             "INSERT IGNORE INTO building_members (user_id, building_id, role, status, invited_by)
              VALUES (?, ?, ?, 'active', ?)"
         );
@@ -173,15 +174,28 @@ final class BulkUserService
         // انتساب به واحد (مالک/مستاجر)
         $unitLabel = null;
         $assignNote = '';
-        if ($unit !== null && $role === 'owner') {
-            $this->assignUnitSlot((int) $unit['id'], 'owner_user_id', $userId, (int) ($unit['owner_user_id'] ?? 0), $force);
-            if ($unit['tenant_user_id'] === null) {
-                $db->prepare("UPDATE units SET owner_resident = 1 WHERE id = ?")->execute([(int) $unit['id']]);
+        if ($unit !== null && in_array($role, ['owner', 'tenant'], true)) {
+            $column = $role === 'owner' ? 'owner_user_id' : 'tenant_user_id';
+            $current = (int) ($unit[$column] ?? 0);
+            if ($current > 0 && $current !== $userId && !$force) {
+                // کاربر ساخته/عضو شده ولی واحد ساکن دارد؛ بدون جایگزینی رد می‌شود
+                return [
+                    'row' => $rowNum,
+                    'status' => 'skipped',
+                    'user_id' => $userId,
+                    'name' => $name,
+                    'phone' => $phone,
+                    'unit' => $unit['unit_number'],
+                    'role' => $role,
+                    'message' => 'عضو ساختمان شد ولی واحد «' . $unit['unit_number'] . '» از قبل ساکن دارد؛ برای جایگزینی گزینهٔ «جایگزینی» را فعال کنید.',
+                ];
             }
-            $unitLabel = $unit['unit_number'];
-        } elseif ($unit !== null && $role === 'tenant') {
-            $this->assignUnitSlot((int) $unit['id'], 'tenant_user_id', $userId, (int) ($unit['tenant_user_id'] ?? 0), $force);
-            $db->prepare("UPDATE units SET owner_resident = 0 WHERE id = ?")->execute([(int) $unit['id']]);
+            $db->prepare("UPDATE units SET {$column} = ? WHERE id = ?")->execute([$userId, (int) $unit['id']]);
+            if ($role === 'owner' && $unit['tenant_user_id'] === null) {
+                $db->prepare("UPDATE units SET owner_resident = 1 WHERE id = ?")->execute([(int) $unit['id']]);
+            } elseif ($role === 'tenant') {
+                $db->prepare("UPDATE units SET owner_resident = 0 WHERE id = ?")->execute([(int) $unit['id']]);
+            }
             $unitLabel = $unit['unit_number'];
         } elseif ($unit !== null) {
             $assignNote = ' (نقش ساکن به واحد متصل نمی‌شود)';
@@ -218,18 +232,6 @@ final class BulkUserService
             'role' => $role,
             'message' => $message,
         ];
-    }
-
-    /**
-     * انتساب کاربر به جایگاه مالک/مستاجر واحد؛ اگر جایگاه پُر باشد بدون «جایگزینی» رد می‌شود.
-     */
-    private function assignUnitSlot(int $unitId, string $column, int $userId, int $currentUserId, bool $force): void
-    {
-        if ($currentUserId > 0 && $currentUserId !== $userId && !$force) {
-            throw new ValidationException('این واحد از قبل ساکن دارد؛ برای جایگزینی گزینهٔ «جایگزینی» را فعال کنید.');
-        }
-        $db = Database::getConnection();
-        $db->prepare("UPDATE units SET {$column} = ? WHERE id = ?")->execute([$userId, $unitId]);
     }
 
     /** @return array<int, array{id:int, unit_number:string, owner_user_id:?int, tenant_user_id:?int}> */

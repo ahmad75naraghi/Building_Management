@@ -139,7 +139,7 @@ final class InvitationService
 
         // Add user to building_members
         $db = \App\Core\Database::getConnection();
-        $stmt = $db->prepare("
+        $stmt = \App\Core\Database::prepareInsertIgnore($db, "
             INSERT IGNORE INTO building_members (user_id, building_id, role, status, invited_by, invitation_token)
             VALUES (?, ?, ?, 'active', ?, ?)
         ");

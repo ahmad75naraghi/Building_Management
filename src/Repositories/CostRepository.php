@@ -74,7 +74,7 @@ final class CostRepository
     public function markIssued(int $costId): bool
     {
         $db = Database::getConnection();
-        $stmt = $db->prepare("UPDATE costs SET issued_at = NOW() WHERE id = ?");
+        $stmt = $db->prepare("UPDATE costs SET issued_at = CURRENT_TIMESTAMP WHERE id = ?");
         return $stmt->execute([$costId]);
     }
 

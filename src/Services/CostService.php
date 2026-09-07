@@ -974,7 +974,7 @@ final class CostService
     public function getUnitBalances(int $buildingId, int $userId): array
     {
         if (!$this->isBuildingMember($userId, $buildingId)) {
-            throw new AppException('You are not a member of this building');
+            throw new AppException('شما عضو این ساختمان نیستید.');
         }
         $balances = $this->paymentRepo->unitBalancesByBuilding($buildingId);
         foreach ($balances as &$b) {
@@ -1089,7 +1089,7 @@ final class CostService
     public function listPenaltySettings(int $buildingId, int $userId): array
     {
         if (!$this->isBuildingMember($userId, $buildingId)) {
-            throw new AppException('You are not a member of this building');
+            throw new AppException('شما عضو این ساختمان نیستید.');
         }
         return $this->penaltyRepo->findByBuildingId($buildingId);
     }

@@ -277,7 +277,7 @@ TestLog::run('مانده واحد: بدهکار، طلبکار و دسترسی �
     TestLog::assertSame('مانده واحد ۲', -50000.0, $balances[$u2]['balance']);
 
     $stranger = make_user('09132000043');
-    TestLog::assertThrows('غیرعضو به مانده‌ها دسترسی ندارد', fn() => $svc->getUnitBalances($b, $stranger), 'member');
+    TestLog::assertThrows('غیرعضو به مانده‌ها دسترسی ندارد', fn() => $svc->getUnitBalances($b, $stranger), 'عضو این ساختمان');
 });
 
 TestLog::run('سهم‌ها واحد-محور و جمعشان دقیقاً برابر مبلغ هزینه است', function () use ($svc, $manager) {

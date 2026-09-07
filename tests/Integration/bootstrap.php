@@ -153,7 +153,9 @@ function test_db(): PDO
         name TEXT NOT NULL,
         address TEXT,
         custom_name TEXT,
+        custom_logo_path TEXT DEFAULT NULL,
         theme_color TEXT,
+        hierarchy_settings TEXT DEFAULT NULL,
         created_by INTEGER,
         total_units INTEGER DEFAULT NULL,
         total_floors INTEGER DEFAULT NULL,
@@ -169,13 +171,29 @@ function test_db(): PDO
         deleted_at TEXT DEFAULT NULL
     )");
 
+    $pdo->exec("CREATE TABLE building_hierarchy_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL UNIQUE,
+        has_blocks INTEGER DEFAULT 1,
+        has_floors INTEGER DEFAULT 1,
+        has_units INTEGER DEFAULT 1,
+        has_common_areas INTEGER DEFAULT 1,
+        settings_json TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )");
+
     $pdo->exec("CREATE TABLE building_members (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         building_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
         role TEXT NOT NULL DEFAULT 'resident',
         status TEXT NOT NULL DEFAULT 'active',
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        invited_by INTEGER DEFAULT NULL,
+        invitation_token TEXT DEFAULT NULL,
+        invitation_expires_at TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (user_id, building_id)
     )");
 
     $pdo->exec("CREATE TABLE blocks (
@@ -381,7 +399,7 @@ function test_db_reset(): void
 {
     $db = test_db();
     foreach (['reviews','vote_results','vote_options','votes','audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
-              'building_members','buildings','otp_codes','users'] as $t) {
+              'building_members','building_hierarchy_settings','buildings','otp_codes','users'] as $t) {
         $db->exec("DELETE FROM {$t}");
         $db->exec("DELETE FROM sqlite_sequence WHERE name = '{$t}'");
     }

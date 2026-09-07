@@ -25,6 +25,18 @@ final class Database
         return self::$connection;
     }
 
+    /**
+     * آماده‌سازی «درج بدون خطا در تکرار» به‌صورت قابل‌حمل:
+     * روی MySQL «INSERT IGNORE» و روی SQLite (محیط تست) «INSERT OR IGNORE».
+     */
+    public static function prepareInsertIgnore(PDO $db, string $sql): \PDOStatement
+    {
+        if ($db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+            $sql = (string) preg_replace('/INSERT\s+IGNORE/i', 'INSERT OR IGNORE', $sql);
+        }
+        return $db->prepare($sql);
+    }
+
     public static function beginTransaction(): bool
     {
         return self::getConnection()->beginTransaction();

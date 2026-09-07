@@ -583,6 +583,7 @@ require_once 'includes/dash_head.php';
                         var UNITS = <?= json_encode($unit_popup_data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
                         var IS_MANAGER = <?= $is_manager ? 'true' : 'false' ?>;
                         var BUILDING_ID = <?= (int) $building_id ?>;
+                        var CSRF_FIELD = <?= json_encode(csrf_field(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 
                         function esc(s) {
                             return String(s === null || s === undefined ? '' : s)
@@ -649,6 +650,7 @@ require_once 'includes/dash_head.php';
                                     '<div class="unit-modal-actions">' +
                                     '<a class="btn-chip btn-chip-edit" href="units.php?building_id=' + BUILDING_ID + '&focus=' + id + '">✏️ ویرایش واحد</a>' +
                                     '<form method="POST" action="" style="flex:1;display:flex;" onsubmit="return confirm(\'این واحد حذف شود؟ این عملیات بازگشت‌پذیر نیست.\');">' +
+                                    CSRF_FIELD +
                                     '<input type="hidden" name="form_action" value="delete_unit">' +
                                     '<input type="hidden" name="unit_id" value="' + id + '">' +
                                     '<button type="submit" class="btn-chip btn-chip-danger" style="flex:1;justify-content:center;">🗑️ حذف واحد</button>' +

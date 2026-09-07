@@ -44,7 +44,7 @@ final class ExtraModulesService
     private function requireMember(int $userId, int $buildingId): void
     {
         if (!$this->repo->isBuildingMember($userId, $buildingId)) {
-            throw new AppException('You are not a member of this building');
+            throw new AppException('شما عضو این ساختمان نیستید.');
         }
     }
 
@@ -211,7 +211,7 @@ final class ExtraModulesService
         }
         $this->requireMember($userId, $vote->building_id);
         if ($vote->status !== 'active') {
-            throw new AppException('Vote is closed and cannot accept new options');
+            throw new AppException('رأی‌گیری بسته شده و گزینهٔ جدید نمی‌پذیرد.');
         }
 
         $clean = [];
@@ -242,19 +242,19 @@ final class ExtraModulesService
         $this->requireMember($userId, $vote->building_id);
 
         if ($vote->status !== 'active') {
-            throw new AppException('Vote is closed');
+            throw new AppException('رأی‌گیری بسته شده است.');
         }
         if ($vote->start_date && strtotime((string) $vote->start_date) > time()) {
-            throw new AppException('Voting has not started yet');
+            throw new AppException('رأی‌گیری هنوز شروع نشده است.');
         }
         if ($vote->end_date && strtotime((string) $vote->end_date) < time()) {
-            throw new AppException('Voting period has ended');
+            throw new AppException('مهلت رأی‌گیری به پایان رسیده است.');
         }
         if (!$this->repo->optionBelongsToVote($optionId, $voteId)) {
             throw new AppException('Invalid vote option');
         }
         if ($this->repo->hasUserVoted($voteId, $userId)) {
-            throw new AppException('You have already voted in this poll');
+            throw new AppException('شما قبلاً در این نظرسنجی رأی داده‌اید.');
         }
 
         $cast = $this->repo->castVote($voteId, $userId, $optionId);
@@ -734,7 +734,7 @@ final class ExtraModulesService
     {
         $role = $this->repo->memberRole($userId, $buildingId);
         if ($role === null) {
-            throw new AppException('You are not a member of this building');
+            throw new AppException('شما عضو این ساختمان نیستید.');
         }
         if ($role === 'manager') {
             return;

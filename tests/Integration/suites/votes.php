@@ -48,10 +48,10 @@ TestLog::run('هر کاربر فقط یک رأی و فقط اعضا', function (
     $opts = $vote->options;
 
     $stranger = make_user('09136000009');
-    TestLog::assertThrows('غیرعضو رأی نمی‌دهد', fn() => $svc->castVote((int) $vote->id, (int) $opts[0]['id'], $stranger), 'member');
+    TestLog::assertThrows('غیرعضو رأی نمی‌دهد', fn() => $svc->castVote((int) $vote->id, (int) $opts[0]['id'], $stranger), 'عضو این ساختمان');
 
     TestLog::assertTrue('رأی اول عضو ثبت شد', $svc->castVote((int) $vote->id, (int) $opts[0]['id'], $member));
-    TestLog::assertThrows('رأی دوم همان عضو رد می‌شود', fn() => $svc->castVote((int) $vote->id, (int) $opts[1]['id'], $member), 'already');
+    TestLog::assertThrows('رأی دوم همان عضو رد می‌شود', fn() => $svc->castVote((int) $vote->id, (int) $opts[1]['id'], $member), 'قبلاً');
 
     // نتیجه با تعداد و درصد درست
     $svc->castVote((int) $vote->id, (int) $opts[1]['id'], $member2);
@@ -71,8 +71,8 @@ TestLog::run('بستن رأی‌گیری فقط مدیر و پس از آن رأ�
 
     TestLog::assertThrows('عضو نمی‌تواند ببندد', fn() => $svc->updateEntityStatus('votes', (int) $vote->id, 'closed', $member), 'مدیر');
     TestLog::assertTrue('مدیر بست', $svc->updateEntityStatus('votes', (int) $vote->id, 'closed', $manager));
-    TestLog::assertThrows('رأی پس از بستن رد می‌شود', fn() => $svc->castVote((int) $vote->id, (int) $opts[0]['id'], $member), 'closed');
-    TestLog::assertThrows('گزینه جدید پس از بستن رد می‌شود', fn() => $svc->addVoteOptions((int) $vote->id, ['گزینه سه'], $manager), 'closed');
+    TestLog::assertThrows('رأی پس از بستن رد می‌شود', fn() => $svc->castVote((int) $vote->id, (int) $opts[0]['id'], $member), 'بسته');
+    TestLog::assertThrows('گزینه جدید پس از بستن رد می‌شود', fn() => $svc->addVoteOptions((int) $vote->id, ['گزینه سه'], $manager), 'بسته');
 });
 
 TestLog::run('نظرات: سقف امتیاز، ویرایش مالک، حذف مدیر', function () use ($svc, $manager, $member, $member2) {

@@ -62,7 +62,8 @@ final class BuildingService
 
         // سازنده ساختمان به‌صورت خودکار مدیر (member) ساختمان می‌شود.
         $db = \App\Core\Database::getConnection();
-        $stmt = $db->prepare(
+        $stmt = \App\Core\Database::prepareInsertIgnore(
+            $db,
             "INSERT IGNORE INTO building_members (user_id, building_id, role, status, invited_by)
              VALUES (?, ?, 'manager', 'active', ?)"
         );
