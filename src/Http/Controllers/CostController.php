@@ -239,6 +239,56 @@ final class CostController
         }
     }
 
+    /**
+     * رد پرداخت توسط مدیر (پول به حساب نیامده) همراه با دلیل؛ به پرداخت‌کننده اعلان می‌رود.
+     */
+    public function rejectPayment(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        $paymentId = (int) ($request->getAttribute('payment_id') ?? 0);
+        if (!$userId || !$paymentId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication or payment required',
+            ]);
+        }
+        $data = $request->getJsonBody() ?? [];
+        $reason = $data['reason'] ?? ($request->getPostParam('reason') ?? null);
+        try {
+            $rejected = $this->service->rejectPayment($paymentId, (int) $userId, $reason);
+            return (new Response())->setJson([
+                'success' => $rejected,
+                'message' => $rejected ? 'پرداخت رد شد و به پرداخت‌کننده اطلاع داده شد.' : 'رد پرداخت ناموفق بود.',
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /** ماندهٔ بدهکار/طلبکار هر واحد ساختمان */
+    public function unitBalances(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        $buildingId = (int) ($request->getAttribute('building_id') ?? 0);
+        if (!$userId || !$buildingId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication or building required',
+            ]);
+        }
+        try {
+            $balances = $this->service->getUnitBalances($buildingId, (int) $userId);
+            return (new Response())->setJson([
+                'success' => true,
+                'data' => $balances,
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
     public function confirmPayment(Request $request): Response
     {
         $userId = $request->getAttribute('user_id');

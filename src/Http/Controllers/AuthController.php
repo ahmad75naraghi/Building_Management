@@ -38,6 +38,9 @@ final class AuthController
         $userService = new UserService();
         try {
             $user = $userService->register($data);
+            \App\Core\Audit::log((int) $user->id, 'auth.register', 'user', (int) $user->id, null, [
+                'phone' => $user->phone,
+            ]);
             $token = JwtHelper::generate([
                 'sub' => $user->id,
                 'phone' => $user->phone,
@@ -103,6 +106,9 @@ final class AuthController
                 'phone' => $username,
                 'attempts_left' => max(0, $left),
             ]);
+            \App\Core\Audit::log(0, 'auth.login_failed', null, null, null, [
+                'phone' => $username,
+            ]);
             return (new Response())->setStatusCode(401)->setJson([
                 'success' => false,
                 'message' => 'شماره موبایل یا رمز عبور اشتباه است.',
@@ -111,6 +117,10 @@ final class AuthController
 
         // ورود موفق: سابقه تلاش‌ها پاک می‌شود
         $limiter->clear($rateKey);
+
+        \App\Core\Audit::log((int) $user->id, 'auth.login', 'user', (int) $user->id, null, [
+            'method' => 'password',
+        ]);
 
         $token = JwtHelper::generate([
             'sub' => $user->id,
@@ -336,6 +346,7 @@ final class AuthController
 
     public function logout(Request $request): Response
     {
+        \App\Core\Audit::log((int) ($request->getAttribute('user_id') ?? 0), 'auth.logout', 'user', (int) ($request->getAttribute('user_id') ?? 0), null, []);
         return (new Response())->setJson([
             'success' => true,
             'message' => 'Logged out successfully. Client should discard token.',

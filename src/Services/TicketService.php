@@ -42,6 +42,9 @@ final class TicketService
 
         $id = $this->repo->create($ticket);
         $ticket->id = $id;
+        \App\Core\Audit::log($userId, 'ticket.create', 'ticket', $id, $ticket->building_id, [
+            'title' => $ticket->title,
+        ]);
         return $ticket;
     }
 
@@ -114,6 +117,9 @@ final class TicketService
         }
 
         $this->repo->update($ticket);
+        \App\Core\Audit::log($userId, 'ticket.update', 'ticket', $id, $ticket->building_id, [
+            'title' => $ticket->title, 'status' => $ticket->status,
+        ]);
         return $ticket;
     }
 
@@ -133,7 +139,13 @@ final class TicketService
         if ($ticket->user_id !== $userId && !$isManager) {
             throw new AuthException('شما اجازه حذف این تیکت را ندارید.');
         }
-        return $this->repo->delete($id);
+        $deleted = $this->repo->delete($id);
+        if ($deleted) {
+            \App\Core\Audit::log($userId, 'ticket.delete', 'ticket', $id, $ticket->building_id, [
+                'title' => $ticket->title,
+            ]);
+        }
+        return $deleted;
     }
 
     private function isBuildingManager(int $userId, int $buildingId): bool
@@ -158,6 +170,8 @@ final class TicketService
             (int) ($data['is_internal'] ?? 0),
             $data['attachment_path'] ?? null,
         ]);
-        return ['id' => (int) $db->lastInsertId(), 'ticket_id' => $ticketId];
+        $commentId = (int) $db->lastInsertId();
+        \App\Core\Audit::log($userId, 'ticket.comment', 'ticket', $ticketId, null, []);
+        return ['id' => $commentId, 'ticket_id' => $ticketId];
     }
 }

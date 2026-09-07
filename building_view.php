@@ -268,6 +268,15 @@ $occ_label_map = [
     'no_owner' => 'بدون مالک',
 ];
 
+// ماندهٔ مالی هر واحد (بدهکار/طلبکار) از پرداخت‌های تأییدشده
+$unit_balances = [];
+$balances_response = callAPI('GET', '/buildings/' . $building_id . '/unit-balances');
+if (!empty($balances_response['success'])) {
+    foreach ($balances_response['data'] ?? [] as $bal) {
+        $unit_balances[(int) $bal['unit_id']] = $bal;
+    }
+}
+
 // داده‌های پاپ‌آپ هر واحد (برای رندر سمت کلاینت)
 $unit_popup_data = [];
 foreach ($units as $u) {
@@ -294,6 +303,7 @@ foreach ($units as $u) {
         'parking_no' => $u['parking_no'] ?? null,
         'storage_no' => $u['storage_no'] ?? null,
         'custom_charge' => $u['custom_charge'] ?? null,
+        'balance' => $unit_balances[$uid] ?? null,
     ];
 }
 
@@ -614,6 +624,18 @@ require_once 'includes/dash_head.php';
                             addRow('🅿️', 'قطعه پارکینگ', u.parking_no ? esc(faNum(u.parking_no)) : null);
                             addRow('📦', 'قطعه انباری', u.storage_no ? esc(faNum(u.storage_no)) : null);
                             addRow('💰', 'شارژ دلخواه', u.custom_charge ? fmtMoney(u.custom_charge) + ' تومان' : null);
+
+                            /* حسابداری واحد: سهم صادرشده، پرداخت تأییدشده و مانده بدهکار/طلبکار */
+                            if (u.balance) {
+                                addRow('🧾', 'جمع سهم صادرشده', fmtMoney(u.balance.total_share) + ' تومان');
+                                addRow('✅', 'پرداخت تأییدشده', fmtMoney(u.balance.total_paid) + ' تومان');
+                                var bal = parseFloat(u.balance.balance) || 0;
+                                var balLabel = bal < 0
+                                    ? fmtMoney(Math.abs(bal)) + ' تومان بدهکار'
+                                    : (bal > 0 ? fmtMoney(bal) + ' تومان طلبکار' : 'تسویه شده');
+                                rows.push('<div class="unit-info-row"><span class="lbl">⚖️ مانده حساب</span>' +
+                                    '<span class="val" style="color:' + (bal < 0 ? '#b91c1c' : (bal > 0 ? '#047857' : '#64748b')) + ';font-weight:800;">' + esc(balLabel) + '</span></div>');
+                            }
 
                             var chips =
                                 '<span class="chip chip-gray">' + esc(u.type_icon + ' ' + u.type_label) + '</span>' +

@@ -82,6 +82,9 @@ final class CostService
 
         $id = $this->costRepo->create($cost);
         $cost->id = $id;
+        \App\Core\Audit::log($userId, 'cost.create', 'cost', $id, $cost->building_id, [
+            'title' => $cost->title, 'amount' => $cost->amount,
+        ]);
         return $cost;
     }
 
@@ -138,6 +141,9 @@ final class CostService
 
         $id = $this->costRepo->create($cost);
         $cost->id = $id;
+        \App\Core\Audit::log($userId, 'cost.create', 'cost', $id, $cost->building_id, [
+            'title' => $cost->title, 'amount' => $cost->amount,
+        ]);
         return $cost;
     }
 
@@ -272,6 +278,9 @@ final class CostService
         }
 
         $this->costRepo->update($cost);
+        \App\Core\Audit::log($userId, 'cost.update', 'cost', $costId, $cost->building_id, [
+            'title' => $cost->title,
+        ]);
         return $this->costRepo->findById($costId);
     }
 
@@ -287,7 +296,13 @@ final class CostService
         if (!$this->isManager($userId, $cost->building_id)) {
             throw new AppException('فقط مدیر ساختمان می‌تواند هزینه‌ها را حذف کند.');
         }
-        return $this->costRepo->delete($costId);
+        $deleted = $this->costRepo->delete($costId);
+        if ($deleted) {
+            \App\Core\Audit::log($userId, 'cost.delete', 'cost', $costId, $cost->building_id, [
+                'title' => $cost->title,
+            ]);
+        }
+        return $deleted;
     }
 
     /**
@@ -404,9 +419,11 @@ final class CostService
     /**
      * صدور هزینه برای مخاطبان انتخاب‌شده (جدا از شارژ ماهیانه).
      *
-     * برای هر پرداخت‌کننده یک ردیف پرداخت با وضعیت «در انتظار» و سهم مشخص
-     * ساخته می‌شود و اعلان پرداخت برای او ارسال می‌گردد. صدور، ایدمپوتنت است:
-     * اگر برای کاربری از قبل ردیفی وجود داشته باشد، ردیف تکراری ساخته نمی‌شود.
+     * برای هر «واحد»ِ منتسب به هر پرداخت‌کننده یک ردیف پرداخت با وضعیت
+     * «در انتظار» و سهم واحد ساخته می‌شود تا حسابداری بدهکار/طلبکار هر واحد
+     * دقیق بماند؛ اعلان پرداخت برای هر کاربر یک‌بار (با جمع سهم واحدهایش)
+     * ارسال می‌گردد. صدور، ایدمپوتنت است: اگر برای کاربری از قبل ردیفی وجود
+     * داشته باشد، ردیف تکراری ساخته نمی‌شود.
      *
      * @return array{issued: int, skipped: int, total: float}
      */
@@ -425,35 +442,47 @@ final class CostService
             throw new AppException('هیچ پرداخت‌کننده‌ای برای مخاطبان انتخاب‌شده پیدا نشد.');
         }
 
-        $shares = $this->calculateShares($cost, $payers);
+        $unitShares = $this->calculateUnitShares($cost, $payers);
+
+        // گروه‌بندی ردیف‌ها بر اساس کاربر (اعلان یک‌بار برای هر کاربر)
+        $byUser = [];
+        foreach ($unitShares as $row) {
+            $byUser[$row['user_id']][] = $row;
+        }
 
         $issued = 0;
         $skipped = 0;
         $notifications = new NotificationService();
-        foreach ($shares as $payerUserId => $shareAmount) {
+        foreach ($byUser as $payerUserId => $userRows) {
             // کاربری که از قبل ردیف پرداخت دارد دوباره برایش ردیف ساخته نمی‌شود
-            if ($this->paymentRepo->findByCostAndUser($costId, $payerUserId)) {
-                $skipped++;
+            if ($this->paymentRepo->findByCostAndUser($costId, (int) $payerUserId)) {
+                $skipped += count($userRows);
                 continue;
             }
-            $payment = new CostPayment();
-            $payment->cost_id = $costId;
-            $payment->user_id = $payerUserId;
-            $payment->share_amount = round($shareAmount, 2);
-            $payment->status = 'pending';
-            $this->paymentRepo->create($payment);
-            $issued++;
+
+            $userTotal = 0.0;
+            foreach ($userRows as $row) {
+                $payment = new CostPayment();
+                $payment->cost_id = $costId;
+                $payment->user_id = (int) $payerUserId;
+                $payment->unit_id = $row['unit_id'];
+                $payment->share_amount = $row['share'];
+                $payment->status = 'pending';
+                $this->paymentRepo->create($payment);
+                $issued++;
+                $userTotal += $row['share'];
+            }
 
             try {
                 $notifications->createNotification([
-                    'user_id' => $payerUserId,
+                    'user_id' => (int) $payerUserId,
                     'building_id' => $cost->building_id,
                     'notification_type' => 'payment',
                     'title' => 'هزینه جدید: ' . $cost->title,
                     'message' => sprintf(
                         'هزینه «%s» به مبلغ %s برای شما ثبت شده است. لطفاً پرداخت را از بخش هزینه‌ها انجام دهید.',
                         $cost->title,
-                        number_format($shareAmount) . ' تومان'
+                        number_format($userTotal) . ' تومان'
                     ),
                     'data' => ['cost_id' => $costId],
                 ]);
@@ -467,11 +496,116 @@ final class CostService
             $this->costRepo->markIssued($costId);
         }
 
+        \App\Core\Audit::log($userId, 'cost.issue', 'cost', $costId, $cost->building_id, [
+            'title' => $cost->title, 'issued' => $issued, 'skipped' => $skipped,
+        ]);
+
         return [
             'issued' => $issued,
             'skipped' => $skipped,
             'total' => (float) $cost->amount,
         ];
+    }
+
+    /**
+     * سهم هر «واحد» از یک هزینه — مبنای حسابداری بدهکار/طلبکار واحدها.
+     *
+     * @param array<int, array{user_id: int, unit_ids: list<int>, weight: float, units: array<int, float>}> $payers
+     * @return list<array{user_id: int, unit_id: ?int, share: float}>
+     */
+    private function calculateUnitShares(Cost $cost, array $payers): array
+    {
+        $rows = [];
+
+        if ($cost->division_method === 'custom' && is_array($cost->division_details)) {
+            $customAmounts = [];
+            foreach ($cost->division_details as $key => $value) {
+                if (is_array($value) && isset($value['unit_id'])) {
+                    $customAmounts[(int) $value['unit_id']] = (float) ($value['amount'] ?? 0);
+                } else {
+                    $customAmounts[(int) $key] = (float) $value;
+                }
+            }
+            foreach ($payers as $userId => $payer) {
+                foreach ($payer['unit_ids'] as $unitId) {
+                    $rows[] = ['user_id' => (int) $userId, 'unit_id' => $unitId, 'share' => round($customAmounts[$unitId] ?? 0.0, 2)];
+                }
+                if (!$payer['unit_ids']) {
+                    $rows[] = ['user_id' => (int) $userId, 'unit_id' => null, 'share' => 0.0];
+                }
+            }
+            return $rows;
+        }
+
+        if (in_array($cost->division_method, self::WEIGHTED_DIVISION_METHODS, true)) {
+            $totalWeight = 0.0;
+            foreach ($payers as $payer) {
+                $totalWeight += $payer['weight'];
+            }
+            if ($totalWeight > 0) {
+                foreach ($payers as $userId => $payer) {
+                    foreach ($payer['units'] as $unitId => $unitWeight) {
+                        $rows[] = [
+                            'user_id' => (int) $userId,
+                            'unit_id' => $unitId,
+                            'share' => round($cost->amount * ($unitWeight / $totalWeight), 2),
+                        ];
+                    }
+                    if (!$payer['units']) {
+                        $rows[] = [
+                            'user_id' => (int) $userId,
+                            'unit_id' => null,
+                            'share' => round($cost->amount * ($payer['weight'] / $totalWeight), 2),
+                        ];
+                    }
+                }
+                return $this->settleRounding($rows, $cost);
+            }
+            // اگر داده‌ای برای وزن‌دهی نبود به تقسیم مساوی برمی‌گردیم
+        }
+
+        // تقسیم مساوی بین همهٔ واحدها (و کاربران بدون واحد)
+        $slots = 0;
+        foreach ($payers as $payer) {
+            $slots += max(1, count($payer['unit_ids']));
+        }
+        $equal = $cost->amount / max(1, $slots);
+        foreach ($payers as $userId => $payer) {
+            if ($payer['unit_ids']) {
+                foreach ($payer['unit_ids'] as $unitId) {
+                    $rows[] = ['user_id' => (int) $userId, 'unit_id' => $unitId, 'share' => round($equal, 2)];
+                }
+            } else {
+                $rows[] = ['user_id' => (int) $userId, 'unit_id' => null, 'share' => round($equal, 2)];
+            }
+        }
+        return $this->settleRounding($rows, $cost);
+    }
+
+    /**
+     * توزیع اختلاف گردکردن روی بزرگ‌ترین سهم تا جمع ردیف‌ها دقیقاً برابر
+     * مبلغ هزینه بماند (حسابداری بدون سررسید).
+     *
+     * @param list<array{user_id: int, unit_id: ?int, share: float}> $rows
+     * @return list<array{user_id: int, unit_id: ?int, share: float}>
+     */
+    private function settleRounding(array $rows, Cost $cost): array
+    {
+        $sum = 0.0;
+        $largest = null;
+        foreach ($rows as $i => $row) {
+            $sum += $row['share'];
+            if ($largest === null || $row['share'] > $rows[$largest]['share']) {
+                $largest = $i;
+            }
+        }
+        if ($largest !== null) {
+            $diff = round((float) $cost->amount - $sum, 2);
+            if (abs($diff) > 0.0) {
+                $rows[$largest]['share'] = round($rows[$largest]['share'] + $diff, 2);
+            }
+        }
+        return $rows;
     }
 
     /**
@@ -504,10 +638,11 @@ final class CostService
                 default => 1.0,
             };
             if (!isset($payers[$userId])) {
-                $payers[$userId] = ['user_id' => $userId, 'unit_ids' => [], 'weight' => 0.0];
+                $payers[$userId] = ['user_id' => $userId, 'unit_ids' => [], 'weight' => 0.0, 'units' => []];
             }
             $payers[$userId]['unit_ids'][] = (int) $unit['id'];
             $payers[$userId]['weight'] += $weight;
+            $payers[$userId]['units'][(int) $unit['id']] = $weight;
         };
 
         foreach ($units as $unit) {
@@ -564,7 +699,7 @@ final class CostService
             $stmt->execute([$cost->building_id]);
             foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $member) {
                 $uid = (int) $member['user_id'];
-                $payers[$uid] = ['user_id' => $uid, 'unit_ids' => [], 'weight' => 1.0];
+                $payers[$uid] = ['user_id' => $uid, 'unit_ids' => [], 'weight' => 1.0, 'units' => []];
             }
         }
 
@@ -581,55 +716,6 @@ final class CostService
      * @param array<int, array{user_id: int, unit_ids: list<int>, weight: float}> $payers
      * @return array<int, float> سهم هر کاربر با کلید = شناسه کاربر
      */
-    private function calculateShares(Cost $cost, array $payers): array
-    {
-        // مبلغ سفارشی هر واحد از جزئیات تقسیم خوانده می‌شود
-        if ($cost->division_method === 'custom' && is_array($cost->division_details)) {
-            $customAmounts = [];
-            foreach ($cost->division_details as $key => $value) {
-                if (is_array($value) && isset($value['unit_id'])) {
-                    $customAmounts[(int) $value['unit_id']] = (float) ($value['amount'] ?? 0);
-                } else {
-                    $customAmounts[(int) $key] = (float) $value;
-                }
-            }
-            $shares = [];
-            foreach ($payers as $userId => $payer) {
-                $total = 0.0;
-                foreach ($payer['unit_ids'] as $unitId) {
-                    $total += $customAmounts[$unitId] ?? 0.0;
-                }
-                $shares[$userId] = $total;
-            }
-            return $shares;
-        }
-
-        // تقسیم وزنی (مساحت یا تعداد نفرات)
-        if (in_array($cost->division_method, self::WEIGHTED_DIVISION_METHODS, true)) {
-            $totalWeight = 0.0;
-            foreach ($payers as $payer) {
-                $totalWeight += $payer['weight'];
-            }
-            if ($totalWeight > 0) {
-                $shares = [];
-                foreach ($payers as $userId => $payer) {
-                    $shares[$userId] = $cost->amount * ($payer['weight'] / $totalWeight);
-                }
-                return $shares;
-            }
-            // اگر داده‌ای برای وزن‌دهی نبود (مثلاً مساحت ثبت نشده)، به تقسیم مساوی برمی‌گردیم
-        }
-
-        // تقسیم مساوی
-        $count = count($payers);
-        $equal = $cost->amount / max(1, $count);
-        $shares = [];
-        foreach ($payers as $userId => $payer) {
-            $shares[$userId] = $equal;
-        }
-        return $shares;
-    }
-
     /**
      * نرمال‌سازی شناسه واحدهای هدف؛ آرایه یا رشته جداشده با کاما می‌پذیرد.
      *
@@ -660,16 +746,30 @@ final class CostService
 
     public function submitPayment(array $data, int $userId): CostPayment
     {
+        // ردیف مشخص (پرداخت واحد-محور) یا مسیر قدیمی (هزینه + کاربر)
+        $paymentId = (int) ($data['payment_id'] ?? 0);
         $costId = (int) ($data['cost_id'] ?? 0);
-        if ($costId <= 0) {
-            throw new AppException('cost_id is required');
+        if ($paymentId <= 0 && $costId <= 0) {
+            throw new AppException('payment_id or cost_id is required');
         }
+
+        $existing = null;
+        if ($paymentId > 0) {
+            $existing = $this->paymentRepo->findById($paymentId);
+            if (!$existing || $existing->user_id !== $userId) {
+                throw new AppException('Payment not found or access denied');
+            }
+            $costId = $existing->cost_id;
+        }
+
         $cost = $this->costRepo->findById($costId);
         if (!$cost) {
             throw new AppException('Cost not found');
         }
 
-        $existing = $this->paymentRepo->findByCostAndUser((int) $data['cost_id'], $userId);
+        if ($existing === null) {
+            $existing = $this->paymentRepo->findByCostAndUser($costId, $userId);
+        }
         if ($existing && $existing->status === 'confirmed') {
             throw new AppException('Payment already confirmed');
         }
@@ -684,11 +784,14 @@ final class CostService
             $existing->amount_paid = $amountPaid;
             $existing->notes = $notes;
             $existing->status = 'upload_receipt';
+            \App\Core\Audit::log($userId, 'payment.submit', 'payment', (int) $existing->id, $cost->building_id, [
+                'cost_id' => $costId, 'amount_paid' => $amountPaid, 'unit_id' => $existing->unit_id,
+            ]);
             return $existing;
         }
 
         $payment = new CostPayment();
-        $payment->cost_id = (int) $data['cost_id'];
+        $payment->cost_id = $costId;
         $payment->user_id = $userId;
         $payment->amount_paid = $amountPaid;
         $payment->status = 'upload_receipt';
@@ -698,10 +801,9 @@ final class CostService
         $id = $this->paymentRepo->create($payment);
         $payment->id = $id;
 
-        // Handle receipt upload if file provided
-        if (isset($data['receipt_file']) && $data['receipt_file'] instanceof \App\Core\Request) {
-            // In real scenario, handle file upload from request
-        }
+        \App\Core\Audit::log($userId, 'payment.submit', 'payment', $id, $cost->building_id, [
+            'cost_id' => $costId, 'amount_paid' => $amountPaid, 'unit_id' => $payment->unit_id,
+        ]);
 
         return $payment;
     }
@@ -748,6 +850,11 @@ final class CostService
                 $originalName,
                 (int) $isPublic,
             ]);
+
+            $cost = $this->costRepo->findById($payment->cost_id);
+            \App\Core\Audit::log($userId, 'payment.receipt', 'payment', $paymentId, $cost?->building_id, [
+                'cost_id' => $payment->cost_id, 'original_name' => $originalName,
+            ]);
         }
         return $path;
     }
@@ -772,8 +879,109 @@ final class CostService
         if ($updated) {
             // After confirmation, check for penalties
             $this->applyPenaltiesIfNeeded($paymentId);
+
+            $payment = $this->getPaymentById($paymentId);
+            $cost = $payment ? $this->costRepo->findById($payment->cost_id) : null;
+            $buildingId = $cost?->building_id;
+
+            \App\Core\Audit::log($managerId, 'payment.confirm', 'payment', $paymentId, $buildingId, [
+                'cost_id' => $payment?->cost_id, 'amount_paid' => $payment?->amount_paid, 'unit_id' => $payment?->unit_id,
+            ]);
+
+            // اطلاع به پرداخت‌کننده که پرداختش نشست و به حساب واحد شد
+            if ($payment) {
+                try {
+                    (new NotificationService())->createNotification([
+                        'user_id' => $payment->user_id,
+                        'building_id' => $buildingId,
+                        'notification_type' => 'payment',
+                        'title' => 'پرداخت شما تأیید شد',
+                        'message' => sprintf(
+                            'پرداخت %s بابت هزینه «%s» تأیید و به حساب واحد ثبت شد.',
+                            number_format((float) ($payment->amount_paid ?? 0)) . ' تومان',
+                            $cost?->title ?? ''
+                        ),
+                        'data' => ['cost_id' => $payment->cost_id],
+                    ]);
+                } catch (\Throwable $e) {
+                    Logger::error('costs', 'خطا در ارسال اعلان تأیید پرداخت: ' . $e->getMessage());
+                }
+            }
         }
         return $updated;
+    }
+
+    /**
+     * رد پرداخت توسط مدیر (وقتی مبلغ به حساب نیامده). پرداخت‌کننده دلیل را
+     * می‌بیند و می‌تواند دوباره پرداخت/رسید جدید ثبت کند.
+     */
+    public function rejectPayment(int $paymentId, int $managerId, ?string $reason): bool
+    {
+        $payment = $this->getPaymentById($paymentId);
+        if (!$payment) {
+            throw new AppException('Payment not found');
+        }
+        $cost = $this->costRepo->findById($payment->cost_id);
+        if (!$cost) {
+            throw new AppException('Cost not found');
+        }
+        if (!$this->isManager($managerId, $cost->building_id)) {
+            throw new AppException('فقط مدیر ساختمان می‌تواند پرداخت را رد کند.');
+        }
+        if ($payment->status === 'confirmed') {
+            throw new AppException('پرداخت تأییدشده قابل رد نیست.');
+        }
+
+        $reason = trim((string) $reason);
+        if ($reason === '') {
+            throw new ValidationException('دلیل رد پرداخت الزامی است.');
+        }
+
+        $rejected = $this->paymentRepo->reject($paymentId, $managerId, $reason);
+
+        if ($rejected) {
+            \App\Core\Audit::log($managerId, 'payment.reject', 'payment', $paymentId, $cost->building_id, [
+                'cost_id' => $payment->cost_id, 'reason' => $reason, 'unit_id' => $payment->unit_id,
+            ]);
+
+            try {
+                (new NotificationService())->createNotification([
+                    'user_id' => $payment->user_id,
+                    'building_id' => $cost->building_id,
+                    'notification_type' => 'payment',
+                    'title' => 'پرداخت شما رد شد',
+                    'message' => sprintf(
+                        'پرداخت شما بابت هزینه «%s» رد شد. دلیل: %s — لطفاً پس از پرداخت واقعی، دوباره رسید ثبت کنید.',
+                        $cost->title,
+                        $reason
+                    ),
+                    'data' => ['cost_id' => $payment->cost_id],
+                ]);
+            } catch (\Throwable $e) {
+                Logger::error('costs', 'خطا در ارسال اعلان رد پرداخت: ' . $e->getMessage());
+            }
+        }
+
+        return $rejected;
+    }
+
+    /**
+     * ماندهٔ مالی هر واحد ساختمان: جمع سهم‌های صادرشده در برابر پرداخت‌های
+     * تأییدشده. ماندهٔ منفی یعنی واحد «بدهکار» و مثبت یعنی «طلبکار».
+     *
+     * @return array<int, array{unit_id: int, total_share: float, total_paid: float, balance: float, state: string}>
+     */
+    public function getUnitBalances(int $buildingId, int $userId): array
+    {
+        if (!$this->isBuildingMember($userId, $buildingId)) {
+            throw new AppException('You are not a member of this building');
+        }
+        $balances = $this->paymentRepo->unitBalancesByBuilding($buildingId);
+        foreach ($balances as &$b) {
+            $b['state'] = $b['balance'] < 0 ? 'debtor' : ($b['balance'] > 0 ? 'creditor' : 'settled');
+        }
+        unset($b);
+        return $balances;
     }
 
     public function applyPenaltiesIfNeeded(int $paymentId): void
@@ -871,6 +1079,7 @@ final class CostService
 
         $id = $this->penaltyRepo->create($setting);
         $setting->id = $id;
+        \App\Core\Audit::log($userId, 'penalty_setting.create', 'penalty_setting', $id, $setting->building_id, []);
         return $setting;
     }
 
@@ -928,6 +1137,7 @@ final class CostService
         }
 
         $this->penaltyRepo->update($setting);
+        \App\Core\Audit::log($userId, 'penalty_setting.update', 'penalty_setting', $settingId, $setting->building_id, []);
         return $setting;
     }
 
@@ -943,7 +1153,11 @@ final class CostService
         if (!$this->isManager($userId, $setting->building_id)) {
             throw new AppException('فقط مدیر ساختمان می‌تواند تنظیم جریمه را حذف کند.');
         }
-        return $this->penaltyRepo->delete($settingId);
+        $deleted = $this->penaltyRepo->delete($settingId);
+        if ($deleted) {
+            \App\Core\Audit::log($userId, 'penalty_setting.delete', 'penalty_setting', $settingId, $setting->building_id, []);
+        }
+        return $deleted;
     }
 
     private function isBuildingMember(int $userId, int $buildingId): bool

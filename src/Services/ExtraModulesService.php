@@ -392,6 +392,9 @@ final class ExtraModulesService
 
         $id = $this->repo->createDocument($document);
         $document->id = $id;
+        \App\Core\Audit::log($userId, 'document.create', 'document', $id, $buildingId, [
+            'title' => $document->title, 'category' => $document->document_type, 'type' => 'link',
+        ]);
         return $document;
     }
 
@@ -427,6 +430,9 @@ final class ExtraModulesService
 
         $id = $this->repo->createDocument($document);
         $document->id = $id;
+        \App\Core\Audit::log($userId, 'document.create', 'document', $id, $buildingId, [
+            'title' => $document->title, 'category' => $document->document_type, 'type' => 'file',
+        ]);
         return $document;
     }
 
@@ -496,6 +502,9 @@ final class ExtraModulesService
         $document->stored_name = $stored['stored_name'];
         $document->mime_type = $stored['mime_type'];
         $document->file_size = $stored['file_size'];
+        \App\Core\Audit::log($userId, 'document.replace_file', 'document', $documentId, $document->building_id, [
+            'title' => $document->title,
+        ]);
         return $document;
     }
 

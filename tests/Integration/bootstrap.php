@@ -255,8 +255,21 @@ function test_db(): PDO
         notes TEXT DEFAULT NULL,
         status TEXT DEFAULT 'pending',
         payment_date TEXT DEFAULT NULL,
+        reject_reason TEXT DEFAULT NULL,
         confirmed_by INTEGER DEFAULT NULL,
         confirmed_at TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )");
+
+    $pdo->exec("CREATE TABLE audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER DEFAULT NULL,
+        action TEXT NOT NULL,
+        entity_type TEXT DEFAULT NULL,
+        entity_id INTEGER DEFAULT NULL,
+        building_id INTEGER DEFAULT NULL,
+        meta TEXT DEFAULT NULL,
+        ip TEXT DEFAULT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )");
 
@@ -326,7 +339,7 @@ function test_db(): PDO
 function test_db_reset(): void
 {
     $db = test_db();
-    foreach (['documents','cost_payments','costs','units','common_areas','floors','blocks',
+    foreach (['audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
               'building_members','buildings','otp_codes','users'] as $t) {
         $db->exec("DELETE FROM {$t}");
         $db->exec("DELETE FROM sqlite_sequence WHERE name = '{$t}'");

@@ -3755,6 +3755,86 @@
             "description": "صدور هزینه برای مخاطبان انتخاب‌شده: برای هر پرداخت‌کننده ردیف پرداخت در انتظار با سهم مشخص ساخته می‌شود و اعلان پرداخت می‌گیرد. فقط مدیر. ایدمپوتنت است (صدور مجدد ردیف تکراری نمی‌سازد)."
           },
           "response": []
+        },
+        {
+          "name": "رد پرداخت (Reject Payment)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"reason\": \"مبلغ به حساب ساختمان واریز نشده است\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/payments/1/reject",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "payments",
+                "1",
+                "reject"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "مانده بدهکار/طلبکار واحدها (Unit Balances)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/buildings/1/unit-balances",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "buildings",
+                "1",
+                "unit-balances"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "لاگ ممیزی اقدامات (Audit Logs)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/audit-logs?building_id=1&limit=100",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "audit-logs"
+              ],
+              "query": [
+                {
+                  "key": "building_id",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "100"
+                },
+                {
+                  "key": "action",
+                  "value": "payment.",
+                  "description": "فیلتر اختیاری نوع اقدام",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },

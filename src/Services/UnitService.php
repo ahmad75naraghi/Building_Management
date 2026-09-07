@@ -230,6 +230,9 @@ final class UnitService
         ]);
         $unit->id = (int) $db->lastInsertId();
         $this->computeOccupancy($unit);
+        \App\Core\Audit::log($userId, 'unit.create', 'unit', $unit->id, $buildingId, [
+            'unit_number' => $unit->unit_number,
+        ]);
         return $unit;
     }
 
@@ -275,6 +278,7 @@ final class UnitService
             $unitId,
         ]);
 
+        \App\Core\Audit::log($userId, 'unit.update', 'unit', $unitId, $buildingId, []);
         return $this->getUnitById($unitId, $userId);
     }
 
@@ -289,7 +293,11 @@ final class UnitService
         }
         $db = Database::getConnection();
         $stmt = $db->prepare("DELETE FROM units WHERE id = ?");
-        return $stmt->execute([$unitId]);
+        $deleted = $stmt->execute([$unitId]);
+        if ($deleted) {
+            \App\Core\Audit::log($userId, 'unit.delete', 'unit', $unitId, $buildingId, []);
+        }
+        return $deleted;
     }
 
     // ------------------------------------------------------------------

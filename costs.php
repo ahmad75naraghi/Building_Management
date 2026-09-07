@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action'])) {
     $action = $_POST['form_action'];
 
     // ---- اقدامات مدیریتی ----
-    $manager_actions = ['create_cost', 'update_cost', 'delete_cost', 'issue_cost', 'confirm_payment', 'create_monthly', 'save_charge_settings', 'create_penalty_setting', 'update_penalty_setting', 'delete_penalty_setting'];
+    $manager_actions = ['create_cost', 'update_cost', 'delete_cost', 'issue_cost', 'confirm_payment', 'reject_payment', 'create_monthly', 'save_charge_settings', 'create_penalty_setting', 'update_penalty_setting', 'delete_penalty_setting'];
     if (in_array($action, $manager_actions, true) && !$is_manager) {
         $alert_message = 'این عملیات فقط برای مدیر ساختمان مجاز است.';
     } elseif ($action === 'save_charge_settings') {
@@ -126,13 +126,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action'])) {
                 $alert_message = $response['message'] ?? 'خطا در تأیید پرداخت.';
             }
         }
+    } elseif ($action === 'reject_payment') {
+        // رد پرداخت توسط مدیر وقتی مبلغ به حساب نیامده
+        $payment_id = (int) ($_POST['payment_id'] ?? 0);
+        $reason = trim($_POST['reason'] ?? '');
+        if ($payment_id > 0) {
+            if ($reason === '') {
+                $alert_message = 'دلیل رد پرداخت الزامی است.';
+                $reopen_modal = 'reject-payment';
+            } else {
+                $response = callAPI('POST', '/payments/' . $payment_id . '/reject', ['reason' => $reason]);
+                if (!empty($response['success'])) {
+                    $alert_message = 'پرداخت رد شد و به پرداخت‌کننده اطلاع داده شد.';
+                    $alert_type = 'success';
+                } else {
+                    $alert_message = $response['message'] ?? 'خطا در رد پرداخت.';
+                }
+            }
+        }
     } elseif ($action === 'submit_payment') {
-        // پرداخت توسط ساکن/مالک/مستأجر
+        // پرداخت توسط ساکن/مالک/مستأجر (ردیف مشخص یا مسیر قدیمی هزینه)
         $cost_id = (int) ($_POST['cost_id'] ?? 0);
-        if ($cost_id > 0) {
+        $pay_row_id = (int) ($_POST['payment_id'] ?? 0);
+        if ($cost_id > 0 || $pay_row_id > 0) {
             $amount_paid = en_digits($_POST['amount_paid'] ?? '');
             $response = callAPI('POST', '/payments/submit', [
                 'cost_id' => $cost_id,
+                'payment_id' => $pay_row_id,
                 'amount_paid' => $amount_paid !== '' ? (float) $amount_paid : null,
                 'notes' => trim($_POST['notes'] ?? ''),
             ]);
@@ -478,6 +498,7 @@ require_once 'includes/header.php';
                         <button type="button" class="btn-chip btn-chip-success"
                                 data-modal-open="pay-cost"
                                 data-set-cost_id="<?= $c_id ?>"
+                                data-set-payment_id=""
                                 data-set-amount_paid="<?= (int) ($c_my_share ?? $c_amount) ?>">
                             پرداخت<?= $c_my_share !== null ? ' سهم من' : '' ?>
                         </button>
@@ -542,8 +563,15 @@ require_once 'includes/header.php';
                 <div class="card p-4">
                     <div class="flex items-start justify-between gap-3">
                         <div class="flex-1 min-w-0">
-                            <h3 class="font-bold text-gray-800 text-sm"><?= htmlspecialchars($payment['user_name'] ?? 'کاربر') ?></h3>
+                            <h3 class="font-bold text-gray-800 text-sm"><?= htmlspecialchars($payment['user_name'] ?? 'کاربر') ?>
+                                <?php if (!empty($payment['unit_number'])): ?>
+                                    <span class="chip chip-blue" style="margin-inline-start:6px;">🏠 واحد <?= fa_digits($payment['unit_number']) ?></span>
+                                <?php endif; ?>
+                            </h3>
                             <p class="text-xs text-gray-500 mt-0.5 truncate"><?= htmlspecialchars($payment['cost_title'] ?? '') ?></p>
+                            <?php if (($payment['status'] ?? '') === 'rejected' && !empty($payment['reject_reason'])): ?>
+                                <p class="text-[11px] mt-1" style="color:#b91c1c;">❌ دلیل رد: <?= htmlspecialchars($payment['reject_reason']) ?></p>
+                            <?php endif; ?>
                         </div>
                         <?php
                         $p_paid = ($payment['amount_paid'] ?? null) !== null;
@@ -551,13 +579,22 @@ require_once 'includes/header.php';
                         ?>
                         <div class="text-left flex-shrink-0">
                             <p class="font-bold text-gray-800"><?= fa_number($p_amount) ?> <span class="text-[10px] font-normal text-gray-400">تومان<?= $p_paid ? '' : ' (سهم)' ?></span></p>
-                            <span class="chip <?= ($payment['status'] ?? '') === 'confirmed' ? 'chip-green' : 'chip-amber' ?>" style="margin-top:6px;display:inline-block;">
+                            <span class="chip <?= ($payment['status'] ?? '') === 'confirmed' ? 'chip-green' : (($payment['status'] ?? '') === 'rejected' ? 'chip-red' : 'chip-amber') ?>" style="margin-top:6px;display:inline-block;">
                                 <?= htmlspecialchars(payment_status_label($payment['status'] ?? '')) ?>
                             </span>
                         </div>
                     </div>
 
                     <?php if ((int) ($payment['user_id'] ?? 0) === $current_user_id && ($payment['status'] ?? '') !== 'confirmed'): ?>
+                        <div class="card-actions">
+                            <button type="button" class="btn-chip btn-chip-neutral"
+                                    data-modal-open="pay-cost"
+                                    data-set-payment_id="<?= $p_id ?>"
+                                    data-set-cost_id=""
+                                    data-set-amount_paid="<?= (int) (($payment['share_amount'] ?? 0) ?: ($payment['amount_paid'] ?? 0)) ?>">
+                                💳 پرداخت / ثبت مبلغ
+                            </button>
+                        </div>
                         <form method="POST" action="" enctype="multipart/form-data" class="card-actions" style="flex-wrap:wrap;gap:8px;">
                             <?= csrf_field() ?>
                             <input type="hidden" name="form_action" value="upload_receipt">
@@ -569,12 +606,21 @@ require_once 'includes/header.php';
                     <?php endif; ?>
 
                     <?php if ($is_manager && ($payment['status'] ?? '') !== 'confirmed'): ?>
-                        <form method="POST" action="" class="card-actions">
-                            <?= csrf_field() ?>
-                            <input type="hidden" name="form_action" value="confirm_payment">
-                            <input type="hidden" name="payment_id" value="<?= $p_id ?>">
-                            <button type="submit" class="btn-chip btn-chip-success" style="width:100%;justify-content:center;">تأیید پرداخت</button>
-                        </form>
+                        <div class="card-actions" style="gap:8px;">
+                            <form method="POST" action="" data-confirm="پرداخت این ردیف تأیید و به حساب واحد ثبت شود؟" style="flex:1;">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="form_action" value="confirm_payment">
+                                <input type="hidden" name="payment_id" value="<?= $p_id ?>">
+                                <button type="submit" class="btn-chip btn-chip-success" style="width:100%;justify-content:center;">✓ تأیید (پول به حساب آمده)</button>
+                            </form>
+                            <?php if (($payment['status'] ?? '') !== 'rejected'): ?>
+                                <button type="button" class="btn-chip btn-chip-danger"
+                                        data-modal-open="reject-payment"
+                                        data-set-payment_id="<?= $p_id ?>">
+                                    ✕ رد
+                                </button>
+                            <?php endif; ?>
+                        </div>
                     <?php endif; ?>
                 </div>
             <?php endforeach; ?>
@@ -590,6 +636,7 @@ require_once 'includes/header.php';
         <?= csrf_field() ?>
         <input type="hidden" name="form_action" value="submit_payment">
         <input type="hidden" name="cost_id" value="">
+        <input type="hidden" name="payment_id" value="">
         <div>
             <label for="pay_amount" class="form-label">مبلغ پرداختی (تومان)</label>
             <input type="number" id="pay_amount" name="amount_paid" min="0" step="1000" inputmode="numeric" class="form-input">
@@ -604,6 +651,20 @@ require_once 'includes/header.php';
 <?php modal_end(); ?>
 
 <?php if ($is_manager): ?>
+
+    <?php modal_start('reject-payment', 'رد پرداخت', 'اگر مبلغ به حساب نیامده، با دلیل مشخص رد کنید'); ?>
+        <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
+            <input type="hidden" name="form_action" value="reject_payment">
+            <input type="hidden" name="payment_id" value="">
+            <div>
+                <label class="form-label">دلیل رد پرداخت *</label>
+                <textarea name="reason" rows="2" required class="form-input" placeholder="مثال: مبلغ به حساب ساختمان واریز نشده است"></textarea>
+                <p class="text-[11px] text-gray-400 mt-1">دلیل برای پرداخت‌کننده ارسال می‌شود و او می‌تواند پس از پرداخت واقعی دوباره رسید ثبت کند.</p>
+            </div>
+            <button type="submit" class="btn-primary" style="background:linear-gradient(135deg,#ef4444,#dc2626);">رد پرداخت</button>
+        </form>
+    <?php modal_end(); ?>
 
     <?php modal_start('charge-settings', 'تنظیم شارژ ماهیانه', 'ثابت، بر اساس نفرات، یا دلخواه'); ?>
         <form method="POST" action="" class="space-y-4" data-loading>

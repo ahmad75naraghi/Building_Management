@@ -219,3 +219,85 @@ TestLog::run('برای هر پرداخت‌کننده اعلان پرداخت ث
     $stmt->execute([$b]);
     TestLog::assertSame('دو اعلان', 2, (int) $stmt->fetchColumn());
 });
+
+// ------------------------------------------------------------ چرخه تأیید/رد پرداخت و حسابداری واحد
+
+TestLog::run('رد پرداخت فقط با دلیل و فقط توسط مدیر', function () use ($svc, $manager, $db) {
+    $b = make_building($manager);
+    $o1 = make_user('09132000040');
+    make_unit($b, '1', ['owner_user_id' => $o1]);
+    $cost = $svc->createCost([
+        'building_id' => $b, 'title' => 'نگهبانی', 'amount' => 80000, 'target_audience' => 'owners',
+    ], $manager);
+    $svc->issueCost((int) $cost->id, $manager);
+    $rows = cost_payments_of((int) $cost->id);
+    $pid = (int) $rows[0]['id'];
+
+    TestLog::assertThrows('بدون دلیل مجاز نیست', fn() => $svc->rejectPayment($pid, $manager, ''), 'دلیل');
+    TestLog::assertThrows('غیرمدیر نمی‌تواند رد کند', fn() => $svc->rejectPayment($pid, $o1, 'تست'), 'مدیر');
+
+    TestLog::assertTrue('رد با دلیل موفق', $svc->rejectPayment($pid, $manager, 'واریز نشده'));
+    $rows = cost_payments_of((int) $cost->id);
+    TestLog::assertSame('وضعیت رد شد', 'rejected', $rows[0]['status']);
+    TestLog::assertSame('دلیل ذخیره شد', 'واریز نشده', $rows[0]['reject_reason']);
+
+    $stmt = $db->prepare("SELECT COUNT(*) FROM notifications WHERE building_id = ? AND title LIKE '%رد شد%'");
+    $stmt->execute([$b]);
+    TestLog::assertTrue('اعلان رد برای پرداخت‌کننده ثبت شد', (int) $stmt->fetchColumn() >= 1);
+
+    // پرداخت‌کننده پس از رد می‌تواند دوباره پرداخت/رسید ثبت کند
+    $p = $svc->submitPayment(['payment_id' => $pid, 'amount_paid' => 80000], $o1);
+    TestLog::assertSame('به چرخه بررسی برگشت', 'upload_receipt', $p->status);
+});
+
+TestLog::run('مانده واحد: بدهکار، طلبکار و دسترسی اعضا', function () use ($svc, $manager) {
+    $b = make_building($manager);
+    $o1 = make_user('09132000041');
+    $o2 = make_user('09132000042');
+    $u1 = make_unit($b, '1', ['owner_user_id' => $o1]);
+    $u2 = make_unit($b, '2', ['owner_user_id' => $o2]);
+    $cost = $svc->createCost([
+        'building_id' => $b, 'title' => 'ایزوگام', 'amount' => 100000, 'target_audience' => 'owners',
+    ], $manager);
+    $svc->issueCost((int) $cost->id, $manager);
+    $rows = cost_payments_of((int) $cost->id);
+    $byUser = [];
+    foreach ($rows as $r) {
+        $byUser[(int) $r['user_id']] = (int) $r['id'];
+    }
+
+    // واحد ۱ بیشتر از سهمش پرداخت و تأیید می‌کند → طلبکار؛ واحد ۲ هیچ → بدهکار
+    $svc->submitPayment(['payment_id' => $byUser[$o1], 'amount_paid' => 60000], $o1);
+    $svc->confirmPayment($byUser[$o1], $manager);
+
+    $balances = $svc->getUnitBalances($b, $manager);
+    TestLog::assertSame('واحد ۱ طلبکار', 'creditor', $balances[$u1]['state']);
+    TestLog::assertSame('مانده واحد ۱', 10000.0, $balances[$u1]['balance']);
+    TestLog::assertSame('واحد ۲ بدهکار', 'debtor', $balances[$u2]['state']);
+    TestLog::assertSame('مانده واحد ۲', -50000.0, $balances[$u2]['balance']);
+
+    $stranger = make_user('09132000043');
+    TestLog::assertThrows('غیرعضو به مانده‌ها دسترسی ندارد', fn() => $svc->getUnitBalances($b, $stranger), 'member');
+});
+
+TestLog::run('سهم‌ها واحد-محور و جمعشان دقیقاً برابر مبلغ هزینه است', function () use ($svc, $manager) {
+    $b = make_building($manager);
+    make_unit($b, '1', ['owner_user_id' => make_user('09132000045')]);
+    make_unit($b, '2', ['owner_user_id' => make_user('09132000046')]);
+    make_unit($b, '3', ['owner_user_id' => make_user('09132000047')]);
+    $cost = $svc->createCost([
+        'building_id' => $b, 'title' => 'رنگ', 'amount' => 100000, 'target_audience' => 'owners',
+    ], $manager);
+    $svc->issueCost((int) $cost->id, $manager);
+
+    $rows = cost_payments_of((int) $cost->id);
+    $sum = 0.0;
+    $unitIds = [];
+    foreach ($rows as $r) {
+        $sum += (float) $r['share_amount'];
+        $unitIds[] = $r['unit_id'];
+    }
+    TestLog::assertSame('سه ردیف واحد-محور', 3, count($rows));
+    TestLog::assertSame('هر ردیف به واحد منتسب است', [], array_values(array_filter($unitIds, fn($v) => $v === null)));
+    TestLog::assertSame('جمع سهم‌ها = مبلغ هزینه', 100000.0, round($sum, 2));
+});

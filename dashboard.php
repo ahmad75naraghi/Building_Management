@@ -323,6 +323,14 @@ require_once 'includes/header.php';
                     </svg>
                     <span>مدارک ساختمان</span>
                 </div>
+                <!-- آیتم ۴ب: لاگ ممیزی اقدامات -->
+                <div class="quick-btn-item" onclick="window.location.href='audit_logs.php?building_id=<?= (int) $building_id ?>'" style="cursor:pointer;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                    <span>لاگ اقدامات</span>
+                </div>
                 <?php endif; ?>
                 <!-- آیتم ۵ -->
                 <div class="quick-btn-item" onclick="window.location.href='members.php?building_id=<?= (int) $building_id ?>'" style="cursor:pointer;">

@@ -94,7 +94,7 @@ final class BuildingController
         }
         $data = $request->getJsonBody() ?? [];
         try {
-            $building = $this->service->updateBuilding($id, $data);
+            $building = $this->service->updateBuilding($id, $data, $userId);
             if (!$building) {
                 return (new Response())->setStatusCode(404)->setJson([
                     'success' => false,
@@ -130,7 +130,7 @@ final class BuildingController
                 'message' => 'You are not a member of this building',
             ]);
         }
-        $deleted = $this->service->deleteBuilding($id);
+        $deleted = $this->service->deleteBuilding($id, $userId);
         if ($deleted) {
             return (new Response())->setJson([
                 'success' => true,
