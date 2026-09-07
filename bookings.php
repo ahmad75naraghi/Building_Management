@@ -166,7 +166,7 @@ require_once 'includes/header.php';
                                 <?= htmlspecialchars($area_names[$b_area] ?? 'مشاع') ?>
                             </h3>
                             <p class="text-sm text-gray-500 mt-1">
-                                <?php if ($b_date !== ''): ?>📅 <?= fa_digits($b_date) ?><?php endif; ?>
+                                <?php if ($b_date !== ''): ?>📅 <?= fa_date($b_date) ?><?php endif; ?>
                                 <?php if ($b_start !== ''): ?>
                                     • 🕐 <?= fa_digits(substr($b_start, 0, 5)) ?><?= $b_end !== '' ? ' تا ' . fa_digits(substr($b_end, 0, 5)) : '' ?>
                                 <?php endif; ?>

@@ -13,6 +13,12 @@ $alert_message = '';
 $alert_type = 'error';
 $reopen_modal = '';
 
+// پیام حذف موفق تیکت (از صفحه جزئیات برمی‌گردیم)
+if (isset($_GET['deleted'])) {
+    $alert_message = 'تیکت با موفقیت حذف شد.';
+    $alert_type = 'success';
+}
+
 // ثبت تیکت جدید
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($building_id <= 0) {

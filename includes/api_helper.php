@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use App\Core\Logger;
+use App\Utilities\JalaliHelper;
 
 // هیچ خطایی نباید بی‌صدا بماند: هشدارها، استثناهای مدیریت‌نشده و خطاهای مرگبار لاگ می‌شوند
 Logger::install();
@@ -342,6 +343,94 @@ function fa_time_ago($datetime)
         return 'دیروز';
     }
     return fa_digits((int) floor($diff / 86400)) . ' روز پیش';
+}
+
+// ---------- تقویم جلالی (شمسی) ----------
+// پیاده‌سازی اصلی در کلاس مشترک \App\Utilities\JalaliHelper است
+// تا اسکریپت‌های سمت سرور (مثل یادآوری‌ها) و فرانت‌اند هر دو یک منطق داشته باشند.
+
+/** تبدیل میلادی به جلالی — خروجی: [سال، ماه، روز] */
+function gregorian_to_jalali(int $gy, int $gm, int $gd): array
+{
+    return JalaliHelper::toJalali($gy, $gm, $gd);
+}
+
+/** تبدیل جلالی به میلادی — خروجی: [سال، ماه، روز] */
+function jalali_to_gregorian(int $jy, int $jm, int $jd): array
+{
+    return JalaliHelper::toGregorian($jy, $jm, $jd);
+}
+
+/** تعداد روزهای ماه جلالی (اسفند: ۲۹ یا ۳۰) */
+function jalali_month_length(int $jy, int $jm): int
+{
+    return JalaliHelper::monthLength($jy, $jm);
+}
+
+/** نام ماه جلالی (۱ تا ۱۲) */
+function jalali_month_name(int $jm): string
+{
+    return JalaliHelper::MONTH_NAMES[$jm] ?? '';
+}
+
+/** قالب‌بندی تاریخ جلالی — توکن‌ها: Y, m, d, j, F, l */
+function jdate(string $format, ?int $timestamp = null): string
+{
+    return JalaliHelper::format($format, $timestamp ?? time());
+}
+
+/** شاخص روز هفته شنبه‌محور: شنبه=۰ ... جمعه=۶ */
+function jalali_weekday_index(int $timestamp): int
+{
+    return JalaliHelper::weekDayIndex($timestamp);
+}
+
+/**
+ * نمایش تاریخ شمسی یک مقدار تاریخ/زمان: «۱۵ شهریور ۱۴۰۵»
+ * ورودی تهی یا نامعتبر رشته خالی برمی‌گرداند.
+ */
+function fa_date($datetime)
+{
+    $ts = strtotime((string) $datetime);
+    if ($ts === false) {
+        return '';
+    }
+    return fa_digits(JalaliHelper::format('j F Y', $ts));
+}
+
+/**
+ * نمایش تاریخ + ساعت شمسی: «۱۵ شهریور ۱۴۰۵، ساعت ۱۸:۳۰»
+ * اگر مقدار ورودی ساعت نداشته باشد (فقط تاریخ)، بخش ساعت حذف می‌شود.
+ */
+function fa_datetime($datetime)
+{
+    $raw = (string) $datetime;
+    $ts = strtotime($raw);
+    if ($ts === false) {
+        return '';
+    }
+    $has_time = preg_match('/[:T]|\d{4}-\d{2}-\d{2} \d/', $raw) === 1;
+    $date = fa_digits(JalaliHelper::format('j F Y', $ts));
+    return $has_time ? $date . '، ساعت ' . fa_digits(date('H:i', $ts)) : $date;
+}
+
+/**
+ * برچسب فاصله روزی نسبت به امروز: امروز / فردا / پس‌فردا / ۳ روز دیگر
+ * ورودی: تاریخ رویداد (هر فرمت قابل‌فهم با strtotime).
+ */
+function fa_days_until($datetime)
+{
+    $ts = strtotime((string) $datetime);
+    if ($ts === false) {
+        return '';
+    }
+    $days = (int) floor((strtotime(date('Y-m-d', $ts)) - strtotime(date('Y-m-d'))) / 86400);
+    return match (true) {
+        $days <= 0 => 'امروز',
+        $days === 1 => 'فردا',
+        $days === 2 => 'پس‌فردا',
+        default => fa_digits($days) . ' روز دیگر',
+    };
 }
 
 // ---------- نقشه وضعیت‌ها و دسته‌بندی‌ها ----------

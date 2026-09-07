@@ -177,7 +177,7 @@ require_once 'includes/header.php';
                         <p class="text-sm text-gray-500 mt-2 leading-6"><?= nl2br(htmlspecialchars($vote['description'])) ?></p>
                     <?php endif; ?>
                     <?php if (!empty($vote['end_date'])): ?>
-                        <p class="text-xs text-gray-400 mt-2">پایان: <?= htmlspecialchars($vote['end_date']) ?></p>
+                        <p class="text-xs text-gray-400 mt-2">پایان: <?= fa_date($vote['end_date']) ?></p>
                     <?php endif; ?>
 
                     <?php if ($can_vote): ?>

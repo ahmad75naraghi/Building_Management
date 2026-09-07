@@ -33,6 +33,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_manager) {
                 $alert_message = $response['message'] ?? 'ارسال پیامک ناموفق بود.';
             }
         }
+    } elseif ($action === 'revoke_invitation') {
+        $inv_id = (int) ($_POST['invitation_id'] ?? 0);
+        if ($inv_id > 0) {
+            $response = callAPI('DELETE', '/invitations/' . $inv_id);
+            if (isset($response['success']) && $response['success'] === true) {
+                $alert_message = 'دعوت‌نامه لغو شد و لینک آن دیگر معتبر نیست.';
+                $alert_type = 'success';
+            } else {
+                $alert_message = $response['message'] ?? 'لغو دعوت‌نامه ناموفق بود.';
+            }
+        }
     } else {
         $invited_name = trim($_POST['invited_name'] ?? '');
         $invited_phone = normalize_phone($_POST['invited_phone'] ?? '');
@@ -189,7 +200,7 @@ require_once 'includes/header.php';
                             <p class="text-xs text-gray-500 mt-1">
                                 نقش: <?= htmlspecialchars($role_labels[$inv['role'] ?? ''] ?? ($inv['role'] ?? 'ساکن')) ?>
                                 <?php if (!empty($inv['expires_at'])): ?>
-                                    • انقضا: <?= htmlspecialchars($inv['expires_at']) ?>
+                                    • انقضا: <?= fa_digits(jdate('j F Y', strtotime((string) $inv['expires_at']))) ?>
                                 <?php endif; ?>
                             </p>
                             <p class="text-[11px] text-gray-400 mt-2 break-all" dir="ltr"><?= htmlspecialchars($invite_link) ?></p>
@@ -207,6 +218,15 @@ require_once 'includes/header.php';
                                 <input type="hidden" name="invitation_id" value="<?= (int) ($inv['id'] ?? 0) ?>">
                                 <button type="submit" class="text-xs bg-green-50 hover:bg-green-100 text-green-700 font-bold px-3 py-2 rounded-lg transition-colors">
                                     ارسال مجدد پیامک
+                                </button>
+                            </form>
+                            <form method="POST" action="" style="display:contents;"
+                                  onsubmit="return confirm('دعوت‌نامه لغو شود؟ لینک دعوت دیگر کار نخواهد کرد.');">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="form_action" value="revoke_invitation">
+                                <input type="hidden" name="invitation_id" value="<?= (int) ($inv['id'] ?? 0) ?>">
+                                <button type="submit" class="text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-lg transition-colors">
+                                    لغو دعوت
                                 </button>
                             </form>
                         </div>

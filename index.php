@@ -31,6 +31,60 @@ if (isset($buildings_response['success']) && $buildings_response['success'] === 
     $buildings = is_array($buildings_response['data']) ? $buildings_response['data'] : [];
 }
 
+// رویدادهای امروز در همه ساختمان‌های کاربر (برای ویجت داشبورد)
+// برای جلوگیری از کندی، فقط ۵ ساختمان اول بررسی می‌شود
+$today_g = date('Y-m-d');
+$today_events = [];
+foreach (array_slice($buildings, 0, 5) as $b) {
+    $bid = (int) ($b['id'] ?? 0);
+    if ($bid <= 0) {
+        continue;
+    }
+    $m_response = callAPI('GET', '/meetings', ['building_id' => $bid]);
+    if (!empty($m_response['success'])) {
+        foreach (($m_response['data'] ?? []) as $meeting) {
+            if (($meeting['status'] ?? '') === 'cancelled') {
+                continue;
+            }
+            $raw = (string) ($meeting['meeting_date'] ?? '');
+            if (substr($raw, 0, 10) !== $today_g) {
+                continue;
+            }
+            $ts = strtotime($raw);
+            $today_events[] = [
+                'type' => 'meeting',
+                'title' => $meeting['title'] ?: 'جلسه',
+                'time' => $ts !== false ? date('H:i', $ts) : '',
+                'building' => $b['name'] ?? '',
+                'building_id' => $bid,
+                'ts' => $ts !== false ? $ts : 0,
+            ];
+        }
+    }
+    $bk_response = callAPI('GET', '/bookings', ['building_id' => $bid]);
+    if (!empty($bk_response['success'])) {
+        foreach (($bk_response['data'] ?? []) as $booking) {
+            if (in_array($booking['status'] ?? '', ['cancelled', 'completed'], true)) {
+                continue;
+            }
+            if (substr((string) ($booking['booking_date'] ?? ''), 0, 10) !== $today_g) {
+                continue;
+            }
+            $start = substr((string) ($booking['start_time'] ?? ''), 0, 5);
+            $ts = strtotime($booking['booking_date'] . ' ' . ($booking['start_time'] ?: '09:00:00'));
+            $today_events[] = [
+                'type' => 'booking',
+                'title' => 'رزرو مشاعات',
+                'time' => $start,
+                'building' => $b['name'] ?? '',
+                'building_id' => $bid,
+                'ts' => $ts !== false ? $ts : 0,
+            ];
+        }
+    }
+}
+usort($today_events, fn($x, $y) => $x['ts'] <=> $y['ts']);
+
 $page_title     = 'ساختمان‌های من';
 $header_sub     = $userName . ' خوش آمدید 👋';
 $header_variant = 'home';
@@ -75,6 +129,36 @@ require_once 'includes/header.php';
         </section>
 
         <main class="p-5">
+
+            <!-- رویدادهای امروز -->
+            <?php if (!empty($today_events)): ?>
+                <div class="card p-4" style="margin-bottom: 16px;">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-bold text-gray-800 text-sm">📅 رویدادهای امروز</h3>
+                        <span class="text-[11px] text-gray-400"><?= jdate('l j F Y') ?></span>
+                    </div>
+                    <div class="space-y-2">
+                        <?php foreach (array_slice($today_events, 0, 4) as $ev): ?>
+                            <a href="calendar.php?building_id=<?= (int) $ev['building_id'] ?>"
+                               class="flex items-center gap-3 p-2 rounded-xl bg-gray-50 hover:bg-blue-50 transition-colors">
+                                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0 <?= $ev['type'] === 'meeting' ? 'bg-purple-400' : 'bg-green-400' ?>"></span>
+                                <span class="flex-1 min-w-0">
+                                    <span class="block text-sm font-bold text-gray-700 truncate"><?= htmlspecialchars($ev['title']) ?></span>
+                                    <span class="block text-[11px] text-gray-400 truncate"><?= htmlspecialchars($ev['building']) ?></span>
+                                </span>
+                                <?php if ($ev['time'] !== ''): ?>
+                                    <span class="text-[11px] font-bold text-blue-600 flex-shrink-0"><?= fa_digits($ev['time']) ?></span>
+                                <?php endif; ?>
+                            </a>
+                        <?php endforeach; ?>
+                        <?php if (count($today_events) > 4): ?>
+                            <a href="calendar.php" class="block text-center text-[11px] text-blue-600 font-bold pt-1">
+                                و <?= fa_digits(count($today_events) - 4) ?> رویداد دیگر — مشاهده تقویم
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
 
             <!-- لیست ساختمان‌ها -->
             <div class="section-header-row" style="margin-bottom: 12px;">

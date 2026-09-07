@@ -53,6 +53,15 @@ final class InvitationRepository
         return $cache[$column];
     }
 
+    public function findById(int $id): ?Invitation
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare("SELECT * FROM invitations WHERE id = ?");
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? $this->mapRow($row) : null;
+    }
+
     public function findByToken(string $token): ?Invitation
     {
         $db = Database::getConnection();
@@ -75,6 +84,15 @@ final class InvitationRepository
         $db = Database::getConnection();
         $stmt = $db->prepare("UPDATE invitations SET status = ?, accepted_at = ? WHERE token = ?");
         return $stmt->execute([$status, $acceptedAt, $token]);
+    }
+
+    /** لغو دعوت‌نامه — فقط دعوت‌های در انتظار پذیرش لغو می‌شوند */
+    public function revoke(int $id): bool
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare("UPDATE invitations SET status = 'revoked' WHERE id = ? AND status = 'pending'");
+        $stmt->execute([$id]);
+        return $stmt->rowCount() > 0;
     }
 
     private function mapRow(array $row): Invitation

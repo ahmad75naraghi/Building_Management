@@ -160,7 +160,7 @@ require_once 'includes/header.php';
                             </h3>
                             <p class="text-sm text-gray-500 mt-1">
                                 مقدار: <?= fa_number($r_value) ?>
-                                <?php if ($r_date !== ''): ?> • <?= fa_digits($r_date) ?><?php endif; ?>
+                                <?php if ($r_date !== ''): ?> • <?= fa_date($r_date) ?><?php endif; ?>
                             </p>
                         </div>
                     </div>

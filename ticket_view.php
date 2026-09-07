@@ -15,9 +15,41 @@ if ($ticket_id <= 0) {
 
 $alert_message = '';
 $alert_type = 'error';
+$reopen_modal = '';
 
-// افزودن کامنت
+// افزودن کامنت / ویرایش / حذف تیکت
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action'])) {
+    if ($_POST['form_action'] === 'edit_ticket') {
+        $title = trim($_POST['title'] ?? '');
+        $description = trim($_POST['description'] ?? '');
+        if ($title === '' || $description === '') {
+            $alert_message = 'عنوان و شرح تیکت نمی‌تواند خالی باشد.';
+            $reopen_modal = 'edit-ticket';
+        } else {
+            $response = callAPI('PUT', '/tickets/' . $ticket_id, [
+                'title' => $title,
+                'description' => $description,
+                'category' => $_POST['category'] ?? 'technical',
+                'priority' => $_POST['priority'] ?? 'normal',
+            ]);
+            if (isset($response['success']) && $response['success'] === true) {
+                $alert_message = 'تیکت با موفقیت ویرایش شد.';
+                $alert_type = 'success';
+            } else {
+                $alert_message = $response['message'] ?? 'خطا در ویرایش تیکت.';
+                $reopen_modal = 'edit-ticket';
+            }
+        }
+    } elseif ($_POST['form_action'] === 'delete_ticket') {
+        $response = callAPI('DELETE', '/tickets/' . $ticket_id);
+        if (isset($response['success']) && $response['success'] === true) {
+            header('Location: tickets.php?deleted=1');
+            exit;
+        }
+        $alert_message = $response['message'] ?? 'خطا در حذف تیکت.';
+    }
+}
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action']) && !in_array($_POST['form_action'], ['edit_ticket', 'delete_ticket'], true)) {
     if ($_POST['form_action'] === 'add_comment') {
         $comment = trim($_POST['comment'] ?? '');
         if ($comment === '') {
@@ -71,6 +103,13 @@ $category_labels = [
     'suggestion' => 'پیشنهاد',
 ];
 
+// سطح دسترسی کاربر جاری برای ویرایش/حذف این تیکت
+$role_ctx = building_role_context((int) ($ticket['building_id'] ?? 0));
+$is_owner = $role_ctx['user_id'] > 0 && $role_ctx['user_id'] === (int) ($ticket['user_id'] ?? 0);
+$is_manager = !empty($role_ctx['is_manager']);
+$can_edit = $is_manager || $is_owner;
+$can_delete = $is_manager || ($is_owner && in_array($ticket['status'] ?? '', ['open', 'rejected'], true));
+
 $page_title = 'جزئیات تیکت';
 $header_sub = $ticket['title'] ?? 'تیکت';
 $back_url = 'tickets.php';
@@ -98,6 +137,27 @@ require_once 'includes/page_head.php';
                 </div>
             </div>
             <span class="text-xs text-gray-400 flex-shrink-0"><?= fa_time_ago($ticket['created_at'] ?? '') ?></span>
+        </div>
+
+        <!-- تاریخ ثبت (شمسی) + عملیات -->
+        <div class="flex items-center justify-between mt-3 flex-wrap gap-2">
+            <span class="text-[11px] text-gray-400">
+                ثبت: <?= !empty($ticket['created_at']) ? fa_digits(jdate('l j F Y', strtotime((string) $ticket['created_at']))) : '—' ?>
+            </span>
+            <div class="flex items-center gap-2">
+                <?php if ($can_edit): ?>
+                    <button type="button" data-modal-open="edit-ticket"
+                            class="text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
+                        ✏️ ویرایش
+                    </button>
+                <?php endif; ?>
+                <?php if ($can_delete): ?>
+                    <button type="button" data-modal-open="delete-ticket"
+                            class="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors">
+                        🗑 حذف
+                    </button>
+                <?php endif; ?>
+            </div>
         </div>
 
         <!-- شرح تیکت -->
@@ -176,5 +236,60 @@ require_once 'includes/page_head.php';
     </div>
 
 </main>
+
+<?php if ($can_edit): ?>
+<?php modal_start('edit-ticket', 'ویرایش تیکت', 'عنوان، شرح، دسته‌بندی و اولویت را تغییر دهید'); ?>
+    <form method="POST" action="" class="space-y-4" data-loading>
+        <?= csrf_field() ?>
+        <input type="hidden" name="form_action" value="edit_ticket">
+        <div>
+            <label class="form-label">عنوان *</label>
+            <input type="text" name="title" required class="form-input"
+                   value="<?= htmlspecialchars($ticket['title'] ?? '') ?>">
+        </div>
+        <div>
+            <label class="form-label">شرح مشکل *</label>
+            <textarea name="description" rows="4" required class="form-input"><?= htmlspecialchars($ticket['description'] ?? '') ?></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="form-label">دسته‌بندی</label>
+                <select name="category" class="form-input">
+                    <?php foreach ($category_labels as $value => $label): ?>
+                        <option value="<?= $value ?>" <?= ($ticket['category'] ?? '') === $value ? 'selected' : '' ?>><?= $label ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label class="form-label">اولویت</label>
+                <select name="priority" class="form-input">
+                    <option value="low" <?= ($ticket['priority'] ?? '') === 'low' ? 'selected' : '' ?>>کم</option>
+                    <option value="normal" <?= ($ticket['priority'] ?? '') === 'normal' ? 'selected' : '' ?>>عادی</option>
+                    <option value="high" <?= ($ticket['priority'] ?? '') === 'high' ? 'selected' : '' ?>>زیاد</option>
+                    <option value="urgent" <?= ($ticket['priority'] ?? '') === 'urgent' ? 'selected' : '' ?>>فوری</option>
+                </select>
+            </div>
+        </div>
+        <button type="submit" class="btn-primary">ذخیره تغییرات</button>
+    </form>
+<?php modal_end(); ?>
+<?php endif; ?>
+
+<?php if ($can_delete): ?>
+<?php modal_start('delete-ticket', 'حذف تیکت', 'این عملیات قابل بازگشت نیست'); ?>
+    <form method="POST" action="" data-loading>
+        <?= csrf_field() ?>
+        <input type="hidden" name="form_action" value="delete_ticket">
+        <p class="text-sm text-gray-600 leading-7 mb-4">
+            تیکت «<?= htmlspecialchars($ticket['title'] ?? '') ?>» به‌همراه همه کامنت‌هایش برای همیشه حذف می‌شود.
+            آیا مطمئن هستید؟
+        </p>
+        <div class="flex gap-2">
+            <button type="submit" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-3 rounded-xl transition-colors">بله، حذف شود</button>
+            <button type="button" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold py-3 rounded-xl transition-colors" data-modal-close>انصراف</button>
+        </div>
+    </form>
+<?php modal_end(); ?>
+<?php endif; ?>
 
 <?php require_once 'includes/page_tail.php'; ?>

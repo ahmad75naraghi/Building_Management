@@ -132,7 +132,7 @@ require_once 'includes/header.php';
                             <?php endif; ?>
                             <?php if ($v_date !== '' || $v_time !== ''): ?>
                                 <p class="text-xs text-gray-400 mt-1">
-                                    <?= fa_digits($v_date) ?><?= $v_time !== '' ? ' • ' . fa_digits($v_time) : '' ?>
+                                    <?= fa_date($v_date) ?><?= $v_time !== '' ? ' • ساعت ' . fa_digits(substr($v_time, 0, 5)) : '' ?>
                                 </p>
                             <?php endif; ?>
                         </div>

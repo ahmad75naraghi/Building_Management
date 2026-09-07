@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Core\Logger;
 use App\Config\AppConfig;
 use App\Exceptions\AppException;
+use App\Exceptions\AuthException;
 use App\Exceptions\ValidationException;
 use App\Models\Invitation;
 use App\Repositories\InvitationRepository;
@@ -229,5 +230,46 @@ final class InvitationService
             'invited_phone' => $invitation->invited_phone,
             'invited_name' => $invitation->invited_name,
         ];
+    }
+
+    /**
+     * لغو دعوت‌نامه توسط مدیر ساختمان.
+     *
+     * فقط دعوت‌های «در انتظار پذیرش» لغو می‌شوند؛ دعوت پذیرفته‌شده قابل لغو نیست.
+     * پس از لغو، لینک دعوت دیگر کار نمی‌کند چون پذیرش فقط برای وضعیت pending مجاز است.
+     */
+    public function revokeInvitation(int $invitationId, int $userId): Invitation
+    {
+        $invitation = $this->repo->findById($invitationId);
+        if ($invitation === null) {
+            throw new AppException('Invitation not found');
+        }
+        if (!$this->isManager($userId, $invitation->building_id)) {
+            throw new AuthException('فقط مدیر ساختمان می‌تواند دعوت‌نامه را لغو کند.');
+        }
+        if ($invitation->status !== 'pending') {
+            throw new ValidationException('فقط دعوت‌نامه‌های در انتظار پذیرش قابل لغو هستند.');
+        }
+        if (!$this->repo->revoke($invitationId)) {
+            throw new AppException('لغو دعوت‌نامه ناموفق بود.');
+        }
+        $invitation->status = 'revoked';
+        Logger::info('invitation', 'دعوت‌نامه لغو شد', [
+            'invitation_id' => $invitationId,
+            'building_id' => $invitation->building_id,
+            'by_user' => $userId,
+        ]);
+        return $invitation;
+    }
+
+    private function isManager(int $userId, int $buildingId): bool
+    {
+        $db = \App\Core\Database::getConnection();
+        $stmt = $db->prepare(
+            "SELECT 1 FROM building_members
+             WHERE user_id = ? AND building_id = ? AND role = 'manager' AND status = 'active' LIMIT 1"
+        );
+        $stmt->execute([$userId, $buildingId]);
+        return (bool) $stmt->fetchColumn();
     }
 }

@@ -167,7 +167,7 @@ require_once 'includes/header.php';
 
                     <?php if ($m_date !== '' || $m_loc !== ''): ?>
                         <p class="text-xs text-gray-400 mt-2">
-                            📅 <?= fa_digits($m_date) ?>
+                            📅 <?= fa_datetime($m_date) ?>
                             <?php if ($m_loc !== ''): ?> • 📍 <?= htmlspecialchars($m_loc) ?><?php endif; ?>
                         </p>
                     <?php endif; ?>
