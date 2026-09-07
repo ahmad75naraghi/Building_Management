@@ -745,7 +745,7 @@
             align-items: center;
         }
 
-        /* نوار ناوبری پایین (Bottom Nav) */
+        /* نوار ناوبری پایین (Bottom Nav) — ۵ آیتم یک‌دست، فعال هایلایت طلایی */
         .bottom-nav-bar {
             position: fixed;
             bottom: 0;
@@ -753,88 +753,96 @@
             transform: translateX(-50%);
             width: 100%;
             max-width: 440px;
-            height: var(--app-nav-h);
             z-index: 60;
-            background-color: var(--text-white);
-            border-top: 1px solid #f1f5f9;
-            border-radius: 24px 24px 0 0;
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            padding: 0 12px;
-            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.04);
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            border-top: 1px solid #edf0f5;
+            border-radius: 22px 22px 0 0;
+            box-shadow: 0 -12px 32px rgba(2, 10, 32, 0.10);
+            padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+        }
+
+        .bottom-nav-inner {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 2px;
         }
 
         .nav-item-link {
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: center;
             gap: 4px;
             text-decoration: none;
             color: var(--text-gray);
             position: relative;
             cursor: pointer;
-            width: 60px;
+            padding: 4px 0 2px;
+            -webkit-tap-highlight-color: transparent;
+            transition: color 0.2s ease;
         }
 
-        .nav-item-link span {
-            font-size: 9px;
+        .nav-ico {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 30px;
+            border-radius: 12px;
+            transition: background 0.25s ease, box-shadow 0.25s ease, color 0.2s ease, transform 0.15s ease;
+        }
+
+        .nav-label {
+            font-size: 9.5px;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            transition: color 0.2s ease;
+        }
+
+        /* حالت فشرده‌شدن برای همه آیتم‌ها */
+        .nav-item-link:active .nav-ico { transform: scale(0.92); }
+
+        /* آیتم فعال: کپسول طلایی + برچسب سرمه‌ای پررنگ */
+        .nav-item-link.active { color: #0c1a30; }
+        .nav-item-link.active .nav-ico {
+            background: linear-gradient(135deg, #e9c39a 0%, #cf9c66 55%, #c08a52 100%);
+            color: #14233d;
+            box-shadow: 0 6px 14px rgba(200, 148, 92, 0.38);
+        }
+        .nav-item-link.active .nav-label {
+            color: #0c1a30;
             font-weight: 800;
         }
-
-        .nav-item-link.active {
-            color: #0c1a30;
+        .nav-item-link.active::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: var(--gold-primary);
+            box-shadow: 0 0 8px rgba(212, 163, 115, 0.9);
         }
 
-        .active-pill-box {
-            background-color: #0a1931;
-            padding: 6px 12px;
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            color: var(--text-white);
-        }
-
-        .active-pill-box span {
-            color: var(--text-white);
-            margin-top: 2px;
-        }
-
+        /* نشان پیام‌های خوانده‌نشده — گوشهٔ بالا سمت چپ آیکون */
         .nav-badge {
             position: absolute;
-            top: -3px;
-            right: 14px;
-            background-color: var(--gold-primary);
-            color: #000;
+            top: -4px;
+            left: -4px;
+            background: #e0564b;
+            color: #fff;
             font-size: 8px;
             font-weight: 900;
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
+            min-width: 15px;
+            height: 15px;
+            padding: 0 3px;
+            border-radius: 999px;
             display: flex;
             justify-content: center;
             align-items: center;
-        }
-
-        /* دکمه دایره‌ای شناور وسط ناوبری */
-        .floating-action-button {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, #e5ba93 0%, #b88553 100%);
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-shadow: 0 6px 16px rgba(184, 133, 83, 0.45);
-            border: 3px solid var(--text-white);
-            margin-top: -30px;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-
-        .floating-action-button:active {
-            transform: scale(0.9);
+            border: 2px solid #fff;
+            box-sizing: content-box;
         }
     
 

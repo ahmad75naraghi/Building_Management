@@ -8,7 +8,7 @@
  *  - API و دانلود اسناد: هرگز کش نمی‌شوند (دادهٔ خصوصی و پویا).
  * ============================================================ */
 
-var VERSION = 'bms-v1';
+var VERSION = 'bms-v2';
 var STATIC_CACHE = VERSION + '-static';
 var RUNTIME_CACHE = VERSION + '-runtime';
 

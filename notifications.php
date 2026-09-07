@@ -29,7 +29,7 @@ if (isset($list_response['success']) && $list_response['success'] === true) {
 $page_title = 'اعلانات من';
 $header_sub = 'پیام‌ها و رویدادها';
 $back_url = 'index.php';
-$active_nav = 'home';
+$active_nav = 'messages';
 require_once 'includes/page_head.php';
 ?>
 
