@@ -11,6 +11,8 @@ use App\Core\Logger;
  * مشخصات از متغیرهای محیطی خوانده می‌شود تا در کد عمومی نماند؛
  * در صورت نبود، از مقادیر پیش‌فرض پنل استفاده می‌شود:
  *   MELIPAYAMAK_USERNAME / MELIPAYAMAK_PASSWORD / MELIPAYAMAK_BODY_ID
+ *   MELIPAYAMAK_REMINDER_BODY_ID — پترن جداگانه برای یادآوری رویدادها
+ *   (اختیاری؛ اگر تنظیم نشود یادآوری با همان پترن پیش‌فرض و متن کامل ارسال می‌شود)
  *
  * در صورت نبود افزونه SOAP یا خطای شبکه، خطا فقط لاگ می‌شود
  * و مقدار false برمی‌گردد تا جریان اصلی (ثبت‌نام/دعوت) متوقف نشود.
@@ -20,22 +22,25 @@ final class SmsService
     private string $username;
     private string $password;
     private int $bodyId;
+    private int $reminderBodyId;
 
     public function __construct()
     {
         $this->username = (string) (getenv('MELIPAYAMAK_USERNAME') ?: '9905367498');
         $this->password = (string) (getenv('MELIPAYAMAK_PASSWORD') ?: '96R3Q');
         $this->bodyId = (int) (getenv('MELIPAYAMAK_BODY_ID') ?: 530743);
+        $this->reminderBodyId = (int) (getenv('MELIPAYAMAK_REMINDER_BODY_ID') ?: 0);
     }
 
     /**
      * ارسال پیامک پترن (متن + آرگومان‌ها) به یک شماره.
      *
-     * @param string $to   شماره مقصد (فرمت 09xxxxxxxxx)
-     * @param string $text متن اصلی پیامک
-     * @param array  $args آرگومان‌های پترن (متناظر با arg1 و arg2 و ...)
+     * @param string   $to     شماره مقصد (فرمت 09xxxxxxxxx)
+     * @param string   $text   متن اصلی پیامک
+     * @param array    $args   آرگومان‌های پترن (متناظر با arg1 و arg2 و ...)
+     * @param int|null $bodyId شناسه پترن (اگر نال باشد، پترن پیش‌فرض استفاده می‌شود)
      */
-    public function sendByBaseNumber(string $to, string $text, array $args = []): bool
+    public function sendByBaseNumber(string $to, string $text, array $args = [], ?int $bodyId = null): bool
     {
         $to = \App\Utilities\PhoneHelper::normalize($to);
         if (!\App\Utilities\PhoneHelper::isValid($to)) {
@@ -59,7 +64,7 @@ final class SmsService
                 'password' => $this->password,
                 'text' => $text,
                 'to' => $to,
-                'bodyId' => $this->bodyId,
+                'bodyId' => $bodyId ?? $this->bodyId,
             ];
             // اگر پترن آرگومان دارد، به‌صورت آرایه ارسال شود
             if (!empty($args)) {
@@ -115,6 +120,24 @@ final class SmsService
     public function sendChargeReminderSms(string $to, string $name, string $buildingName, string $amount): bool
     {
         $text = "کاربر گرامی {$name}، شارژ ماهیانه ساختمان «{$buildingName}» به مبلغ {$amount} تومان صادر شد. لطفاً پرداخت فرمایید.";
+        return $this->sendByBaseNumber($to, $text);
+    }
+
+    /**
+     * پیامک یادآوری رویداد (جلسه یا رزرو مشاعات) — ارسال توسط اسکریپت کران یادآوری‌ها.
+     *
+     * اگر `MELIPAYAMAK_REMINDER_BODY_ID` تنظیم شده باشد، پترن جداگانه با
+     * آرگومان‌های [نام، عنوان رویداد، زمان، نام ساختمان] ارسال می‌شود؛
+     * در غیر این صورت متن کامل با پترن پیش‌فرض ارسال می‌گردد.
+     *
+     * @param string $when زمان رویداد به‌صورت متن (مثلاً «شنبه ۱۵ شهریور ۱۴۰۵، ساعت ۱۸:۰۰»)
+     */
+    public function sendEventReminderSms(string $to, string $name, string $eventTitle, string $when, string $buildingName): bool
+    {
+        $text = "کاربر گرامی {$name}، یادآوری رویداد ساختمان «{$buildingName}»: {$eventTitle} — زمان: {$when}";
+        if ($this->reminderBodyId > 0) {
+            return $this->sendByBaseNumber($to, $text, [$name, $eventTitle, $when, $buildingName], $this->reminderBodyId);
+        }
         return $this->sendByBaseNumber($to, $text);
     }
 }
