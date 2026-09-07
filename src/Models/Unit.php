@@ -31,6 +31,10 @@ final class Unit
     public int $residents_count = 0;
     /** شارژ دلخواه این واحد (حالت custom) */
     public ?float $custom_charge = null;
+    /** شماره قطعه پارکینگ اختصاصی واحد (اختیاری — برای چند قطعه با ویرگول جدا می‌شود) */
+    public ?string $parking_no = null;
+    /** شماره قطعه انباری اختصاصی واحد (اختیاری) */
+    public ?string $storage_no = null;
     public ?string $created_at = null;
 
     // فیلدهای الحاقی (از JOIN با users — فقط در خروجی، نه در دیتابیس)
@@ -63,6 +67,8 @@ final class Unit
             'owner_resident' => $this->owner_resident,
             'residents_count' => $this->residents_count,
             'custom_charge' => $this->custom_charge,
+            'parking_no' => $this->parking_no,
+            'storage_no' => $this->storage_no,
             'created_at' => $this->created_at,
             // اطلاعات مالک / مستاجر
             'owner_name' => $this->owner_name,

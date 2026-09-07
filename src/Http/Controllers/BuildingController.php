@@ -647,6 +647,45 @@ final class BuildingController
         }
     }
 
+    /**
+     * لغو دعوت‌نامه — فقط مدیر ساختمان، فقط دعوت‌های در انتظار پذیرش.
+     */
+    public function revokeInvitation(Request $request): Response
+    {
+        $userId = (int) ($request->getAttribute('user_id') ?? 0);
+        $invitationId = (int) ($request->getAttribute('id') ?? 0);
+        if (!$userId || !$invitationId) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false,
+                'message' => 'invitation id is required',
+            ]);
+        }
+        try {
+            $invitation = (new InvitationService())->revokeInvitation($invitationId, $userId);
+            return (new Response())->setJson([
+                'success' => true,
+                'message' => 'دعوت‌نامه لغو شد.',
+                'data' => ['id' => $invitation->id, 'status' => $invitation->status],
+            ]);
+        } catch (\App\Exceptions\AuthException $e) {
+            return (new Response())->setStatusCode(403)->setJson([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        } catch (\App\Exceptions\ValidationException $e) {
+            return (new Response())->setStatusCode(422)->setJson([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        } catch (\Exception $e) {
+            $status = $e->getMessage() === 'Invitation not found' ? 404 : 400;
+            return (new Response())->setStatusCode($status)->setJson([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
     public function invitationInfo(Request $request): Response
     {
         $token = trim((string) ($request->getQueryParam('token') ?? ''));

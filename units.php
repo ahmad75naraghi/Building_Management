@@ -71,6 +71,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $building_id > 0) {
                 'owner_resident' => !empty($_POST['owner_resident']) ? 1 : 0,
                 'residents_count' => max(0, (int) en_digits($_POST['residents_count'] ?? '0')),
                 'custom_charge' => $custom_charge_raw !== '' ? (float) $custom_charge_raw : null,
+                'parking_no' => trim($_POST['parking_no'] ?? '') !== '' ? trim($_POST['parking_no']) : null,
+                'storage_no' => trim($_POST['storage_no'] ?? '') !== '' ? trim($_POST['storage_no']) : null,
             ];
 
             if ($action === 'update') {
@@ -212,6 +214,12 @@ require_once 'includes/header.php';
                         <?php if ($residents > 0): ?>
                             <span class="chip chip-green"><?= fa_digits($residents) ?> نفر ساکن</span>
                         <?php endif; ?>
+                        <?php if (!empty($unit['parking_no'])): ?>
+                            <span class="chip chip-gray">🚗 پارکینگ: <?= fa_digits(htmlspecialchars($unit['parking_no'])) ?></span>
+                        <?php endif; ?>
+                        <?php if (!empty($unit['storage_no'])): ?>
+                            <span class="chip chip-gray">📦 انباری: <?= fa_digits(htmlspecialchars($unit['storage_no'])) ?></span>
+                        <?php endif; ?>
                         <?php if ($charge_mode === 'custom' && isset($unit['custom_charge']) && $unit['custom_charge'] !== null): ?>
                             <span class="chip chip-green">شارژ: <?= fa_number($unit['custom_charge']) ?></span>
                         <?php endif; ?>
@@ -231,7 +239,9 @@ require_once 'includes/header.php';
                                     data-set-tenant_user_id="<?= (int) ($unit['tenant_user_id'] ?? 0) ?>"
                                     data-set-owner_resident="<?= !empty($unit['owner_resident']) ? '1' : '0' ?>"
                                     data-set-residents_count="<?= $residents ?>"
-                                    data-set-custom_charge="<?= htmlspecialchars((string) ($unit['custom_charge'] ?? '')) ?>">
+                                    data-set-custom_charge="<?= htmlspecialchars((string) ($unit['custom_charge'] ?? '')) ?>"
+                                    data-set-parking_no="<?= htmlspecialchars($unit['parking_no'] ?? '') ?>"
+                                    data-set-storage_no="<?= htmlspecialchars($unit['storage_no'] ?? '') ?>">
                                 ویرایش
                             </button>
                             <form method="POST" action="?building_id=<?= $building_id ?>" data-confirm="واحد حذف شود؟ این عمل قابل بازگشت نیست." style="display:inline;">
