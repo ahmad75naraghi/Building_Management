@@ -46,35 +46,11 @@ $building_response = callAPI('GET', '/buildings/' . $building_id);
 $thread = [];
 $peer_name = '';
 $conversations = [];
-if ($peer_id > 0 && $building_id > 0) {
-$thread_response = callAPI('GET', '/messages/thread/' . $peer_id, ['building_id' => $building_id]);
-    if (!empty($thread_response['success'])) {
-        $thread = $thread_response['data'] ?? [];
-    }
-    // نام طرف گفتگو از فهرست اعضا
-    $members_response = callAPI('GET', '/buildings/' . $building_id . '/members');
-    if (!empty($members_response['success'])) {
-        foreach ($members_response['data'] ?? [] as $m) {
-            if ((int) ($m['user_id'] ?? 0) === $peer_id) {
-                $peer_name = $m['name'] ?? 'کاربر';
-                break;
-            }
-        }
-    }
-    if ($peer_name === '') {
-        $peer_name = 'کاربر';
-    }
-} elseif ($building_id > 0) {
-$conv_response = callAPI('GET', '/messages/conversations', ['building_id' => $building_id]);
-    if (!empty($conv_response['success'])) {
-        $conversations = $conv_response['data'] ?? [];
-    }
-}
-
-// برای شروع گفتگوی جدید: فهرست اعضای ساختمان
 $members = [];
+// فهرست اعضا یک‌بار خوانده می‌شود و هم برای نام طرف گفتگو و هم برای
+// «شروع گفتگوی جدید» استفاده می‌شود (جلوگیری از دیسپچ تکراری).
 if ($building_id > 0) {
-$members_response = callAPI('GET', '/buildings/' . $building_id . '/members');
+    $members_response = callAPI('GET', '/buildings/' . $building_id . '/members');
     if (!empty($members_response['success'])) {
         $my_id = (int) ($_SESSION['user_id'] ?? 0);
         foreach ($members_response['data'] ?? [] as $m) {
@@ -82,6 +58,27 @@ $members_response = callAPI('GET', '/buildings/' . $building_id . '/members');
                 $members[] = $m;
             }
         }
+    }
+}
+if ($peer_id > 0 && $building_id > 0) {
+    $thread_response = callAPI('GET', '/messages/thread/' . $peer_id, ['building_id' => $building_id]);
+    if (!empty($thread_response['success'])) {
+        $thread = $thread_response['data'] ?? [];
+    }
+    // نام طرف گفتگو از فهرست اعضای خوانده‌شده
+    foreach ($members as $m) {
+        if ((int) ($m['user_id'] ?? 0) === $peer_id) {
+            $peer_name = $m['name'] ?? 'کاربر';
+            break;
+        }
+    }
+    if ($peer_name === '') {
+        $peer_name = 'کاربر';
+    }
+} elseif ($building_id > 0) {
+    $conv_response = callAPI('GET', '/messages/conversations', ['building_id' => $building_id]);
+    if (!empty($conv_response['success'])) {
+        $conversations = $conv_response['data'] ?? [];
     }
 }
 

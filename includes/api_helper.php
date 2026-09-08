@@ -130,6 +130,29 @@ function api_apply_ssl_options($curl)
 }
 
 function callAPI($method, $endpoint, $data = false) {
+    // کش scoped به درخواست: GETهای صرفاً خواندنی که در یک صفحه چندبار
+    // تکرار می‌شوند، فقط یک‌بار دیسپچ می‌شوند (کاهش رفت‌وآمد کرنل/شبکه).
+    // فهرست سفید: داده‌هایی که در طول یک درخواست تغییر نمی‌کنند.
+    static $__get_cache = [];
+    $normalized = '/' . ltrim((string) $endpoint, '/');
+    $cache_key = null;
+    if (strtoupper((string) $method) === 'GET'
+        && preg_match('#^/(auth/me|buildings/\d+/members|buildings/\d+/units|messages/unread-count)$#', $normalized)) {
+        $cache_key = $normalized . '|' . md5(json_encode($data ?: []));
+        if (array_key_exists($cache_key, $__get_cache)) {
+            return $__get_cache[$cache_key];
+        }
+    }
+
+    $response = callAPI_dispatch($method, $endpoint, $data);
+    if ($cache_key !== null) {
+        $__get_cache[$cache_key] = $response;
+    }
+    return $response;
+}
+
+/** دیسپچ واقعی درخواست (داخلی در حالت تست، وگرنه curl) */
+function callAPI_dispatch($method, $endpoint, $data = false) {
     // حالت تست/‏E2E: به‌جای HTTP، درخواست در همان فرایند از مسیر واقعی
     // کرنل (میدل‌ورها → روتر → کنترلر → سرویس) عبور می‌کند.
     if (defined('API_INTERNAL_DISPATCH') && API_INTERNAL_DISPATCH === true) {

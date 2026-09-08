@@ -33,7 +33,8 @@ $reopen_modal = $reopen_modal ?? '';
 require_once __DIR__ . '/modal.php';
 
 // اگر تعداد اعلانات تعیین نشده بود، از API خوانده شود (نمایش نشان ناوبری و زنگ)
-if (!isset($unread_nav) && function_exists('callAPI')) {
+// در صفحات بدون لاگین/بدون ناوبری (ورود، ثبت‌نام و…) نیازی به واکشی نیست.
+if (!isset($unread_nav) && empty($standalone) && !empty($_SESSION['token']) && function_exists('callAPI')) {
     $unread_nav = 0;
     $notif_response = callAPI('GET', '/notifications');
     if (!empty($notif_response['success'])) {
@@ -49,7 +50,7 @@ if (!isset($unread_nav)) {
 }
 
 // تعداد پیام‌های نخواندهٔ صندوق پیام (برای نشان ناوبری) — اگر صفحه خودش نیاورده باشد
-if (!isset($unread_messages_nav) && function_exists('callAPI')) {
+if (!isset($unread_messages_nav) && empty($standalone) && !empty($_SESSION['token']) && function_exists('callAPI')) {
     $unread_messages_nav = 0;
     $msg_building = (int) ($nav_building_id ?? ($building_id ?? ($_SESSION['active_building_id'] ?? 0)));
     if ($msg_building > 0) {
