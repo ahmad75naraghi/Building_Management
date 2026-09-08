@@ -111,6 +111,8 @@ $nav_qs = $nav_building_id > 0 ? '?building_id=' . $nav_building_id : '';
 
     <!-- اسکریپت مشترک همه صفحات -->
     <script src="assets/js/main.js"></script>
+    <!-- ارتقای تجربه: توست، نوار پیشرفت، جستجو/صفحه‌بندی فهرست‌ها -->
+    <script src="assets/js/ui-enhance.js"></script>
     <!-- تقویم شمسی برای فیلدهای تاریخ (data-jalali-date) -->
     <script src="assets/js/jalali-picker.js"></script>
     <!-- منطق نصب PWA و بنر -->

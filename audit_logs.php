@@ -64,7 +64,7 @@ if ($building_id > 0 && $is_manager) {
     if (!empty($building_response['success'])) {
         $building_name = $building_response['data']['name'] ?? '';
     }
-    $query = ['building_id' => $building_id, 'limit' => '200'];
+    $query = ['building_id' => (string) $building_id, 'limit' => '200'];
     if ($action_filter !== '') {
         $query['action'] = $action_filter;
     }
@@ -114,7 +114,11 @@ require_once 'includes/header.php';
                 هنوز اقدامی ثبت نشده است.
             </div>
         <?php else: ?>
-            <div class="space-y-3">
+            <div class="list-filter-bar">
+                <input type="search" class="form-input" data-list-search="audit-list" placeholder="🔍 جستجو در شرح اقدام، کاربر یا واحد…" style="flex:1;">
+                <span class="list-count-chip" data-list-count="audit-list"></span>
+            </div>
+            <div class="space-y-3" data-list-items="audit-list">
                 <?php foreach ($logs as $log): ?>
                     <?php
                     $l_action = (string) ($log['action'] ?? '');
@@ -142,6 +146,7 @@ require_once 'includes/header.php';
                     </div>
                 <?php endforeach; ?>
             </div>
+            <div data-list-pager="audit-list"></div>
         <?php endif; ?>
 
     <?php endif; ?>

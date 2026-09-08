@@ -456,7 +456,11 @@ require_once 'includes/header.php';
             هنوز هزینه‌ای ثبت نشده است.
         </div>
     <?php else: ?>
-        <div class="space-y-3">
+        <div class="list-filter-bar">
+            <input type="search" class="form-input" data-list-search="costs-list" placeholder="🔍 جستجوی عنوان یا توضیح هزینه…" style="flex:1;">
+            <span class="list-count-chip" data-list-count="costs-list"></span>
+        </div>
+        <div class="space-y-3" data-list-items="costs-list">
             <?php foreach ($costs as $cost): ?>
                 <?php
                 $c_id = (int) ($cost['id'] ?? 0);
@@ -561,6 +565,7 @@ require_once 'includes/header.php';
                 </div>
             <?php endforeach; ?>
         </div>
+        <div data-list-pager="costs-list"></div>
     <?php endif; ?>
 
     <!-- پرداخت‌ها -->
@@ -581,7 +586,11 @@ require_once 'includes/header.php';
             هنوز پرداختی ثبت نشده است.
         </div>
     <?php else: ?>
-        <div class="space-y-3">
+        <div class="list-filter-bar">
+            <input type="search" class="form-input" data-list-search="payments-list" placeholder="🔍 جستجوی پرداخت‌کننده، واحد یا وضعیت…" style="flex:1;">
+            <span class="list-count-chip" data-list-count="payments-list"></span>
+        </div>
+        <div class="space-y-3" data-list-items="payments-list">
             <?php foreach ($visible_payments as $payment): ?>
                 <?php $p_id = (int) ($payment['id'] ?? 0); ?>
                 <div class="card p-4">
@@ -655,6 +664,7 @@ require_once 'includes/header.php';
                 </div>
             <?php endforeach; ?>
         </div>
+        <div data-list-pager="payments-list"></div>
     <?php endif; ?>
 
 </main>

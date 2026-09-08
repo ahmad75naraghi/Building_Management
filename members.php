@@ -134,7 +134,11 @@ require_once 'includes/header.php';
             هنوز عضوی در ساختمان ثبت نشده است.
         </div>
     <?php else: ?>
-        <div class="space-y-3">
+        <div class="list-filter-bar">
+            <input type="search" class="form-input" data-list-search="members" placeholder="🔍 جستجوی نام، شماره یا واحد…" style="flex:1;">
+            <span class="list-count-chip" data-list-count="members"></span>
+        </div>
+        <div class="space-y-3" data-list-items="members">
             <?php foreach ($members as $member): ?>
                 <div class="card p-4 flex items-center gap-4">
                     <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 font-bold text-lg">
@@ -187,6 +191,7 @@ require_once 'includes/header.php';
                 </div>
             <?php endforeach; ?>
         </div>
+        <div data-list-pager="members"></div>
     <?php endif; ?>
 
     <!-- دعوت‌نامه‌های در انتظار -->
