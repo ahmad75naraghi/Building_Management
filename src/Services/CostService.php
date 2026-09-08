@@ -607,10 +607,9 @@ final class CostService
             $final = $shared !== null
                 ? (float) $shared['balance']
                 : round($running, 2);
-            if (!empty($list)) {
-                // سازگاری ماندهٔ لحظه‌ایِ آخرین تراکنش با ماندهٔ نهایی
-                $list[count($list) - 1]['balance'] = $final;
-            }
+            // سازگاری ماندهٔ لحظه‌ایِ آخرین تراکنش با ماندهٔ نهایی
+            // (ورود به این حلقه فقط برای واحدهای دارای حداقل یک تراکنش است)
+            $list[count($list) - 1]['balance'] = $final;
             if ($final < 0) {
                 $totalDebt += -$final;
             } else {
@@ -694,16 +693,20 @@ final class CostService
             if ($share > 0) {
                 $key = $monthKey((string) ($r['created_at'] ?? ''));
                 if ($key !== null) {
-                    $buckets[$uid][$key]['charge'] = ($buckets[$uid][$key]['charge'] ?? 0.0) + $share;
-                    $buildingBuckets[$key]['charge'] = ($buildingBuckets[$key]['charge'] ?? 0.0) + $share;
+                    $buckets[$uid][$key] = $buckets[$uid][$key] ?? ['charge' => 0.0, 'paid' => 0.0];
+                    $buildingBuckets[$key] = $buildingBuckets[$key] ?? ['charge' => 0.0, 'paid' => 0.0];
+                    $buckets[$uid][$key]['charge'] += $share;
+                    $buildingBuckets[$key]['charge'] += $share;
                 }
             }
             $paid = (float) ($r['amount_paid'] ?? 0);
             if (($r['status'] ?? '') === 'confirmed' && $paid > 0) {
                 $key = $monthKey((string) ($r['confirmed_at'] ?? $r['payment_date'] ?? $r['created_at'] ?? ''));
                 if ($key !== null) {
-                    $buckets[$uid][$key]['paid'] = ($buckets[$uid][$key]['paid'] ?? 0.0) + $paid;
-                    $buildingBuckets[$key]['paid'] = ($buildingBuckets[$key]['paid'] ?? 0.0) + $paid;
+                    $buckets[$uid][$key] = $buckets[$uid][$key] ?? ['charge' => 0.0, 'paid' => 0.0];
+                    $buildingBuckets[$key] = $buildingBuckets[$key] ?? ['charge' => 0.0, 'paid' => 0.0];
+                    $buckets[$uid][$key]['paid'] += $paid;
+                    $buildingBuckets[$key]['paid'] += $paid;
                 }
             }
         }
@@ -724,8 +727,8 @@ final class CostService
             $running = 0.0;
             $list = [];
             foreach ($months as $key => $b) {
-                $charge = round((float) ($b['charge'] ?? 0), 2);
-                $paid = round((float) ($b['paid'] ?? 0), 2);
+                $charge = round((float) $b['charge'], 2);
+                $paid = round((float) $b['paid'], 2);
                 $running = round($running + $paid - $charge, 2);
                 $list[] = $formatMonth($key) + [
                     'charge' => $charge,
@@ -746,8 +749,8 @@ final class CostService
         $buildingMonths = [];
         $buildingRunning = 0.0;
         foreach ($buildingBuckets as $key => $b) {
-            $charge = round((float) ($b['charge'] ?? 0), 2);
-            $paid = round((float) ($b['paid'] ?? 0), 2);
+            $charge = round((float) $b['charge'], 2);
+            $paid = round((float) $b['paid'], 2);
             $buildingRunning = round($buildingRunning + $paid - $charge, 2);
             $buildingMonths[] = $formatMonth($key) + [
                 'charge' => $charge,
@@ -1282,7 +1285,7 @@ final class CostService
     /**
      * تعیین پرداخت‌کنندگان یک هزینه بر اساس مخاطب انتخاب‌شده.
      *
-     * @return array<int, array{user_id: int, unit_ids: list<int>, weight: float}> فهرست با کلید = شناسه کاربر
+     * @return array<int, array{user_id: int, unit_ids: list<int>, weight: float, units: array<int, float>}> فهرست با کلید = شناسه کاربر
      */
     private function resolvePayers(Cost $cost): array
     {
@@ -1377,16 +1380,6 @@ final class CostService
         return $payers;
     }
 
-    /**
-     * محاسبه سهم هر پرداخت‌کننده.
-     *
-     * - تقسیم مساوی (پیش‌فرض): مبلغ کل ÷ تعداد پرداخت‌کنندگان
-     * - مساحت/نفرات: سهم وزنی بر اساس واحدهای مرتبط با پرداخت‌کننده
-     * - مبلغ سفارشی (custom): جمع مبالغ تعیین‌شده برای واحدهای پرداخت‌کننده
-     *
-     * @param array<int, array{user_id: int, unit_ids: list<int>, weight: float}> $payers
-     * @return array<int, float> سهم هر کاربر با کلید = شناسه کاربر
-     */
     /**
      * نرمال‌سازی شناسه واحدهای هدف؛ آرایه یا رشته جداشده با کاما می‌پذیرد.
      *

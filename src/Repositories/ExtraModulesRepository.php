@@ -370,7 +370,7 @@ final class ExtraModulesRepository
         $d->created_at = $row['created_at'];
         $d->stored_name = isset($row['stored_name']) && $row['stored_name'] !== null && $row['stored_name'] !== ''
             ? (string) $row['stored_name'] : null;
-        $d->mime_type = isset($row['mime_type']) ? ($row['mime_type'] !== null ? (string) $row['mime_type'] : null) : null;
+        $d->mime_type = isset($row['mime_type']) ? (string) $row['mime_type'] : null;
         $d->file_size = isset($row['file_size']) && $row['file_size'] !== null ? (int) $row['file_size'] : null;
         $d->is_visible_to_members = isset($row['is_visible_to_members']) ? (int) $row['is_visible_to_members'] : 1;
         $d->updated_at = isset($row['updated_at']) && $row['updated_at'] !== null ? (string) $row['updated_at'] : null;

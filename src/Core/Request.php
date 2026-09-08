@@ -56,6 +56,16 @@ final class Request
         return $this->post[$key] ?? $default;
     }
 
+    public function getCookieParam(string $key, mixed $default = null): mixed
+    {
+        return $this->cookies[$key] ?? $default;
+    }
+
+    public function getServerParam(string $key, mixed $default = null): mixed
+    {
+        return $this->server[$key] ?? $default;
+    }
+
     public function getJsonBody(): ?array
     {
         if ($this->body === null) {

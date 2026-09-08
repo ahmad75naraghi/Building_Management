@@ -103,7 +103,8 @@ final class DebtorReminderService
 
             // ثبت برای جلوگیری از ارسال تکراری در همین دوره (کلید یکتا محافظ نهایی)
             $stmt = Database::prepareInsertIgnore(
-                'INSERT INTO debtor_sms_log (building_id, unit_id, user_id, phone, amount, period)
+                $db,
+                'INSERT IGNORE INTO debtor_sms_log (building_id, unit_id, user_id, phone, amount, period)
                  VALUES (?, ?, ?, ?, ?, ?)'
             );
             $stmt->execute([

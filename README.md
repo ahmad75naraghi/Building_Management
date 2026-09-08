@@ -379,6 +379,7 @@ Migrationها از `001` تا `020` در `database/migrations/` و نسخه SQL 
 - **احراز هویت:** هدر `Authorization: Bearer <token>` (به‌جز register/login/refresh)
 - **فرمت پاسخ:** JSON با ساختار `{ "success": bool, "message"?: string, "data"?: ... }`
 - **کالکشن Postman:** فایل `Building Management Pro - Master.postman_collection` — شامل ۱۴۱ درخواست در ۸ پوشه، متغیر `base_url`، ذخیره خودکار توکن بعد از Login و هدرهای خودکار `Accept` و `Content-Type: application/json`
+- **مشخصات OpenAPI 3.0:** فایل `docs/openapi.json` — تولید خودکار از جدول روت‌ها با `php scripts/generate_openapi.php`؛ پس از هر تغییر روت بازتولید شود (سوئیت تست `openapi` همگام‌سازی را تضمین می‌کند). قابل مشاهده در هر ابزار سازگار (مثل `editor.swagger.io` یا Swagger UI).
 
 ### ۱. احراز هویت (Auth)
 
@@ -569,14 +570,21 @@ Migrationها از `001` تا `020` در `database/migrations/` و نسخه SQL 
 ## 🧪 تست و ابزارها
 
 ```bash
-composer test            # ۷۱۲ تست یکپارچه + E2E (بدون نیاز به دیتابیس یا افزونه خاص)
+composer test            # ۷۲۴ تست یکپارچه + E2E (بدون نیاز به دیتابیس یا افزونه خاص)
 composer test:unit       # تست‌های قدیمی PHPUnit (tests/Unit)
 composer health          # بررسی سلامت و آمادگی استقرار
 composer migrate:status  # نمایش مایگریشن‌های در انتظار
 composer migrate         # اجرای مایگریشن‌های اعمال‌نشده
 composer verify          # بررسی اتصال routes/controllers/services/models/schema
+composer analyse         # تحلیل استاتیک هسته با PHPStan (سطح ۵ — تنظیم در phpstan.neon)
+composer quality         # دروازهٔ کیفیت کامل: PHPStan + تست‌ها
 composer serve           # سرور توسعه روی پورت 8000
+php scripts/generate_openapi.php   # بازتولید خروجی مستندات API در docs/openapi.json
 ```
+
+> 💡 `composer analyse` به بستهٔ توسعهٔ `phpstan/phpstan` نیاز دارد؛ بار اول با
+> `composer update` (یا `composer install`) نصب می‌شود. دروازهٔ کیفیت در نمونهٔ
+> گردش کار `ci/github-actions.yml.example` نیز فعال شده است.
 
 تست‌ها یک پایگاه‌داده **SQLite در حافظه** می‌سازند و آن را به `App\Core\Database`
 تزریق می‌کنند، بنابراین سرویس‌های واقعی بدون نیاز به MySQL اجرا می‌شوند.
@@ -596,7 +604,7 @@ composer serve           # سرور توسعه روی پورت 8000
 | فاز ۶ — ماژول‌های حرفه‌ای (۱۰ ماژول) | ✅ تکمیل — GET/POST + تغییر وضعیت (PUT) + حذف (DELETE) + رأی‌گیری کامل با گزینه/رأی/نتیجه |
 | ورود یکپارچه با موبایل و کد یک‌بارمصرف | ✅ تکمیل |
 | رابط مودال‌محور + ویرایش کامل + نقش‌ها + سه حالت شارژ | ✅ تکمیل |
-| لاگ‌گیر مرکزی و ۷۱۲ تست (یکپارچه + رندر E2E صفحات) | ✅ تکمیل |
+| لاگ‌گیر مرکزی و ۷۲۴ تست (یکپارچه + رندر E2E صفحات) | ✅ تکمیل |
 | تقویم شمسی رویدادها + یادآوری خودکار (اعلان + پیامک) | ✅ تکمیل |
 | هزینه موردی با انتخاب مخاطب (ساکنین/مالکین/مستأجرین/واحدهای خاص) و صدور سهم | ✅ تکمیل |
 | نمای گرافیکی ساختمان (بلوک ← طبقه ← واحد) با پاپ‌آپ اطلاعات و اقدامات واحد | ✅ تکمیل |
@@ -614,7 +622,7 @@ composer serve           # سرور توسعه روی پورت 8000
 | بهینه‌سازی پایگاه‌داده: ایندکس‌های عملکردی روی جدول‌های پرتراکنش (مهاجرت ۰۳۴) | ✅ تکمیل |
 | گزارش‌گیری پیشرفته: ریز مانده‌ها به تفکیک ماه شمسی + خروجی اکسل (لجر و گزارش ماهانه) | ✅ تکمیل |
 | یادآوری پیامکی بدهکاران در کران روزانه (هر واحد حداکثر یک‌بار در ماه، قالب قابل تنظیم، ضدتکرار با مهاجرت ۰۳۶) | ✅ تکمیل |
-| تست و بهینه‌سازی (PHPStan, OpenAPI) | 🟡 تست‌ها کامل؛ PHPStan و OpenAPI باقی‌مانده |
+| تست و بهینه‌سازی (PHPStan, OpenAPI) | ✅ تحلیل استاتیک (سطح ۵) + خروجی `docs/openapi.json` + گردش کار `quality` |
 | استقرار production (OPcache, .env, Backup) | 🟡 `.env` و healthcheck آماده؛ OPcache و Backup باقی‌مانده |
 
 ---
