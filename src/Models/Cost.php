@@ -21,6 +21,12 @@ final class Cost
     public string $status = 'pending';
     public bool $is_recurring = false;
     public ?string $recurring_interval = null;
+    /** تاریخ شروع/پایان/نوبت بعدی برای قالب‌های دوره‌ای */
+    public ?string $recurring_start_date = null;
+    public ?string $recurring_end_date = null;
+    public ?string $recurring_next_date = null;
+    /** نمونه‌های صادرشده به قالب دوره‌ای خود وصل می‌شوند */
+    public ?int $parent_cost_id = null;
     public int $created_by;
     public ?string $created_at = null;
     /** زمان صدور هزینه برای مخاطبان (ایجاد ردیف‌های پرداخت و اعلان) */
@@ -43,6 +49,10 @@ final class Cost
             'status' => $this->status,
             'is_recurring' => $this->is_recurring,
             'recurring_interval' => $this->recurring_interval,
+            'recurring_start_date' => $this->recurring_start_date,
+            'recurring_end_date' => $this->recurring_end_date,
+            'recurring_next_date' => $this->recurring_next_date,
+            'parent_cost_id' => $this->parent_cost_id,
             'issued_at' => $this->issued_at,
         ];
     }

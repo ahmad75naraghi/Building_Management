@@ -433,6 +433,12 @@ require_once 'includes/dash_head.php';
                     <span style="font-size: 20px;">💰</span>
                     <span class="tile-label">مالی</span>
                 </a>
+                <?php if ($is_manager): ?>
+                <a href="accounting.php?building_id=<?= $building_id ?>" class="quick-btn-item">
+                    <span style="font-size: 20px;">🧾</span>
+                    <span class="tile-label">حسابداری</span>
+                </a>
+                <?php endif; ?>
                 <a href="tickets.php?building_id=<?= $building_id ?>" class="quick-btn-item">
                     <span style="font-size: 20px;">🎫</span>
                     <span class="tile-label">تیکت</span>

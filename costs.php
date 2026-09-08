@@ -67,6 +67,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action'])) {
                 'due_date' => !empty($_POST['due_date']) ? $_POST['due_date'] : null,
                 'target_audience' => $_POST['target_audience'] ?? 'all',
                 'target_unit_ids' => array_values(array_map('intval', $_POST['unit_ids'] ?? [])),
+                'is_recurring' => !empty($_POST['is_recurring']),
+                'recurring_interval' => $_POST['recurring_interval'] ?? 'monthly',
+                'recurring_start_date' => $_POST['recurring_start_date'] ?? null,
+                'recurring_end_date' => $_POST['recurring_end_date'] ?? null,
             ];
             if ($action === 'update_cost') {
                 $cost_id = (int) ($_POST['cost_id'] ?? 0);
@@ -329,6 +333,11 @@ require_once 'includes/header.php';
 ?>
 
 <main class="p-5">
+    <?php if ($is_manager): ?>
+        <div class="flex gap-2 flex-wrap mb-4">
+            <a href="accounting.php?building_id=<?= $building_id ?>" class="btn-secondary" style="font-size:12px;">🧾 حسابداری — مانده واحدها، پرداخت و بدهی مستقیم</a>
+        </div>
+    <?php endif; ?>
 
     <!-- خلاصه مالی -->
     <div class="finance-summary-card">
@@ -454,7 +463,12 @@ require_once 'includes/header.php';
                 $c_title = $cost['title'] ?? 'بدون عنوان';
                 $c_desc = $cost['description'] ?? '';
                 // توضیح داخلی شارژ خودکار برای کاربر نمایش داده نشود
-                $is_auto = str_starts_with((string) $c_desc, 'auto:monthly:');
+                $is_auto = str_starts_with((string) $c_desc, 'auto:monthly:') || str_starts_with((string) $c_desc, 'auto:recurring:');
+                $is_template = ($cost['cost_type'] ?? '') === 'recurring';
+                $is_deposit = ($cost['cost_type'] ?? '') === 'direct_deposit';
+                if ($is_deposit) {
+                    continue; // دریافت‌های مستقیم فقط در گردش حساب دیده می‌شوند
+                }
                 $c_amount = (float) ($cost['amount'] ?? 0);
                 $c_audience = $cost['target_audience'] ?? 'all';
                 $c_issued = !empty($cost['issued_at']);
@@ -478,7 +492,12 @@ require_once 'includes/header.php';
                     </div>
 
                     <div class="building-list-chips" style="margin-top:10px;">
-                        <span class="chip chip-gray"><?= ($cost['cost_type'] ?? '') === 'one_time' ? 'یک‌باره' : 'دوره‌ای' ?></span>
+                        <span class="chip chip-gray"><?= ($cost['cost_type'] ?? '') === 'one_time' ? 'یک‌باره' : (($cost['cost_type'] ?? '') === 'recurring' ? 'قالب دوره‌ای' : 'دوره‌ای') ?></span>
+                        <?php if ($is_template): ?>
+                            <?php $int_label = \App\Services\CostService::intervalLabel($cost['recurring_interval'] ?? 'monthly'); ?>
+                            <span class="chip chip-amber">🔁 <?= htmlspecialchars($int_label) ?><?= !empty($cost['recurring_next_date']) ? ' — نوبت بعد: ' . fa_date($cost['recurring_next_date']) : '' ?></span>
+                            <?php if (($cost['status'] ?? '') === 'ended'): ?><span class="chip chip-gray">پایان‌یافته</span><?php endif; ?>
+                        <?php endif; ?>
                         <span class="chip chip-gray"><?= htmlspecialchars($division_labels[$cost['division_method'] ?? 'fixed_share'] ?? 'سهم مساوی') ?></span>
                         <?php if (!$is_auto): ?>
                             <span class="chip chip-gray">👥 <?= htmlspecialchars($audience_labels[$c_audience] ?? 'همه اعضا') ?><?php
@@ -498,6 +517,7 @@ require_once 'includes/header.php';
                     </div>
 
                     <div class="card-actions">
+                        <?php if (!$is_template): ?>
                         <button type="button" class="btn-chip btn-chip-success"
                                 data-modal-open="pay-cost"
                                 data-set-cost_id="<?= $c_id ?>"
@@ -505,9 +525,10 @@ require_once 'includes/header.php';
                                 data-set-amount_paid="<?= (int) ($c_my_share ?? $c_amount) ?>">
                             پرداخت<?= $c_my_share !== null ? ' سهم من' : '' ?>
                         </button>
+                        <?php endif; ?>
 
                         <?php if ($is_manager): ?>
-                            <?php if (!$is_auto && !$c_issued): ?>
+                            <?php if (!$is_auto && !$is_template && !$c_issued): ?>
                                 <form method="POST" action="" style="display:inline;"
                                       data-confirm="این هزینه برای مخاطبان انتخاب‌شده صادر شود؟ درخواست پرداخت و اعلان برای آن‌ها ارسال می‌شود.">
                                     <?= csrf_field() ?>
@@ -906,6 +927,22 @@ require_once 'includes/header.php';
                 });
             });
             syncAudienceBoxes();
+        })();
+
+        /* نمایش/مخفی‌کردن فیلدهای هزینهٔ دوره‌ای با چک‌باکس «تکرار می‌شود» */
+        (function () {
+            document.querySelectorAll('[data-recurring-toggle]').forEach(function (cb) {
+                var fields = cb.closest('div').parentElement.querySelector('[data-recurring-fields]');
+                function syncRec() {
+                    if (fields) {
+                        fields.style.display = cb.checked ? '' : 'none';
+                        var startDate = fields.querySelector('input[name="recurring_start_date"]');
+                        if (startDate) { startDate.required = cb.checked; }
+                    }
+                }
+                cb.addEventListener('change', syncRec);
+                syncRec();
+            });
         })();
     </script>
 

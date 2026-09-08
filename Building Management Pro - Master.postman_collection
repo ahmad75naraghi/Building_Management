@@ -3864,6 +3864,131 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "گردش حساب واحدها — لجر (Building Ledger)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/buildings/1/ledger",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "buildings",
+                "1",
+                "ledger"
+              ]
+            },
+            "description": "بدهی/پرداخت هر واحد به ترتیب تاریخ با ماندهٔ لحظه‌ای؛ ماندهٔ منفی = بدهکار، مثبت = طلبکار."
+          },
+          "response": []
+        },
+        {
+          "name": "پرداخت مستقیم برای واحد (Direct Payment)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/buildings/1/direct-payments",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "buildings",
+                "1",
+                "direct-payments"
+              ]
+            },
+            "description": "ثبت پرداخت توسط مدیر بدون درخواست ساکن؛ بلافاصله تأیید و به حساب واحد منظور می‌شود. مبلغ بیشتر از بدهی = طلبکاری واحد.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"unit_id\": 1,\n    \"amount\": 500000,\n    \"notes\": \"واریز کارت به کارت\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "بدهی مستقیم برای واحد (Unit Charge)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/buildings/1/unit-charges",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "buildings",
+                "1",
+                "unit-charges"
+              ]
+            },
+            "description": "ثبت بدهی یک‌باره برای یک واحد خاص توسط مدیر؛ بلافاصله صادر و از اعتبار واحد کم می‌شود.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"unit_id\": 1,\n    \"amount\": 200000,\n    \"title\": \"جریمه دیرکرد\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "اجرای دستی موتور دوره‌ای (Recurring Generate)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/buildings/1/recurring-generate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "buildings",
+                "1",
+                "recurring-generate"
+              ]
+            },
+            "description": "معادل کران روزانه: صدور نوبت‌های سررسیدشدهٔ هزینه‌های دوره‌ای + شارژ ماه جاری ساختمان‌ها. توان‌تکرار است."
+          },
+          "response": []
+        },
+        {
+          "name": "هزینه دوره‌ای با تناوب (Recurring Cost Template)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/costs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "costs"
+              ]
+            },
+            "description": "قالب دوره‌ای: هفتگی/دوهفتگی/ماهانه/دوماهانه/سه‌ماهانه/سالانه. کران روزانه در هر نوبت یک هزینهٔ جدا می‌سازد و صادر می‌کند.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"building_id\": 1,\n    \"title\": \"نظافت راه‌پله\",\n    \"amount\": 300000,\n    \"is_recurring\": true,\n    \"recurring_interval\": \"weekly\",\n    \"recurring_start_date\": \"2026-09-10\",\n    \"recurring_end_date\": null,\n    \"target_audience\": \"all\",\n    \"division_method\": \"fixed_share\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
         }
       ]
     },

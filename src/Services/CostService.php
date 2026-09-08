@@ -78,6 +78,30 @@ final class CostService
         $cost->status = $data['status'] ?? 'pending';
         $cost->is_recurring = (bool) ($data['is_recurring'] ?? false);
         $cost->recurring_interval = $data['recurring_interval'] ?? 'monthly';
+
+        // هزینهٔ دوره‌ای با تناوب مشخص → به‌صورت «قالب» ذخیره می‌شود؛
+        // کران روزانه در هر نوبت یک نمونهٔ قابل‌پرداخت می‌سازد و صادر می‌کند.
+        if ($cost->is_recurring) {
+            $interval = (string) ($data['recurring_interval'] ?? 'monthly');
+            if (!array_key_exists($interval, self::RECURRING_INTERVALS)) {
+                throw new ValidationException('تناوب تکرار نامعتبر است.');
+            }
+            $start = trim((string) ($data['recurring_start_date'] ?? date('Y-m-d')));
+            if (strtotime($start) === false) {
+                throw new ValidationException('تاریخ شروع دوره معتبر نیست.');
+            }
+            $end = trim((string) ($data['recurring_end_date'] ?? ''));
+            if ($end !== '' && (strtotime($end) === false || strtotime($end) < strtotime($start))) {
+                throw new ValidationException('تاریخ پایان دوره باید پس از تاریخ شروع آن باشد.');
+            }
+            $cost->cost_type = 'recurring';
+            $cost->status = 'active';
+            $cost->recurring_interval = $interval;
+            $cost->recurring_start_date = date('Y-m-d', strtotime($start));
+            $cost->recurring_end_date = $end !== '' ? date('Y-m-d', strtotime($end)) : null;
+            $cost->recurring_next_date = $cost->recurring_start_date;
+        }
+
         $cost->created_by = $userId;
 
         $id = $this->costRepo->create($cost);
@@ -171,6 +195,429 @@ final class CostService
                 return 'مبلغ شارژ ثابت ماهیانه تنظیم نشده است. ابتدا مبلغ را ذخیره کنید.';
         }
     }
+
+    // ================================================================
+    //  هزینه‌های دوره‌ای با تناوب دلخواه + کران روزانه
+    // ================================================================
+
+    /** تناوب‌های مجاز هزینهٔ دوره‌ای */
+    public const RECURRING_INTERVALS = [
+        'weekly' => 'هفتگی (هر هفته)',
+        'biweekly' => 'دو هفته یک‌بار',
+        'monthly' => 'ماهانه',
+        'bimonthly' => 'دو ماه یک‌بار',
+        'quarterly' => 'سه ماه یک‌بار',
+        'yearly' => 'سالانه',
+    ];
+
+    /** حداکثر نمونه‌سازی عقب‌افتاده برای یک قالب (جلوگیری از حلقهٔ بی‌پایان) */
+    private const MAX_CATCHUP = 24;
+
+    public static function intervalLabel(?string $interval): string
+    {
+        return self::RECURRING_INTERVALS[$interval ?? ''] ?? 'ماهانه';
+    }
+
+    /** افزودن یک تناوب به تاریخ (Y-m-d) و بازگشت تاریخ جدید */
+    public static function addInterval(string $date, string $interval): string
+    {
+        $d = new \DateTime(substr($date, 0, 10));
+        switch ($interval) {
+            case 'weekly':
+                $d->modify('+1 week');
+                break;
+            case 'biweekly':
+                $d->modify('+2 weeks');
+                break;
+            case 'bimonthly':
+                $d->modify('+2 months');
+                break;
+            case 'quarterly':
+                $d->modify('+3 months');
+                break;
+            case 'yearly':
+                $d->modify('+1 year');
+                break;
+            default:
+                $d->modify('+1 month');
+        }
+        return $d->format('Y-m-d');
+    }
+
+    /**
+     * تولید و صدور نمونه‌های سررسیدشدهٔ هزینه‌های دوره‌ای.
+     * کاملاً توان‌تکرار (idempotent): هر نوبت با نشانگر یکتا ثبت می‌شود.
+     *
+     * @return array{generated:int, ended:int, details:list<array<string, mixed>>}
+     */
+    public function generateDueRecurringCosts(?string $today = null): array
+    {
+        $today = date('Y-m-d', strtotime($today ?: date('Y-m-d')));
+        $templates = $this->costRepo->findDueRecurringTemplates($today);
+        $generated = 0;
+        $ended = 0;
+        $details = [];
+
+        foreach ($templates as $tpl) {
+            $next = $tpl->recurring_next_date;
+            $guard = 0;
+            $stuck = false; // صدور ناموفق: نوبت جلو نمی‌رود تا در کران بعدی دوباره تلاش شود
+
+            while ($next !== null && $next <= $today && $guard < self::MAX_CATCHUP) {
+                $guard++;
+                // پایان دوره؟
+                if ($tpl->recurring_end_date !== null && $next > $tpl->recurring_end_date) {
+                    $next = null;
+                    break;
+                }
+                $marker = 'auto:recurring:' . $tpl->id . ':' . $next;
+                if (!$this->costExistsWithDescription((int) $tpl->building_id, $marker)) {
+                    $child = new Cost();
+                    $child->building_id = (int) $tpl->building_id;
+                    $child->title = $tpl->title . ' (نوبت ' . $next . ')';
+                    $child->description = $marker;
+                    $child->amount = $tpl->amount;
+                    $child->cost_type = 'periodic';
+                    $child->target_audience = $tpl->target_audience;
+                    $child->division_method = $tpl->division_method;
+                    $child->target_unit_ids = $tpl->target_unit_ids;
+                    $child->due_date = $next;
+                    $child->status = 'pending';
+                    $child->is_recurring = false;
+                    $child->recurring_interval = null;
+                    $child->parent_cost_id = $tpl->id;
+                    $child->created_by = (int) $tpl->created_by;
+                    $childId = $this->costRepo->create($child);
+
+                    try {
+                        $this->issueCost((int) $childId, (int) $tpl->created_by);
+                        $generated++;
+                        $details[] = ['template_id' => $tpl->id, 'cost_id' => $childId, 'period' => $next];
+                    } catch (\Throwable $e) {
+                        Logger::warning('CostService', 'صدور نمونهٔ دوره‌ای ناموفق بود', [
+                            'template_id' => $tpl->id, 'period' => $next, 'reason' => $e->getMessage(),
+                        ]);
+                        // نمونهٔ ساخته‌شده حذف می‌شود و نوبت سررسید ثابت می‌ماند تا دوباره تلاش شود
+                        $this->costRepo->delete((int) $childId);
+                        $stuck = true;
+                        break;
+                    }
+                }
+                $next = self::addInterval($next, (string) $tpl->recurring_interval);
+            }
+
+            if ($stuck) {
+                // هیچ پیشرفتی حاصل نشد؛ چیزی تغییر نمی‌کند
+                continue;
+            }
+            if ($next === null) {
+                $this->costRepo->advanceRecurringTemplate((int) $tpl->id, null, 'ended');
+                $ended++;
+            } elseif ($tpl->recurring_end_date !== null && $next > $tpl->recurring_end_date) {
+                // دوره تمام شده؛ حتی اگر نوبت بعد در آینده باشد، قالب بسته می‌شود
+                $this->costRepo->advanceRecurringTemplate((int) $tpl->id, null, 'ended');
+                $ended++;
+            } else {
+                $this->costRepo->advanceRecurringTemplate((int) $tpl->id, $next);
+            }
+        }
+
+        if ($generated > 0 || $ended > 0) {
+            // کاربر ۰ = سیستم (کران)
+            \App\Core\Audit::log(0, 'cron.recurring', null, null, null, [
+                'generated' => $generated, 'ended' => $ended, 'date' => $today,
+            ]);
+        }
+        return ['generated' => $generated, 'ended' => $ended, 'details' => $details];
+    }
+
+    /**
+     * کران: اطمینان از صدور شارژ ماه جاری برای همهٔ ساختمان‌های فعال.
+     *
+     * @return array{created:int, skipped:int}
+     */
+    public function generateAllMonthlyCharges(): array
+    {
+        $db = Database::getConnection();
+        $rows = $db->query(
+            "SELECT b.id AS building_id,
+                    (SELECT bm.user_id FROM building_members bm
+                      WHERE bm.building_id = b.id AND bm.role = 'manager' AND bm.status = 'active'
+                      ORDER BY bm.id LIMIT 1) AS manager_id
+             FROM buildings b
+             WHERE b.monthly_charge_enabled = 1 AND b.deleted_at IS NULL"
+        )->fetchAll(\PDO::FETCH_ASSOC);
+
+        $created = 0;
+        $skipped = 0;
+        foreach ($rows as $r) {
+            $buildingId = (int) $r['building_id'];
+            $managerId = (int) ($r['manager_id'] ?? 0);
+            if ($managerId <= 0) {
+                $skipped++;
+                continue;
+            }
+            try {
+                $cost = $this->createMonthlyCharge($buildingId, $managerId);
+                if ($cost->status === 'pending' && empty($cost->issued_at)) {
+                    $this->issueCost((int) $cost->id, $managerId);
+                    $created++;
+                } else {
+                    $skipped++;
+                }
+            } catch (\Throwable $e) {
+                $skipped++;
+                Logger::warning('CostService', 'کران شارژ ماهیانه برای ساختمان ناموفق بود', [
+                    'building_id' => $buildingId, 'reason' => $e->getMessage(),
+                ]);
+            }
+        }
+        return ['created' => $created, 'skipped' => $skipped];
+    }
+
+    /** آیا هزینه‌ای با این نشانگر در ساختمان هست؟ */
+    private function costExistsWithDescription(int $buildingId, string $description): bool
+    {
+        $stmt = Database::getConnection()->prepare(
+            "SELECT id FROM costs WHERE building_id = ? AND description = ? LIMIT 1"
+        );
+        $stmt->execute([$buildingId, $description]);
+        return (bool) $stmt->fetchColumn();
+    }
+
+    // ================================================================
+    //  ثبت مستقیم توسط مدیر (بدون درخواست ساکن)
+    // ================================================================
+
+    /** آیا کاربر مدیر فعال این ساختمان است؟ (عمومی برای کنترلرها) */
+    public function isBuildingManager(int $userId, int $buildingId): bool
+    {
+        $stmt = Database::getConnection()->prepare(
+            "SELECT id FROM building_members
+             WHERE user_id = ? AND building_id = ? AND role = 'manager' AND status = 'active' LIMIT 1"
+        );
+        $stmt->execute([$userId, $buildingId]);
+        return (bool) $stmt->fetchColumn();
+    }
+
+    private function requireBuildingManager(int $userId, int $buildingId): void
+    {
+        if (!$this->isBuildingManager($userId, $buildingId)) {
+            throw new AppException('فقط مدیر ساختمان می‌تواند این کار را انجام دهد.');
+        }
+    }
+
+    /** واحد باید متعلق به همان ساختمان باشد؛ شناسهٔ ساکن (مستأجر وگرنه مالک) برمی‌گردد */
+    private function resolveUnitInBuilding(int $buildingId, int $unitId): array
+    {
+        $stmt = Database::getConnection()->prepare(
+            "SELECT id, unit_number, owner_user_id, tenant_user_id FROM units WHERE id = ? AND building_id = ? LIMIT 1"
+        );
+        $stmt->execute([$unitId, $buildingId]);
+        $unit = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$unit) {
+            throw new AppException('واحد در این ساختمان پیدا نشد.');
+        }
+        return $unit;
+    }
+
+    /**
+     * ثبت مستقیم پرداخت برای یک واحد توسط مدیر (بدون درخواست ساکن).
+     * پرداخت بلافاصله تأیید می‌شود و به حساب واحد می‌نشیند (بدهی کم / طلب زیاد).
+     */
+    public function recordDirectPayment(int $buildingId, int $unitId, float $amount, ?string $notes, int $managerId): CostPayment
+    {
+        $this->requireBuildingManager($managerId, $buildingId);
+        if ($amount <= 0) {
+            throw new ValidationException('مبلغ پرداخت باید بیشتر از صفر باشد.');
+        }
+        $unit = $this->resolveUnitInBuilding($buildingId, $unitId);
+        $payerUserId = (int) ($unit['tenant_user_id'] ?: $unit['owner_user_id']);
+        if ($payerUserId <= 0) {
+            throw new AppException('این واحد مالک یا مستأجری ندارد؛ ابتدا در صفحه واحدها مشخص کنید.');
+        }
+
+        // هزینهٔ «دریافت مستقیم» با مبلغ صفر می‌سازیم تا ردیف پرداخت، مرجع حسابداری داشته باشد
+        $deposit = new Cost();
+        $deposit->building_id = $buildingId;
+        $deposit->title = 'پرداخت مستقیم واحد ' . $unit['unit_number'];
+        $deposit->description = 'direct-payment';
+        $deposit->amount = 0.0;
+        $deposit->cost_type = 'direct_deposit';
+        $deposit->target_audience = 'specific_units';
+        $deposit->division_method = 'fixed_share';
+        $deposit->target_unit_ids = [$unitId];
+        $deposit->status = 'pending';
+        $deposit->created_by = $managerId;
+        $deposit->id = $this->costRepo->create($deposit);
+
+        $this->issueCost((int) $deposit->id, $managerId);
+
+        $payment = $this->paymentRepo->findByCostAndUser((int) $deposit->id, $payerUserId);
+        if (!$payment) {
+            throw new AppException('ردیف پرداخت برای این واحد ساخته نشد.');
+        }
+
+        $db = Database::getConnection();
+        $now = date('Y-m-d H:i:s');
+        $db->prepare(
+            "UPDATE cost_payments
+             SET amount_paid = ?, status = 'confirmed', payment_date = ?, confirmed_at = ?, confirmed_by = ?, notes = ?
+             WHERE id = ?"
+        )->execute([$amount, $now, $now, $managerId, $notes, $payment->id]);
+
+        \App\Core\Audit::log($managerId, 'payment.direct', 'cost_payment', (int) $payment->id, $buildingId, [
+            'unit_id' => $unitId, 'amount' => $amount,
+        ]);
+        try {
+            (new NotificationService())->createNotification([
+                'user_id' => $payerUserId,
+                'building_id' => $buildingId,
+                'notification_type' => 'payment',
+                'title' => 'پرداخت شما ثبت شد',
+                'message' => 'پرداخت ' . number_format($amount) . ' تومانی توسط مدیر ساختمان برای واحد ' . $unit['unit_number'] . ' ثبت و تأیید شد.',
+            ]);
+        } catch (\Throwable $e) {
+            Logger::error('CostService', 'اعلان پرداخت مستقیم ارسال نشد', ['payment_id' => $payment->id], $e);
+        }
+
+        $payment->amount_paid = $amount;
+        $payment->status = 'confirmed';
+        return $payment;
+    }
+
+    /**
+     * ثبت مستقیم بدهی (هزینه) برای یک واحد خاص توسط مدیر — بلافاصله صادر می‌شود.
+     */
+    public function recordUnitCharge(int $buildingId, int $unitId, float $amount, string $title, int $managerId, ?string $dueDate = null): Cost
+    {
+        $this->requireBuildingManager($managerId, $buildingId);
+        if ($amount <= 0) {
+            throw new ValidationException('مبلغ بدهی باید بیشتر از صفر باشد.');
+        }
+        if (trim($title) === '') {
+            throw new ValidationException('عنوان بدهی را وارد کنید.');
+        }
+        $this->resolveUnitInBuilding($buildingId, $unitId);
+
+        $cost = $this->createCost([
+            'building_id' => $buildingId,
+            'title' => trim($title),
+            'amount' => $amount,
+            'cost_type' => 'one_time',
+            'target_audience' => 'specific_units',
+            'target_unit_ids' => [$unitId],
+            'division_method' => 'fixed_share',
+            'due_date' => $dueDate,
+            'description' => 'ثبت مستقیم مدیر برای واحد',
+        ], $managerId);
+
+        $this->issueCost((int) $cost->id, $managerId);
+        \App\Core\Audit::log($managerId, 'cost.direct', 'cost', (int) $cost->id, $buildingId, [
+            'unit_id' => $unitId, 'amount' => $amount,
+        ]);
+        return $cost;
+    }
+
+    // ================================================================
+    //  گردش حساب واحد (لجر)
+    // ================================================================
+
+    /**
+     * گردش حساب واحدهای ساختمان: هر بدهی (سهم صادرشده) و هر اعتبار (پرداخت تأییدشده)
+     * به‌ترتیب تاریخ، همراه ماندهٔ لحظه‌ای. ماندهٔ مثبت = طلبکار، منفی = بدهکار.
+     *
+     * @return array{units: array<int, array<string, mixed>>, totals: array{debt:float, credit:float, balance:float}}
+     */
+    public function getBuildingLedger(int $buildingId, int $userId): array
+    {
+        if (!$this->isBuildingMember($userId, $buildingId)) {
+            throw new AppException('شما عضو این ساختمان نیستید.');
+        }
+
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "SELECT cp.id AS payment_id, cp.unit_id, cp.share_amount, cp.amount_paid, cp.status,
+                    cp.payment_date, cp.confirmed_at, cp.created_at, cp.notes,
+                    c.title AS cost_title, c.cost_type, c.due_date,
+                    un.unit_number
+             FROM cost_payments cp
+             INNER JOIN costs c ON cp.cost_id = c.id
+             LEFT JOIN units un ON cp.unit_id = un.id
+             WHERE c.building_id = ? AND cp.unit_id IS NOT NULL AND c.deleted_at IS NULL
+             ORDER BY cp.unit_id, cp.id"
+        );
+        $stmt->execute([$buildingId]);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        $unitMeta = [];
+        $events = []; // unit_id => list of ['ts','date','title','debit','credit','type']
+        foreach ($rows as $r) {
+            $uid = (int) $r['unit_id'];
+            $unitMeta[$uid] = (string) ($r['unit_number'] ?? $uid);
+            $isDeposit = ($r['cost_type'] ?? '') === 'direct_deposit';
+
+            // رویداد بدهی: سهم صادرشده (برای دریافت مستقیم، سهم صفر است)
+            $share = (float) ($r['share_amount'] ?? 0);
+            if ($share > 0) {
+                $events[$uid][] = [
+                    'ts' => (string) ($r['created_at'] ?? ''),
+                    'title' => $r['cost_title'] ?? 'هزینه',
+                    'debit' => $share,
+                    'credit' => 0.0,
+                    'type' => 'charge',
+                ];
+            }
+            // رویداد اعتبار: پرداخت تأییدشده
+            $paid = (float) ($r['amount_paid'] ?? 0);
+            if (($r['status'] ?? '') === 'confirmed' && $paid > 0) {
+                $events[$uid][] = [
+                    'ts' => (string) ($r['confirmed_at'] ?? $r['payment_date'] ?? $r['created_at'] ?? ''),
+                    'title' => $isDeposit ? 'پرداخت مستقیم' . ($r['notes'] ? ' — ' . $r['notes'] : '')
+                                           : 'پرداخت — ' . ($r['cost_title'] ?? ''),
+                    'debit' => 0.0,
+                    'credit' => $paid,
+                    'type' => 'payment',
+                ];
+            }
+        }
+
+        $units = [];
+        $totalDebt = 0.0;
+        $totalCredit = 0.0;
+        foreach ($events as $uid => $list) {
+            usort($list, static fn(array $a, array $b): int => strcmp($a['ts'], $b['ts']) ?: strcmp($a['type'], $b['type']));
+            $balance = 0.0;
+            foreach ($list as &$ev) {
+                $balance += $ev['credit'] - $ev['debit'];
+                $ev['balance'] = round($balance, 2);
+            }
+            unset($ev);
+            $final = round($balance, 2);
+            if ($final < 0) {
+                $totalDebt += -$final;
+            } else {
+                $totalCredit += $final;
+            }
+            $units[$uid] = [
+                'unit_id' => $uid,
+                'unit_number' => $unitMeta[$uid] ?? (string) $uid,
+                'balance' => $final,
+                'state' => $final < 0 ? 'debtor' : ($final > 0 ? 'creditor' : 'settled'),
+                'entries' => $list,
+            ];
+        }
+
+        return [
+            'units' => $units,
+            'totals' => [
+                'debt' => round($totalDebt, 2),
+                'credit' => round($totalCredit, 2),
+                'balance' => round($totalCredit - $totalDebt, 2),
+            ],
+        ];
+    }
+
 
     /**
      * آیا کاربر مدیر این ساختمان است؟

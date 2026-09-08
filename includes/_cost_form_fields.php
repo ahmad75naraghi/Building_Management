@@ -95,6 +95,40 @@
     <label class="form-label">مهلت پرداخت (اختیاری)</label>
     <input type="date" name="due_date" class="form-input">
 </div>
+
+<!-- هزینهٔ دوره‌ای با تناوب دلخواه؛ کران روزانه در هر نوبت آن را صادر می‌کند -->
+<div style="background:#f8fafc;border:1px solid #e9eef5;border-radius:12px;padding:12px 14px;">
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--text-dark);cursor:pointer;">
+        <input type="checkbox" name="is_recurring" value="1" data-recurring-toggle>
+        🔁 این هزینه دوره‌ای است و تکرار می‌شود
+    </label>
+    <div data-recurring-fields style="display:none;margin-top:10px;">
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="form-label">هر چند وقت یک‌بار؟</label>
+                <select name="recurring_interval" class="form-input">
+                    <option value="weekly">هفتگی (هر هفته)</option>
+                    <option value="biweekly">دو هفته یک‌بار</option>
+                    <option value="monthly" selected>ماهانه</option>
+                    <option value="bimonthly">دو ماه یک‌بار</option>
+                    <option value="quarterly">سه ماه یک‌بار</option>
+                    <option value="yearly">سالانه</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label">شروع از تاریخ *</label>
+                <input type="date" name="recurring_start_date" class="form-input" value="<?= date('Y-m-d') ?>">
+            </div>
+        </div>
+        <div style="margin-top:8px;">
+            <label class="form-label">پایان دوره (اختیاری — خالی یعنی بدون پایان)</label>
+            <input type="date" name="recurring_end_date" class="form-input">
+        </div>
+        <p class="text-[11px] text-gray-400 mt-2">
+            در هر نوبت، یک هزینهٔ جداگانه ساخته و برای مخاطبان صادر می‌شود؛ کران روزانه (یا دکمهٔ «اجرای موتور دوره‌ای» در صفحه حسابداری) آن را انجام می‌دهد.
+        </p>
+    </div>
+</div>
 <div>
     <label class="form-label">توضیحات (اختیاری)</label>
     <textarea name="description" rows="2" class="form-input" placeholder="توضیح هزینه"></textarea>

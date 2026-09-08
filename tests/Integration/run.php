@@ -13,7 +13,7 @@ require_once __DIR__ . '/bootstrap.php';
 \App\Core\Logger::useMemory(true);
 
 $only = array_slice($argv ?? [], 1);
-$suites = ['logger', 'handlers', 'phone', 'jalali', 'validator', 'otp', 'user', 'charge', 'costissue', 'roles', 'documents', 'votes', 'bulkusers', 'audit', 'security', 'codebase'];
+$suites = ['logger', 'handlers', 'phone', 'jalali', 'validator', 'otp', 'user', 'charge', 'costissue', 'accounting', 'roles', 'documents', 'votes', 'bulkusers', 'audit', 'security', 'codebase'];
 
 TestLog::start();
 foreach ($suites as $suite) {

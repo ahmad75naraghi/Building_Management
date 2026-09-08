@@ -33,7 +33,8 @@ final class CostController
             // صدور فوری برای مخاطبان (پیش‌فرض روشن است؛ با ارسال صریح «خیر» قابل غیرفعال‌شدن)
             $autoIssue = !array_key_exists('auto_issue', $data) || filter_var($data['auto_issue'], FILTER_VALIDATE_BOOLEAN);
             $issueInfo = null;
-            if ($autoIssue) {
+            // قالب دوره‌ای صادر نمی‌شود؛ کران در هر نوبت نمونهٔ آن را می‌سازد و صادر می‌کند
+            if ($autoIssue && $cost->cost_type !== 'recurring') {
                 try {
                     $issueInfo = $this->service->issueCost((int) $cost->id, (int) $userId);
                     $cost = $this->service->getCost((int) $cost->id) ?? $cost;
@@ -537,6 +538,125 @@ final class CostController
         } catch (\Exception $e) {
             $status = $e->getMessage() === 'Penalty setting not found' ? 404 : 400;
             return (new Response())->setStatusCode($status)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /** گردش حساب واحدها (لجر) — مدیر ساختمان */
+    public function ledger(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        $buildingId = (int) ($request->getAttribute('building_id') ?? 0);
+        if (!$userId || !$buildingId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication or building required',
+            ]);
+        }
+        try {
+            return (new Response())->setJson([
+                'success' => true,
+                'data' => $this->service->getBuildingLedger($buildingId, (int) $userId),
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /** ثبت مستقیم پرداخت برای واحد توسط مدیر */
+    public function directPayment(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        $buildingId = (int) ($request->getAttribute('building_id') ?? 0);
+        if (!$userId || !$buildingId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication or building required',
+            ]);
+        }
+        $body = $request->getJsonBody() ?? [];
+        try {
+            $payment = $this->service->recordDirectPayment(
+                $buildingId,
+                (int) ($body['unit_id'] ?? 0),
+                (float) ($body['amount'] ?? 0),
+                isset($body['notes']) ? (string) $body['notes'] : null,
+                (int) $userId
+            );
+            return (new Response())->setStatusCode(201)->setJson([
+                'success' => true,
+                'message' => 'پرداخت مستقیم ثبت و تأیید شد.',
+                'data' => ['payment_id' => $payment->id],
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /** ثبت مستقیم بدهی برای یک واحد توسط مدیر */
+    public function unitCharge(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        $buildingId = (int) ($request->getAttribute('building_id') ?? 0);
+        if (!$userId || !$buildingId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication or building required',
+            ]);
+        }
+        $body = $request->getJsonBody() ?? [];
+        try {
+            $cost = $this->service->recordUnitCharge(
+                $buildingId,
+                (int) ($body['unit_id'] ?? 0),
+                (float) ($body['amount'] ?? 0),
+                (string) ($body['title'] ?? ''),
+                (int) $userId,
+                !empty($body['due_date']) ? (string) $body['due_date'] : null
+            );
+            return (new Response())->setStatusCode(201)->setJson([
+                'success' => true,
+                'message' => 'بدهی برای واحد ثبت و صادر شد.',
+                'data' => ['cost_id' => $cost->id],
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /** اجرای دستی موتور دوره‌ای: صدور نوبت‌های سررسیدشده + شارژ ماه جاری ساختمان */
+    public function recurringGenerate(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        $buildingId = (int) ($request->getAttribute('building_id') ?? 0);
+        if (!$userId || !$buildingId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication or building required',
+            ]);
+        }
+        if (!$this->service->isBuildingManager((int) $userId, $buildingId)) {
+            return (new Response())->setStatusCode(403)->setJson([
+                'success' => false, 'message' => 'فقط مدیر ساختمان می‌تواند موتور دوره‌ای را اجرا کند.',
+            ]);
+        }
+        try {
+            $monthly = $this->service->generateAllMonthlyCharges();
+            $recurring = $this->service->generateDueRecurringCosts();
+            return (new Response())->setJson([
+                'success' => true,
+                'message' => 'موتور دوره‌ای اجرا شد.',
+                'data' => [
+                    'monthly_issued' => $monthly['created'],
+                    'recurring_issued' => $recurring['generated'],
+                    'recurring_ended' => $recurring['ended'],
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
                 'success' => false, 'message' => $e->getMessage(),
             ]);
         }

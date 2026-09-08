@@ -14,8 +14,8 @@ final class CostRepository
     {
         $db = Database::getConnection();
         $stmt = $db->prepare("
-            INSERT INTO costs (building_id, title, description, amount, cost_type, target_audience, division_method, division_details, target_unit_ids, due_date, status, is_recurring, recurring_interval, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO costs (building_id, title, description, amount, cost_type, target_audience, division_method, division_details, target_unit_ids, due_date, status, is_recurring, recurring_interval, recurring_start_date, recurring_end_date, recurring_next_date, parent_cost_id, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $cost->building_id,
@@ -31,6 +31,10 @@ final class CostRepository
             $cost->status,
             (int) $cost->is_recurring,
             $cost->recurring_interval,
+            $cost->recurring_start_date,
+            $cost->recurring_end_date,
+            $cost->recurring_next_date,
+            $cost->parent_cost_id,
             $cost->created_by,
         ]);
         return (int) $db->lastInsertId();
@@ -93,6 +97,32 @@ final class CostRepository
         return $stmt->execute([$id]);
     }
 
+    /** قالب‌های دوره‌ای فعال برای تولید نمونه‌های سررسیدشده */
+    public function findDueRecurringTemplates(string $today): array
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "SELECT * FROM costs
+             WHERE cost_type = 'recurring' AND status = 'active' AND deleted_at IS NULL
+               AND recurring_next_date IS NOT NULL AND recurring_next_date <= ?
+             ORDER BY id"
+        );
+        $stmt->execute([$today]);
+        return array_map(fn($r) => $this->mapRow($r), $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    /** به‌روزرسانی نوبت بعدی و وضعیت قالب دوره‌ای */
+    public function advanceRecurringTemplate(int $costId, ?string $nextDate, ?string $status = null): bool
+    {
+        $db = Database::getConnection();
+        if ($status !== null) {
+            return $db->prepare("UPDATE costs SET recurring_next_date = ?, status = ? WHERE id = ?")
+                ->execute([$nextDate, $status, $costId]);
+        }
+        return $db->prepare("UPDATE costs SET recurring_next_date = ? WHERE id = ?")
+            ->execute([$nextDate, $costId]);
+    }
+
     public function findByBuildingId(int $buildingId): array
     {
         $db = Database::getConnection();
@@ -120,6 +150,10 @@ final class CostRepository
         $cost->status = $row['status'];
         $cost->is_recurring = (bool) $row['is_recurring'];
         $cost->recurring_interval = $row['recurring_interval'];
+        $cost->recurring_start_date = $row['recurring_start_date'] ?? null;
+        $cost->recurring_end_date = $row['recurring_end_date'] ?? null;
+        $cost->recurring_next_date = $row['recurring_next_date'] ?? null;
+        $cost->parent_cost_id = isset($row['parent_cost_id']) && $row['parent_cost_id'] !== null ? (int) $row['parent_cost_id'] : null;
         $cost->created_by = (int) $row['created_by'];
         $cost->created_at = $row['created_at'];
         $cost->issued_at = $row['issued_at'] ?? null;
