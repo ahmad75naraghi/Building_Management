@@ -188,8 +188,9 @@ require_once 'includes/page_head.php';
 
     <?php if (empty($comments)): ?>
         <div class="card empty-state">
-            <div class="text-4xl mb-3">💬</div>
+            <div class="empty-icon">💬</div>
             هنوز کامنتی ثبت نشده است.
+            <a class="empty-action" href="#ticket-comment-form" onclick="var el=document.getElementById('ticket-comment-form'); if(el){el.scrollIntoView({behavior:'smooth'}); var f=el.querySelector('textarea,input:not([type=hidden])'); if(f) f.focus();} return false;">💬 نوشتن اولین کامنت</a>
         </div>
     <?php else: ?>
         <div class="space-y-3">
@@ -216,7 +217,7 @@ require_once 'includes/page_head.php';
     <!-- فرم ثبت کامنت -->
     <div class="card p-5 mt-6">
         <h3 class="font-bold text-gray-800 mb-4">افزودن کامنت</h3>
-        <form method="POST" action="" class="space-y-4">
+        <form method="POST" action="" class="space-y-4" id="ticket-comment-form">
             <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="add_comment">
             <div>

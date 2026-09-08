@@ -111,8 +111,11 @@ require_once 'includes/header.php';
 
     <?php if (empty($announcements)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">📢</div>
+            <div class="empty-icon">📢</div>
             هنوز اطلاعیه‌ای ثبت نشده است.
+            <?php if ($is_manager): ?>
+                <button type="button" class="empty-action" data-modal-open="add-announcement">📢 ثبت اولین اطلاعیه</button>
+            <?php endif; ?>
         </div>
     <?php else: ?>
         <div class="space-y-3">

@@ -328,6 +328,36 @@
     window.syncThemeButtons = syncThemeButtons;
 
     /* ----------------------------------------------------------
+     * ۷) دکمهٔ اصلی فرم‌ها: چسبان در دسترس شست
+     * ---------------------------------------------------------- */
+    /* بازکردن جعبهٔ «شروع گفتگوی جدید» از دکمهٔ حالت خالی */
+    function hookNewChatButton() {
+        var btns = document.querySelectorAll('[data-open-new-chat]');
+        for (var i = 0; i < btns.length; i++) {
+            btns[i].addEventListener('click', function () {
+                var box = document.getElementById('new-conversation-box');
+                if (!box) { return; }
+                box.open = true;
+                box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        }
+    }
+
+    function hookStickySubmit() {
+        /* فقط در صفحه‌هایی با نوار پایین؛ وگرنه دکمه بی‌دلیل شناور می‌شود */
+        if (!document.querySelector('.bottom-nav-bar')) { return; }
+        var forms = document.querySelectorAll('main form, form.card, form.space-y-4');
+        for (var i = 0; i < forms.length; i++) {
+            var f = forms[i];
+            if (f.closest('.modal-overlay') || f.closest('#toast-stack')) { continue; }
+            var btn = f.querySelector('.btn-primary');
+            if (btn && btn.closest('form') === f && btn.type === 'submit') {
+                f.classList.add('sticky-submit');
+            }
+        }
+    }
+
+    /* ----------------------------------------------------------
      * ۳) جستجو + صفحه‌بندی فهرست‌ها
      * ---------------------------------------------------------- */
     function faNum(n) {
@@ -419,6 +449,8 @@
         hookNavigationProgress();
         hookConfirmSheets();
         setupBulkPayments();
+        hookNewChatButton();
+        hookStickySubmit();
         syncThemeButtons();
         var ids = {};
         var nodes = document.querySelectorAll('[data-list-items]');

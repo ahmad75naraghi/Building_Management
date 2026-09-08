@@ -130,8 +130,11 @@ require_once 'includes/header.php';
 
     <?php if (empty($members)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">👥</div>
+            <div class="empty-icon">👥</div>
             هنوز عضوی در ساختمان ثبت نشده است.
+            <?php if ($is_manager): ?>
+                <button type="button" class="empty-action" data-modal-open="invite-member">✉️ دعوت اولین ساکن</button>
+            <?php endif; ?>
         </div>
     <?php else: ?>
         <div class="list-filter-bar">

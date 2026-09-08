@@ -138,8 +138,11 @@ require_once 'includes/header.php';
 
     <?php if (empty($meetings)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">🤝</div>
+            <div class="empty-icon">🤝</div>
             جلسه‌ای ثبت نشده است.
+            <?php if ($is_manager): ?>
+                <button type="button" class="empty-action" data-modal-open="add-meeting">🤝 برنامه‌ریزی اولین جلسه</button>
+            <?php endif; ?>
         </div>
     <?php else: ?>
         <div class="space-y-3">

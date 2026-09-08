@@ -110,8 +110,8 @@ require_once 'includes/header.php';
 
         <?php if (empty($logs)): ?>
             <div class="empty-state">
-                <div style="font-size: 34px; margin-bottom: 8px;">🗂️</div>
-                هنوز اقدامی ثبت نشده است.
+                <div class="empty-icon">🗂️</div>
+                هنوز اقدامی ثبت نشده است. به‌محض انجام هر عملیات، ردپای آن اینجا ثبت می‌شود.
             </div>
         <?php else: ?>
             <div class="list-filter-bar">

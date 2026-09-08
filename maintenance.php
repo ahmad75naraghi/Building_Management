@@ -122,8 +122,9 @@ require_once 'includes/header.php';
 
     <?php if (empty($requests)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">🔧</div>
+            <div class="empty-icon">🔧</div>
             درخواست تعمیراتی ثبت نشده است.
+            <button type="button" class="empty-action" data-modal-open="add-maintenance">🔧 ثبت اولین درخواست</button>
         </div>
     <?php else: ?>
         <div class="space-y-3">

@@ -40,8 +40,9 @@ require_once 'includes/page_head.php';
 
     <?php if (empty($notifications)): ?>
         <div class="card empty-state">
-            <div class="text-4xl mb-3">🔔</div>
+            <div class="empty-icon">🔔</div>
             اعلانی برای شما ثبت نشده است.
+            <a class="empty-action" href="index.php">🏠 بازگشت به داشبورد</a>
         </div>
     <?php else: ?>
         <div class="space-y-3">

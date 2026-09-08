@@ -492,8 +492,11 @@ require_once 'includes/header.php';
 
     <?php if (empty($costs)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">💰</div>
+            <div class="empty-icon">💰</div>
             هنوز هزینه‌ای ثبت نشده است.
+            <?php if ($is_manager): ?>
+                <button type="button" class="empty-action" data-modal-open="add-cost">➕ ثبت اولین هزینه</button>
+            <?php endif; ?>
         </div>
     <?php else: ?>
         <div class="list-filter-bar">
@@ -624,8 +627,9 @@ require_once 'includes/header.php';
 
     <?php if (empty($visible_payments)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">🧾</div>
+            <div class="empty-icon">🧾</div>
             هنوز پرداختی ثبت نشده است.
+            <p class="text-[11px] mt-2" style="color:var(--text-gray);">پس از صدور هزینه، پرداخت‌های ساکنین اینجا نمایش داده می‌شود.</p>
         </div>
     <?php else: ?>
         <div class="list-filter-bar">

@@ -210,9 +210,11 @@ require_once 'includes/header.php';
 
     <?php if (empty($documents)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">📂</div>
+            <div class="empty-icon">📂</div>
             هنوز سندی ثبت نشده است.
-            <?php if ($is_manager): ?><br><span class="muted" style="font-size:12px;">از دکمه بالا اولین سند را بارگذاری کنید.</span><?php endif; ?>
+            <?php if ($is_manager): ?>
+                <button type="button" class="empty-action" data-modal-open="add-document">📤 بارگذاری اولین سند</button>
+            <?php endif; ?>
         </div>
     <?php else: ?>
         <?php foreach (Document::CATEGORIES as $cat_key => $cat_label): ?>

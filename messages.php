@@ -141,7 +141,7 @@ require_once 'includes/header.php';
         <!-- ==================== فهرست گفتگوها ==================== -->
 
         <!-- شروع گفتگوی جدید -->
-        <details class="card p-3 mb-4">
+        <details class="card p-3 mb-4" id="new-conversation-box">
             <summary class="font-bold text-gray-700 text-sm cursor-pointer">✍️ شروع گفتگوی جدید</summary>
             <div class="flex flex-wrap gap-2 mt-3">
                 <?php if (empty($members)): ?>
@@ -159,8 +159,9 @@ require_once 'includes/header.php';
 
         <?php if (empty($conversations)): ?>
             <div class="empty-state">
-                <div style="font-size: 34px; margin-bottom: 8px;">💬</div>
-                هنوز گفتگویی ندارید. از بخش «شروع گفتگوی جدید» پیام بدهید.
+                <div class="empty-icon">💬</div>
+                هنوز گفتگویی ندارید.
+                <button type="button" class="empty-action" data-open-new-chat>✍️ شروع اولین گفتگو</button>
             </div>
         <?php else: ?>
             <div class="space-y-2">

@@ -17,6 +17,7 @@ use App\Core\Database;
 use App\Repositories\CostPaymentRepository;
 use App\Repositories\PenaltySettingRepository;
 use App\Utilities\FileStorage;
+use App\Utilities\JalaliHelper;
 use App\Utilities\Validator;
 
 final class CostService
@@ -477,7 +478,7 @@ final class CostService
                 'building_id' => $buildingId,
                 'notification_type' => 'payment',
                 'title' => 'پرداخت شما ثبت شد',
-                'message' => 'پرداخت ' . number_format($amount) . ' تومانی توسط مدیر ساختمان برای واحد ' . $unit['unit_number'] . ' ثبت و تأیید شد.',
+                'message' => 'پرداخت ' . JalaliHelper::faDigits(number_format($amount)) . ' تومانی توسط مدیر ساختمان برای واحد ' . JalaliHelper::faDigits((string) $unit['unit_number']) . ' ثبت و تأیید شد.',
             ]);
         } catch (\Throwable $e) {
             Logger::error('CostService', 'اعلان پرداخت مستقیم ارسال نشد', ['payment_id' => $payment->id], $e);
@@ -1156,7 +1157,7 @@ final class CostService
                     'message' => sprintf(
                         'هزینه «%s» به مبلغ %s برای شما ثبت شده است. لطفاً پرداخت را از بخش هزینه‌ها انجام دهید.',
                         $cost->title,
-                        number_format($userTotal) . ' تومان'
+                        JalaliHelper::faDigits(number_format($userTotal)) . ' تومان'
                     ),
                     'data' => ['cost_id' => $costId],
                 ]);
@@ -1575,7 +1576,7 @@ final class CostService
                         'title' => 'پرداخت شما تأیید شد',
                         'message' => sprintf(
                             'پرداخت %s بابت هزینه «%s» تأیید و به حساب واحد ثبت شد.',
-                            number_format((float) ($payment->amount_paid ?? 0)) . ' تومان',
+                            JalaliHelper::faDigits(number_format((float) ($payment->amount_paid ?? 0))) . ' تومان',
                             $cost?->title ?? ''
                         ),
                         'data' => ['cost_id' => $payment->cost_id],

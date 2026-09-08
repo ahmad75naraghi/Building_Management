@@ -167,9 +167,10 @@ require_once 'includes/header.php';
 
             <?php if (empty($buildings)): ?>
                 <div class="empty-state">
-                    <div style="font-size: 34px; margin-bottom: 8px;">🏢</div>
+                    <div class="empty-icon">🏢</div>
                     ساختمانی یافت نشد.<br>
-                    با دکمه «ثبت ساختمان جدید» اولین ساختمان را بسازید.
+                    با ثبت اولین ساختمان، مدیریت را شروع کنید.
+                    <a class="empty-action" href="building_add.php">🏢 ثبت ساختمان جدید</a>
                 </div>
             <?php else: ?>
                 <div class="space-y-3">

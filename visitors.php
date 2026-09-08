@@ -108,8 +108,9 @@ require_once 'includes/header.php';
 
     <?php if (empty($visitors)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">🚶</div>
+            <div class="empty-icon">🚶</div>
             مهمانی ثبت نشده است.
+            <button type="button" class="empty-action" data-modal-open="add-visitor">🚶 ثبت اولین مهمان</button>
         </div>
     <?php else: ?>
         <div class="space-y-3">

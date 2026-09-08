@@ -87,7 +87,7 @@ final class DebtorReminderService
                 continue;
             }
 
-            $amountText = number_format((float) $d['debt']) . ' تومان';
+            $amountText = JalaliHelper::faDigits(number_format((float) $d['debt'])) . ' تومان';
             $ok = $sms->sendDebtorReminderSms(
                 (string) $d['phone'],
                 (string) $d['name'],

@@ -2282,3 +2282,69 @@
         }
         html[data-theme="dark"] .list-day-divider::before,
         html[data-theme="dark"] .list-day-divider::after { background: var(--line); }
+
+        /* ============================================================
+         * دسترسی‌پذیری لمس: هدف ≥۴۴ پیکسل + برچسب‌های خوانا
+         * ============================================================ */
+        .nav-label { font-size: 10.5px; }
+        .nav-item-link { min-height: 44px; }
+        .btn-chip {
+            min-height: 44px;
+            padding: 10px 14px;
+            font-size: 12px;
+        }
+        .theme-toggle-btn,
+        .notification-bell {
+            min-width: 44px;
+            min-height: 44px;
+        }
+        .list-pager-btn,
+        .app-sheet-btn,
+        .pwa-banner-install,
+        .pwa-banner-close { min-height: 44px; }
+        .bulk-check-label { width: 30px; height: 30px; }
+        .bulk-check { width: 20px; height: 20px; }
+        .list-filter-bar .form-input { min-height: 44px; }
+
+        /* دکمهٔ اصلی فرم‌ها: چسبان در دسترس شست */
+        form.sticky-submit .btn-primary {
+            position: sticky;
+            bottom: calc(var(--app-nav-h) + 14px);
+            z-index: 55;
+            min-height: 48px;
+            box-shadow: 0 14px 30px rgba(2, 10, 32, 0.35);
+        }
+
+        /* ============================================================
+         * الگوی یکپارچهٔ حالت خالی: آیکون + توضیح + دکمهٔ اقدام
+         * ============================================================ */
+        .empty-state .empty-icon {
+            font-size: 38px;
+            margin-bottom: 10px;
+            line-height: 1;
+        }
+        .empty-action {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 14px;
+            min-height: 44px;
+            padding: 10px 24px;
+            background: var(--bg-dark-blue);
+            color: #fff;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            border: none;
+            border-radius: 12px;
+            text-decoration: none;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(2, 10, 32, 0.22);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .empty-action:active { transform: scale(0.97); }
+        html[data-theme="dark"] .empty-action {
+            background: var(--surface-3);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+        }

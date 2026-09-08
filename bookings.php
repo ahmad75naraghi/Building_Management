@@ -143,8 +143,9 @@ require_once 'includes/header.php';
 
     <?php if (empty($bookings)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">📅</div>
+            <div class="empty-icon">📅</div>
             رزروی ثبت نشده است.
+            <button type="button" class="empty-action" data-modal-open="add-booking">📅 ثبت اولین رزرو</button>
         </div>
     <?php else: ?>
         <div class="space-y-3">
