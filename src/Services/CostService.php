@@ -582,18 +582,33 @@ final class CostService
             }
         }
 
+        // تعریف یکتای مانده: همان «مانده بدهکار/طلبکار» مشترک همهٔ صفحه‌ها
+        $sharedBalances = [];
+        foreach ($this->paymentRepo->unitBalancesByBuilding($buildingId) as $b) {
+            $sharedBalances[(int) $b['unit_id']] = $b;
+        }
+
         $units = [];
         $totalDebt = 0.0;
         $totalCredit = 0.0;
         foreach ($events as $uid => $list) {
             usort($list, static fn(array $a, array $b): int => strcmp($a['ts'], $b['ts']) ?: strcmp($a['type'], $b['type']));
-            $balance = 0.0;
+            $running = 0.0;
             foreach ($list as &$ev) {
-                $balance += $ev['credit'] - $ev['debit'];
-                $ev['balance'] = round($balance, 2);
+                $running += $ev['credit'] - $ev['debit'];
+                $ev['balance'] = round($running, 2);
             }
             unset($ev);
-            $final = round($balance, 2);
+
+            // ماندهٔ نهایی از سرویس مشترک؛ اگر واحدی آنجا نبود (حالت حاشیه‌ای) از جمع تراکنش‌ها
+            $shared = $sharedBalances[$uid] ?? null;
+            $final = $shared !== null
+                ? (float) $shared['balance']
+                : round($running, 2);
+            if (!empty($list)) {
+                // سازگاری ماندهٔ لحظه‌ایِ آخرین تراکنش با ماندهٔ نهایی
+                $list[count($list) - 1]['balance'] = $final;
+            }
             if ($final < 0) {
                 $totalDebt += -$final;
             } else {
@@ -602,6 +617,8 @@ final class CostService
             $units[$uid] = [
                 'unit_id' => $uid,
                 'unit_number' => $unitMeta[$uid] ?? (string) $uid,
+                'total_share' => $shared !== null ? (float) $shared['total_share'] : round($running < 0 ? -$running : 0, 2),
+                'total_paid' => $shared !== null ? (float) $shared['total_paid'] : 0.0,
                 'balance' => $final,
                 'state' => $final < 0 ? 'debtor' : ($final > 0 ? 'creditor' : 'settled'),
                 'entries' => $list,
@@ -1647,38 +1664,51 @@ final class CostService
      */
     public function getFinancialSummary(int $buildingId): array
     {
-        $costs = $this->costRepo->findByBuildingId($buildingId);
-
-        $totalCosts = 0.0;
+        // جمع بدهی صادرشده و پرداخت‌های تأییدشده از «تعریف یکتای مانده» گرفته می‌شود
+        // تا عدد گزارش‌ها با صفحهٔ حسابداری و پروفایل ساختمان یکی باشد.
+        $totalDebt = 0.0;
         $totalCollected = 0.0;
-        $paymentsCount = 0;
-        $confirmedCount = 0;
-
-        foreach ($costs as $cost) {
-            $totalCosts += $cost->amount;
-            foreach ($this->paymentRepo->findByCostId($cost->id) as $payment) {
-                $paymentsCount++;
-                if ($payment->status === 'confirmed') {
-                    $totalCollected += (float) $payment->amount_paid;
-                    $confirmedCount++;
-                }
-            }
+        foreach ($this->paymentRepo->unitBalancesByBuilding($buildingId) as $b) {
+            $totalDebt += (float) ($b['total_share'] ?? 0);
+            $totalCollected += (float) ($b['total_paid'] ?? 0);
         }
 
-        $totalRemaining = max(0.0, $totalCosts - $totalCollected);
-        $collectionPercentage = $totalCosts > 0.0
-            ? round(($totalCollected / $totalCosts) * 100, 1)
+        // شمارش هزینه‌های واقعی (بدون حذف‌شده‌ها، قالب دوره‌ای و ردیف‌های دریافت مستقیم)
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "SELECT COUNT(*) FROM costs
+             WHERE building_id = ? AND deleted_at IS NULL
+               AND cost_type NOT IN ('direct_deposit', 'recurring')"
+        );
+        $stmt->execute([$buildingId]);
+        $costsCount = (int) $stmt->fetchColumn();
+
+        $stmt = $db->prepare(
+            "SELECT COUNT(*) AS total,
+                    SUM(CASE WHEN cp.status = 'confirmed' THEN 1 ELSE 0 END) AS confirmed
+             FROM cost_payments cp
+             INNER JOIN costs c ON cp.cost_id = c.id
+             WHERE c.building_id = ? AND c.deleted_at IS NULL"
+        );
+        $stmt->execute([$buildingId]);
+        $counts = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+        $totalDebt = round($totalDebt, 2);
+        $totalCollected = round($totalCollected, 2);
+        $totalRemaining = round($totalDebt - $totalCollected, 2);
+        $collectionPercentage = $totalDebt > 0.0
+            ? round(($totalCollected / $totalDebt) * 100, 1)
             : 0.0;
 
         return [
             'building_id' => $buildingId,
-            'total_costs' => $totalCosts,
+            'total_costs' => $totalDebt,
             'total_collected' => $totalCollected,
             'total_remaining' => $totalRemaining,
             'collection_percentage' => $collectionPercentage,
-            'costs_count' => count($costs),
-            'payments_count' => $paymentsCount,
-            'confirmed_count' => $confirmedCount,
+            'costs_count' => $costsCount,
+            'payments_count' => (int) ($counts['total'] ?? 0),
+            'confirmed_count' => (int) ($counts['confirmed'] ?? 0),
         ];
     }
 }

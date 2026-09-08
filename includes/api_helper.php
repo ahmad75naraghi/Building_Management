@@ -104,7 +104,7 @@ define('API_BASE_URL', $apiBaseUrl);
  */
 if (!empty($_SESSION['auth_pending']) && !empty($_SESSION['token'])) {
     $current = basename((string) ($_SERVER['SCRIPT_NAME'] ?? ''));
-    if (!in_array($current, ['auth.php', 'logout.php', 'login.php', 'register.php'], true)) {
+    if (!in_array($current, ['auth.php', 'logout.php'], true)) {
         header('Location: auth.php');
         exit;
     }

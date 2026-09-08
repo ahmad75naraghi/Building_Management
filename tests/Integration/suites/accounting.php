@@ -234,3 +234,58 @@ TestLog::run('لجر: کاربر غیرعضو دسترسی ندارد', function
     $stranger = make_user('09139000998', 'غریبه');
     TestLog::assertThrows('غیرعضو', fn() => $svc->getBuildingLedger($b, $stranger), 'عضو');
 });
+
+// ------------------------------------------------------------ سازگاری منبع واحد مانده
+
+TestLog::run('مانده در لجر، واحد-بالانس و خلاصه مالی یک عدد است', function () use ($svc, $manager) {
+    [$b, $u1, $u2, $t1, $t2] = acc_building($svc, $manager, '0913900140', 100000);
+    $svc->generateAllMonthlyCharges();
+    $svc->recordDirectPayment($b, $u1, 150000.0, null, $manager);
+
+    $ledger = $svc->getBuildingLedger($b, $manager);
+    $balances = $svc->getUnitBalances($b, $manager);
+    $balancesByUnit = [];
+    foreach ($balances as $bal) {
+        $balancesByUnit[(int) $bal['unit_id']] = (float) $bal['balance'];
+    }
+
+    foreach ($ledger['units'] as $uid => $lu) {
+        TestLog::assertSame("مانده واحد $uid در هر دو منبع", $balancesByUnit[$uid] ?? null, (float) $lu['balance']);
+    }
+
+    // خلاصه مالی: بدهی صادرشده و وصولی با جمع لجر یکی است
+    $summary = $svc->getFinancialSummary($b);
+    $sumShare = 0.0;
+    $sumPaid = 0.0;
+    foreach ($balances as $bal) {
+        $sumShare += (float) $bal['total_share'];
+        $sumPaid += (float) $bal['total_paid'];
+    }
+    TestLog::assertSame('جمع بدهی صادرشده', $sumShare, (float) $summary['total_costs']);
+    TestLog::assertSame('جمع وصولی', $sumPaid, (float) $summary['total_collected']);
+});
+
+TestLog::run('هزینه حذف‌شده از مانده همه صفحه‌ها خارج می‌شود', function () use ($svc, $manager) {
+    [$b, $u1] = acc_building($svc, $manager, '0913900150', 0);
+    // یک بدهی مستقیم می‌سازیم و سپس حذفش می‌کنیم
+    $cost = $svc->recordUnitCharge($b, $u1, 70000.0, 'هزینه حذف‌شدنی', $manager);
+    $before = $svc->getUnitBalances($b, $manager);
+    $beforeByUnit = [];
+    foreach ($before as $bal) {
+        $beforeByUnit[(int) $bal['unit_id']] = (float) $bal['balance'];
+    }
+    TestLog::assertSame('قبل از حذف: بدهکار ۷۰هزار', -70000.0, $beforeByUnit[$u1] ?? null);
+
+    $svc->deleteCost((int) $cost->id, $manager);
+
+    $after = $svc->getUnitBalances($b, $manager);
+    $afterByUnit = [];
+    foreach ($after as $bal) {
+        $afterByUnit[(int) $bal['unit_id']] = (float) $bal['balance'];
+    }
+    TestLog::assertSame('بعد از حذف: تسویه', 0.0, $afterByUnit[$u1] ?? 0.0);
+
+    // لجر هم نباید تراکنشی از هزینه حذف‌شده نشان دهد
+    $ledger = $svc->getBuildingLedger($b, $manager);
+    TestLog::assertSame('لجر واحد خالی یا صفر', 0.0, (float) ($ledger['units'][$u1]['balance'] ?? 0.0));
+});

@@ -100,6 +100,10 @@ final class CostPaymentRepository
      *
      * @return array<int, array{unit_id: int, total_share: float, total_paid: float, balance: float}>
      */
+    /**
+     * تعریف یکتای ماندهٔ هر واحد: بستانکاری = پرداخت تأییدشده − سهم صادرشده.
+     * همهٔ صفحه‌ها (حسابداری، پروفایل ساختمان، گزارش‌ها) باید مانده را از همین متد بگیرند.
+     */
     public function unitBalancesByBuilding(int $buildingId): array
     {
         $db = Database::getConnection();
@@ -109,7 +113,7 @@ final class CostPaymentRepository
                    SUM(CASE WHEN cp.status = 'confirmed' THEN COALESCE(cp.amount_paid, 0) ELSE 0 END) AS total_paid
             FROM cost_payments cp
             INNER JOIN costs c ON cp.cost_id = c.id
-            WHERE c.building_id = ? AND cp.unit_id IS NOT NULL
+            WHERE c.building_id = ? AND cp.unit_id IS NOT NULL AND c.deleted_at IS NULL
             GROUP BY cp.unit_id
         ");
         $stmt->execute([$buildingId]);
