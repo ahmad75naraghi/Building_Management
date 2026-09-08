@@ -128,7 +128,7 @@
     <?php if (($charge_mode ?? 'fixed') === 'custom'): ?>
         <div style="margin-top:12px;">
             <label class="form-label">شارژ اختصاصی این واحد (تومان)</label>
-            <input type="number" name="custom_charge" min="0" step="1000" inputmode="numeric" class="form-input" placeholder="مثال: 450000">
+            <input type="number" name="custom_charge" min="0" step="1" inputmode="numeric" class="form-input" placeholder="مثال: 450000">
         </div>
     <?php else: ?>
         <input type="hidden" name="custom_charge" value="">

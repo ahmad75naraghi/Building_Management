@@ -663,7 +663,7 @@ require_once 'includes/header.php';
         <input type="hidden" name="payment_id" value="">
         <div>
             <label for="pay_amount" class="form-label">مبلغ پرداختی (تومان)</label>
-            <input type="number" id="pay_amount" name="amount_paid" min="0" step="1000" inputmode="numeric" class="form-input">
+            <input type="number" id="pay_amount" name="amount_paid" min="0" step="1" inputmode="numeric" class="form-input">
             <p class="text-[11px] text-gray-400 mt-1">اگر خالی بگذارید، کل مبلغ هزینه ثبت می‌شود.</p>
         </div>
         <div>
@@ -731,13 +731,13 @@ require_once 'includes/header.php';
 
             <div data-charge-field="fixed,combined">
                 <label for="monthly_charge" class="form-label">مبلغ ثابت ماهیانه هر واحد (تومان)</label>
-                <input type="number" id="monthly_charge" name="monthly_charge" min="0" step="1000" inputmode="numeric" class="form-input"
+                <input type="number" id="monthly_charge" name="monthly_charge" min="0" step="1" inputmode="numeric" class="form-input"
                        value="<?= htmlspecialchars((string) ($building['monthly_charge'] ?? 0)) ?>">
             </div>
 
             <div data-charge-field="per_person,combined">
                 <label for="charge_per_person" class="form-label">مبلغ به‌ازای هر نفر (تومان)</label>
-                <input type="number" id="charge_per_person" name="charge_per_person" min="0" step="1000" inputmode="numeric" class="form-input"
+                <input type="number" id="charge_per_person" name="charge_per_person" min="0" step="1" inputmode="numeric" class="form-input"
                        value="<?= htmlspecialchars((string) ($building['charge_per_person'] ?? 0)) ?>">
                 <p class="text-[11px] text-gray-400 mt-1">تعداد نفرات هر واحد را در صفحه «واحدها» وارد کنید.</p>
             </div>
@@ -841,7 +841,7 @@ require_once 'includes/header.php';
             </div>
             <div>
                 <label for="penalty_value" class="form-label">مقدار جریمه *</label>
-                <input type="number" id="penalty_value" name="penalty_value" required min="0" step="1000" inputmode="numeric" class="form-input" placeholder="مثلاً 2 یا 50000">
+                <input type="number" id="penalty_value" name="penalty_value" required min="0" step="any" inputmode="numeric" class="form-input" placeholder="مثلاً 2 یا 50000">
             </div>
             <div>
                 <label for="delay_days" class="form-label">آستانه تأخیر (روز) *</label>
@@ -865,7 +865,7 @@ require_once 'includes/header.php';
             </div>
             <div>
                 <label class="form-label">مقدار جریمه *</label>
-                <input type="number" name="penalty_value" required min="0" step="1000" inputmode="numeric" class="form-input">
+                <input type="number" name="penalty_value" required min="0" step="any" inputmode="numeric" class="form-input">
             </div>
             <div>
                 <label class="form-label">آستانه تأخیر (روز) *</label>

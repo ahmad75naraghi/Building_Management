@@ -253,7 +253,7 @@ require_once 'includes/header.php';
             </div>
             <div>
                 <label class="form-label">مبلغ پرداخت (تومان) *</label>
-                <input type="number" name="amount" required min="1000" step="1000" inputmode="numeric" class="form-input" placeholder="مثال: 500000">
+                <input type="number" name="amount" required min="1000" step="1" inputmode="numeric" class="form-input" placeholder="مثال: 500000">
                 <p class="text-[11px] text-gray-400 mt-1">اگر بیشتر از بدهی باشد، واحد طلبکار می‌شود و از بدهی‌های بعدی کم می‌گردد.</p>
             </div>
             <div>
@@ -287,7 +287,7 @@ require_once 'includes/header.php';
             </div>
             <div>
                 <label class="form-label">مبلغ (تومان) *</label>
-                <input type="number" name="amount" required min="1000" step="1000" inputmode="numeric" class="form-input" placeholder="مثال: 200000">
+                <input type="number" name="amount" required min="1000" step="1" inputmode="numeric" class="form-input" placeholder="مثال: 200000">
             </div>
             <button type="submit" class="btn-primary">ثبت و صدور بدهی</button>
         </form>

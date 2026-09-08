@@ -190,12 +190,12 @@ require_once 'includes/page_head.php';
 
                 <div class="mt-3" data-charge-field="fixed,combined">
                     <label for="monthly_charge" class="form-label">مبلغ شارژ ثابت هر ماه (تومان)</label>
-                    <input type="number" id="monthly_charge" name="monthly_charge" min="0" step="1000" inputmode="numeric" class="form-input" value="<?= htmlspecialchars((string) ($building['monthly_charge'] ?? 0)) ?>">
+                    <input type="number" id="monthly_charge" name="monthly_charge" min="0" step="1" inputmode="numeric" class="form-input" value="<?= htmlspecialchars((string) ($building['monthly_charge'] ?? 0)) ?>">
                 </div>
 
                 <div class="mt-3" data-charge-field="per_person,combined">
                     <label for="charge_per_person" class="form-label">نرخ شارژ هر نفر (تومان)</label>
-                    <input type="number" id="charge_per_person" name="charge_per_person" min="0" step="1000" inputmode="numeric" class="form-input" value="<?= htmlspecialchars((string) ($building['charge_per_person'] ?? 0)) ?>">
+                    <input type="number" id="charge_per_person" name="charge_per_person" min="0" step="1" inputmode="numeric" class="form-input" value="<?= htmlspecialchars((string) ($building['charge_per_person'] ?? 0)) ?>">
                     <p class="text-[11px] text-gray-500 mt-1">تعداد نفرات هر واحد را در صفحه «واحدها» وارد کنید.</p>
                 </div>
 

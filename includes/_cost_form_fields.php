@@ -7,7 +7,7 @@
 </div>
 <div>
     <label class="form-label">مبلغ کل (تومان) *</label>
-    <input type="number" name="amount" required min="1" step="1000" inputmode="numeric" class="form-input" placeholder="مثال: 500000">
+    <input type="number" name="amount" required min="1" step="1" inputmode="numeric" class="form-input" placeholder="مثال: 500000">
 </div>
 <div class="grid grid-cols-2 gap-3">
     <div>
@@ -93,7 +93,7 @@
 
 <div>
     <label class="form-label">مهلت پرداخت (اختیاری)</label>
-    <input type="date" name="due_date" class="form-input">
+    <input type="date" name="due_date" data-jalali-date class="form-input">
 </div>
 
 <!-- هزینهٔ دوره‌ای با تناوب دلخواه؛ کران روزانه در هر نوبت آن را صادر می‌کند -->
@@ -117,12 +117,12 @@
             </div>
             <div>
                 <label class="form-label">شروع از تاریخ *</label>
-                <input type="date" name="recurring_start_date" class="form-input" value="<?= date('Y-m-d') ?>">
+                <input type="date" name="recurring_start_date" data-jalali-date class="form-input" value="<?= date('Y-m-d') ?>">
             </div>
         </div>
         <div style="margin-top:8px;">
             <label class="form-label">پایان دوره (اختیاری — خالی یعنی بدون پایان)</label>
-            <input type="date" name="recurring_end_date" class="form-input">
+            <input type="date" name="recurring_end_date" data-jalali-date class="form-input">
         </div>
         <p class="text-[11px] text-gray-400 mt-2">
             در هر نوبت، یک هزینهٔ جداگانه ساخته و برای مخاطبان صادر می‌شود؛ کران روزانه (یا دکمهٔ «اجرای موتور دوره‌ای» در صفحه حسابداری) آن را انجام می‌دهد.
