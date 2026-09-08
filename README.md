@@ -120,7 +120,7 @@ Building_Management/
 │   ├── page_head.php / page_tail.php    # wrapper هدر/فوتر (سازگاری)
 │   ├── dash_head.php / dash_tail.php    # wrapper هدر/فوتر (سازگاری)
 │   └── app_styles.php         # shim قدیمی — لینک به style.css
-├── docs/                      # proposal, final_decisions, phase_1_2, project_complete_summary
+├── docs/                      # مستندات: نقشه سایت، مشخصات صفحات، پروپوزال و تصمیمات
 ├── index.php                  # داشبورد وب (موبایل‌فرست، RTL)
 ├── auth.php                   # ورود/ثبت‌نام یکپارچه با موبایل و کد یک‌بارمصرف
 ├── profile.php / logout.php
@@ -552,6 +552,8 @@ Migrationها از `001` تا `020` در `database/migrations/` و نسخه SQL 
 | `docs/final_decisions.md` | تصمیمات نهایی ساختار (تایید شده) — سلسله مراتب، نقش‌ها، پرداخت، امنیت |
 | `docs/phase_1_2_complete.md` | گزارش تکمیل فاز ۱ و ۲ — هسته، ساختمان، سلسله مراتب |
 | `docs/project_complete_summary.md` | خلاصه کامل فازهای ۱ تا ۵ + فازهای باقی‌مانده |
+| `docs/site-map.md` | نقشهٔ سایت: ناوبری سراسری، نمودار جریان و گروه‌بندی صفحه‌ها |
+| `docs/pages.md` | مشخصات کامل ۳۷ صفحه: المان‌ها، مودال‌ها، دسترسی‌ها و اندپوینت‌ها |
 | `DEPLOYMENT.md` | **راهنمای گام‌به‌گام استقرار روی سرور** |
 | `tests/README.md` | راهنمای تست‌ها، لاگ‌گیری و امنیت |
 | `ci/README.md` | فعال‌سازی یکپارچگی پیوسته (گیت‌هاب اکشنز) |
