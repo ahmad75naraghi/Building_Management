@@ -8,14 +8,14 @@ use App\Core\Logger;
 /**
  * ارسال پیامک از طریق پنل ملی‌پیامک (Melipayamak) با متد SendByBaseNumber.
  *
- * مشخصات از متغیرهای محیطی خوانده می‌شود تا در کد عمومی نماند؛
- * در صورت نبود، از مقادیر پیش‌فرض پنل استفاده می‌شود:
+ * مشخصات فقط از متغیرهای محیطی خوانده می‌شود و هیچ مقدار پیش‌فرضی در کد نیست:
  *   MELIPAYAMAK_USERNAME / MELIPAYAMAK_PASSWORD / MELIPAYAMAK_BODY_ID
  *   MELIPAYAMAK_REMINDER_BODY_ID — پترن جداگانه برای یادآوری رویدادها
  *   (اختیاری؛ اگر تنظیم نشود یادآوری با همان پترن پیش‌فرض و متن کامل ارسال می‌شود)
  *
- * در صورت نبود افزونه SOAP یا خطای شبکه، خطا فقط لاگ می‌شود
- * و مقدار false برمی‌گردد تا جریان اصلی (ثبت‌نام/دعوت) متوقف نشود.
+ * اگر اعتبارنامه تنظیم نشده باشد، سرویس «غیرفعال» است و ارسال‌ها بی‌صدا
+ * رد می‌شوند (فقط لاگ) تا جریان اصلی (ثبت‌نام/دعوت/یادآوری) متوقف نشود.
+ * در صورت نبود افزونه SOAP یا خطای شبکه نیز خطا فقط لاگ می‌شود و false برمی‌گردد.
  */
 final class SmsService
 {
@@ -26,10 +26,18 @@ final class SmsService
 
     public function __construct()
     {
-        $this->username = (string) (getenv('MELIPAYAMAK_USERNAME') ?: '9905367498');
-        $this->password = (string) (getenv('MELIPAYAMAK_PASSWORD') ?: '96R3Q');
-        $this->bodyId = (int) (getenv('MELIPAYAMAK_BODY_ID') ?: 530743);
-        $this->reminderBodyId = (int) (getenv('MELIPAYAMAK_REMINDER_BODY_ID') ?: 0);
+        // از طریق AppConfig خوانده می‌شود تا مقادیر فایل .env هم بارگذاری شوند
+        $env = \App\Config\AppConfig::env(...);
+        $this->username = trim((string) $env('MELIPAYAMAK_USERNAME', ''));
+        $this->password = trim((string) $env('MELIPAYAMAK_PASSWORD', ''));
+        $this->bodyId = (int) $env('MELIPAYAMAK_BODY_ID', '0');
+        $this->reminderBodyId = (int) $env('MELIPAYAMAK_REMINDER_BODY_ID', '0');
+    }
+
+    /** آیا اعتبارنامهٔ پیامک پیکربندی شده است؟ */
+    public function isEnabled(): bool
+    {
+        return $this->username !== '' && $this->password !== '' && $this->bodyId > 0;
     }
 
     /**
@@ -42,6 +50,10 @@ final class SmsService
      */
     public function sendByBaseNumber(string $to, string $text, array $args = [], ?int $bodyId = null): bool
     {
+        if (!$this->isEnabled()) {
+            Logger::warning('SmsService', 'پیامک غیرفعال است؛ متغیرهای محیطی MELIPAYAMAK_* تنظیم نشده‌اند', ['to' => $to]);
+            return false;
+        }
         $to = \App\Utilities\PhoneHelper::normalize($to);
         if (!\App\Utilities\PhoneHelper::isValid($to)) {
             Logger::warning('SmsService', 'شماره مقصد پیامک معتبر نیست', ['to' => $to]);

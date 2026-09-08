@@ -130,6 +130,12 @@ function api_apply_ssl_options($curl)
 }
 
 function callAPI($method, $endpoint, $data = false) {
+    // حالت تست/‏E2E: به‌جای HTTP، درخواست در همان فرایند از مسیر واقعی
+    // کرنل (میدل‌ورها → روتر → کنترلر → سرویس) عبور می‌کند.
+    if (defined('API_INTERNAL_DISPATCH') && API_INTERNAL_DISPATCH === true) {
+        return api_internal_dispatch($method, $endpoint, $data);
+    }
+
     $curl = curl_init();
     
     $endpoint = ltrim($endpoint, '/');
@@ -232,6 +238,72 @@ function callAPI($method, $endpoint, $data = false) {
 
     $response['http_code'] = $http_status;
     return $response;
+}
+
+/**
+ * دیسپچ داخلی درخواست در همان فرایند (فقط برای تست‌های یکپارچه و E2E).
+ * همهٔ مراحل واقعی را طی می‌کند: میدل‌ورها (احراز هویت، نرخ، کش) → روتر → کنترلر → سرویس.
+ *
+ * @return array پاسخ جی‌سان + کد وضعیت
+ */
+function api_internal_dispatch($method, $endpoint, $data = false): array
+{
+    static $kernel = null;
+    if ($kernel === null) {
+        // کرنل برای مسیریابی به این دو فایل نیاز دارد (در حالت عادی توسط public/index.php لود می‌شوند)
+        require_once dirname(__DIR__) . '/config/app.php';
+        require_once dirname(__DIR__) . '/config/routes.php';
+        $kernel = new \App\Core\Kernel();
+    }
+
+    $method = strtoupper((string) $method);
+    $uri = '/api/' . ltrim((string) $endpoint, '/');
+    $body = null;
+    if ($method === 'GET' && $data) {
+        $uri .= '?' . http_build_query($data);
+    } elseif ($data) {
+        $body = json_encode($data, JSON_UNESCAPED_UNICODE);
+    }
+
+    $headers = [
+        'content-type' => 'application/json',
+        'accept' => 'application/json',
+    ];
+    if (!empty($_SESSION['token'])) {
+        $headers['authorization'] = 'Bearer ' . $_SESSION['token'];
+    }
+
+    $request = new \App\Core\Request();
+    $ref = new ReflectionClass($request);
+    foreach ([
+        'method' => $method,
+        'uri' => $uri,
+        'query' => $method === 'GET' && $data ? $data : [],
+        'post' => ($method !== 'GET' && is_array($data)) ? $data : [],
+        'headers' => $headers,
+        'body' => $body,
+    ] as $prop => $value) {
+        $p = $ref->getProperty($prop);
+        $p->setAccessible(true);
+        $p->setValue($request, $value);
+    }
+
+    try {
+        $response = $kernel->handle($request);
+        $status = $response->getStatusCode();
+        $decoded = json_decode((string) $response->getContent(), true);
+        if (!is_array($decoded)) {
+            $decoded = ['success' => false, 'message' => 'پاسخ داخلی قابل تفسیر نبود.'];
+        }
+        $decoded['http_code'] = $status;
+        return $decoded;
+    } catch (\Throwable $e) {
+        return [
+            'success' => false,
+            'message' => 'خطای داخلی: ' . $e->getMessage(),
+            'http_code' => 500,
+        ];
+    }
 }
 
 /**

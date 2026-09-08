@@ -432,7 +432,9 @@ final class CostService
             throw new ValidationException('مبلغ پرداخت باید بیشتر از صفر باشد.');
         }
         $unit = $this->resolveUnitInBuilding($buildingId, $unitId);
-        $payerUserId = (int) ($unit['tenant_user_id'] ?: $unit['owner_user_id']);
+        // پرداخت‌کننده باید همان کسی باشد که هزینه برایش صادر می‌شود:
+        // در مخاطب «واحدهای خاص» ترجیح با مالک است و اگر نباشد، مستأجر.
+        $payerUserId = (int) ($unit['owner_user_id'] ?: $unit['tenant_user_id']);
         if ($payerUserId <= 0) {
             throw new AppException('این واحد مالک یا مستأجری ندارد؛ ابتدا در صفحه واحدها مشخص کنید.');
         }
