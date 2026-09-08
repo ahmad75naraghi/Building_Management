@@ -123,6 +123,8 @@ $db->exec("INSERT INTO review_categories (name) VALUES ('نظافت')");
 $db->exec("INSERT INTO reviews (building_id, category_id, user_id, rating, review_text) VALUES ({$b}, 1, {$tenant}, 4, 'خوب')");
 $db->exec("INSERT INTO documents (building_id, title, file_path, stored_name, mime_type, file_size, is_visible_to_members, uploaded_by) VALUES ({$b}, 'سند تست', 'storage/documents/e2e-test-file.txt', 'e2e-test-file.txt', 'text/plain', 12, 1, {$manager})");
 $db->exec("INSERT INTO invitations (building_id, phone, name, role, token, invited_by, status, expires_at) VALUES ({$b}, '09300000099', 'مهمان جدید', 'tenant', 'e2e-invite-token', {$manager}, 'pending', '2099-01-01 00:00:00')");
+$db->exec("INSERT INTO messages (building_id, sender_id, recipient_id, body) VALUES ({$b}, {$tenant}, {$manager}, 'سلام مدیر، سوالی درباره شارژ داشتم')");
+$db->exec("INSERT INTO messages (building_id, sender_id, recipient_id, body) VALUES ({$b}, {$manager}, {$tenant}, 'سلام، بفرمایید')");
 
 // ------------------------------------------------------------------
 // آماده‌سازی نشست کاربر لاگین‌شده
@@ -147,7 +149,9 @@ function e2e_render(string $page, array $get = []): array
     ob_start();
     $fatal = null;
     try {
-        include dirname(__DIR__, 2) . '/' . $page;
+        // کلید صفحه ممکن است برای تمایز حالت‌ها پسوند «?...» داشته باشد
+        $file = explode('?', $page)[0];
+        include dirname(__DIR__, 2) . '/' . $file;
     } catch (\Throwable $e) {
         $fatal = $e->getMessage();
     }
@@ -188,6 +192,8 @@ $pages = [
     'emergency_contacts.php' => ['building_id' => $bid],
     'calendar.php' => ['building_id' => $bid],
     'audit_logs.php' => ['building_id' => $bid],
+    'messages.php' => ['building_id' => $bid],
+    'messages.php?chat' => ['building_id' => $bid, 'with' => $tenant],
     'notifications.php' => [],
     'profile.php' => [],
     'profile_edit.php' => [],
@@ -203,7 +209,8 @@ foreach ($pages as $page => $get) {
 
         TestLog::assertTrue("بدون خطای مهلک", $fatal === null, (string) $fatal);
         TestLog::assertTrue("بدون خطای مهلک در خروجی", !preg_match('/Fatal error|Uncaught|Parse error/i', $html));
-        TestLog::assertTrue("خروجی خالی نیست", strlen($html) > 200, 'طول: ' . strlen($html));
+        TestLog::assertTrue("خروجی خالی نیست", strlen($html) > 200,
+            'صفحه: ' . $page . ' طول: ' . strlen($html) . ($html !== '' && strlen($html) <= 200 ? ' محتوا: ' . trim($html) : ''));
 
         // صفحات با فرم باید توکن CSRF داشته باشند
         $formPages = ['building_add.php', 'building_edit.php', 'costs.php', 'accounting.php', 'members.php',

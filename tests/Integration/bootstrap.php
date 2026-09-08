@@ -232,6 +232,8 @@ function test_db(): PDO
         tenant_user_id INTEGER DEFAULT NULL,
         owner_resident INTEGER DEFAULT 0,
         residents_count INTEGER DEFAULT 0,
+        parking_no TEXT DEFAULT NULL,
+        storage_no TEXT DEFAULT NULL,
         custom_charge REAL DEFAULT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -389,6 +391,17 @@ function test_db(): PDO
         FOREIGN KEY (uploaded_by) REFERENCES users(id)
     )");
 
+    $pdo->exec("CREATE TABLE messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        sender_id INTEGER NOT NULL,
+        recipient_id INTEGER NOT NULL,
+        body TEXT NOT NULL,
+        is_read INTEGER DEFAULT 0,
+        read_at TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )");
+
     // تزریق اتصال به Database از طریق Reflection
     $ref = new ReflectionClass(\App\Core\Database::class);
     $prop = $ref->getProperty('connection');
@@ -402,7 +415,7 @@ function test_db(): PDO
 function test_db_reset(): void
 {
     $db = test_db();
-    foreach (['reviews','vote_results','vote_options','votes','audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
+    foreach (['messages','reviews','vote_results','vote_options','votes','audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
               'building_members','building_hierarchy_settings','buildings','otp_codes','users'] as $t) {
         $db->exec("DELETE FROM {$t}");
         $db->exec("DELETE FROM sqlite_sequence WHERE name = '{$t}'");

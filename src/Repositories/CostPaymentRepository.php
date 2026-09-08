@@ -144,7 +144,7 @@ final class CostPaymentRepository
         $db = Database::getConnection();
         $stmt = $db->prepare("
             SELECT cp.*, c.title AS cost_title, u.name AS user_name, u.email AS user_email,
-                   un.unit_number AS unit_number
+                   un.unit_number AS unit_number, un.parking_no AS parking_no, un.storage_no AS storage_no
             FROM cost_payments cp
             INNER JOIN costs c ON cp.cost_id = c.id
             INNER JOIN users u ON cp.user_id = u.id

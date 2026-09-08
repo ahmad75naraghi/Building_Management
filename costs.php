@@ -591,6 +591,12 @@ require_once 'includes/header.php';
                                 <?php if (!empty($payment['unit_number'])): ?>
                                     <span class="chip chip-blue" style="margin-inline-start:6px;">🏠 واحد <?= fa_digits($payment['unit_number']) ?></span>
                                 <?php endif; ?>
+                                <?php if (!empty($payment['parking_no'])): ?>
+                                    <span class="chip chip-gray" style="margin-inline-start:4px;" title="قطعه پارکینگ">🚗 <?= fa_digits($payment['parking_no']) ?></span>
+                                <?php endif; ?>
+                                <?php if (!empty($payment['storage_no'])): ?>
+                                    <span class="chip chip-gray" style="margin-inline-start:4px;" title="قطعه انباری">📦 <?= fa_digits($payment['storage_no']) ?></span>
+                                <?php endif; ?>
                             </h3>
                             <p class="text-xs text-gray-500 mt-0.5 truncate"><?= htmlspecialchars($payment['cost_title'] ?? '') ?></p>
                             <?php if (($payment['status'] ?? '') === 'rejected' && !empty($payment['reject_reason'])): ?>

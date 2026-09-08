@@ -171,6 +171,12 @@ require_once 'includes/header.php';
                                     }
                                     ?>
                                     <span class="text-[10px] px-2 py-0.5 rounded-full <?= $rel_class ?>"><?= htmlspecialchars($rel_label) ?></span>
+                                    <?php if (!empty($mu['parking_no'])): ?>
+                                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600" title="قطعه پارکینگ">🚗 پارکینگ <?= fa_digits($mu['parking_no']) ?></span>
+                                    <?php endif; ?>
+                                    <?php if (!empty($mu['storage_no'])): ?>
+                                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600" title="قطعه انباری">📦 انباری <?= fa_digits($mu['storage_no']) ?></span>
+                                    <?php endif; ?>
                                 <?php endforeach; ?>
                             </div>
                         <?php endif; ?>

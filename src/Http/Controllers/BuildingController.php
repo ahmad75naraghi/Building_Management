@@ -769,20 +769,20 @@ final class BuildingController
         $stmt->execute([$buildingId]);
         $members = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
-        // اطلاعات واحدهایی که این عضو در آن‌ها مالک/مستاجر/ساکن است
+        // همهٔ واحدهای ساختمان یک‌بار خوانده و بین اعضا تقسیم می‌شود (بدون کوئری اضافی)
         $unitStmt = $db->prepare(
-            "SELECT id, unit_number, owner_user_id, tenant_user_id, owner_resident
+            "SELECT id, unit_number, owner_user_id, tenant_user_id, owner_resident, parking_no, storage_no
              FROM units
-             WHERE building_id = ? AND (owner_user_id = ? OR tenant_user_id = ?)
+             WHERE building_id = ?
              ORDER BY unit_number ASC"
         );
-        $unitStmt->execute([$buildingId, $userId, $userId]);
-        $relatedUnits = $unitStmt->fetchAll(\PDO::FETCH_ASSOC);
+        $unitStmt->execute([$buildingId]);
+        $allUnits = $unitStmt->fetchAll(\PDO::FETCH_ASSOC);
 
-        $members = array_map(function (array $m) use ($relatedUnits): array {
+        $members = array_map(function (array $m) use ($allUnits): array {
             $memberId = (int) $m['user_id'];
             $m['units'] = [];
-            foreach ($relatedUnits as $u) {
+            foreach ($allUnits as $u) {
                 $owner = $u['owner_user_id'] !== null ? (int) $u['owner_user_id'] : null;
                 $tenant = $u['tenant_user_id'] !== null ? (int) $u['tenant_user_id'] : null;
                 if ($owner !== $memberId && $tenant !== $memberId) {
@@ -796,6 +796,8 @@ final class BuildingController
                     'id' => (int) $u['id'],
                     'unit_number' => $u['unit_number'],
                     'relation' => $relation, // owner | owner_resident | tenant
+                    'parking_no' => $u['parking_no'] ?? null,
+                    'storage_no' => $u['storage_no'] ?? null,
                 ];
             }
             return $m;
