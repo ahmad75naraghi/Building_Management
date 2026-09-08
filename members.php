@@ -234,8 +234,10 @@ require_once 'includes/header.php';
                                     ارسال مجدد پیامک
                                 </button>
                             </form>
-                            <form method="POST" action="" style="display:contents;"
-                                  onsubmit="return confirm('دعوت‌نامه لغو شود؟ لینک دعوت دیگر کار نخواهد کرد.');">
+                            <form method="POST" action="" style="display:contents;" data-confirm="دعوت‌نامه لغو شود؟ لینک دعوت دیگر کار نخواهد کرد."
+                                  data-confirm-sheet data-sheet-title="لغو دعوت‌نامه"
+                                  data-sheet-name="دعوت‌نامهٔ «<?= htmlspecialchars($contact) ?>»"
+                                  data-sheet-confirm="لغو دعوت‌نامه">
                                 <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="revoke_invitation">
                                 <input type="hidden" name="invitation_id" value="<?= (int) ($inv['id'] ?? 0) ?>">

@@ -220,7 +220,10 @@ require_once 'includes/page_head.php';
     <div class="card p-5 mt-6 border border-red-200">
         <h3 class="font-bold text-red-600 mb-2">حذف ساختمان</h3>
         <p class="text-xs text-gray-500 mb-4">با حذف ساختمان، دسترسی شما به آن برای همیشه از بین می‌رود. این عملیات قابل بازگشت نیست.</p>
-        <form method="POST" action="building_delete.php" data-confirm="آیا مطمئن هستید؟ این ساختمان و تمام داده‌های آن حذف می‌شود.">
+        <form method="POST" action="building_delete.php" data-confirm="آیا مطمئن هستید؟ این ساختمان و تمام داده‌های آن حذف می‌شود."
+              data-confirm-sheet data-sheet-title="حذف ساختمان"
+              data-sheet-name="ساختمان «<?= htmlspecialchars($building['name'] ?? '') ?>» و تمام داده‌های آن"
+              data-sheet-confirm="حذف دائمی ساختمان">
             <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="delete">
             <input type="hidden" name="id" value="<?= $building_id ?>">

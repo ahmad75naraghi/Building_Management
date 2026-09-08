@@ -93,6 +93,8 @@ final class Routes
         'POST /api/payments/{payment_id}/upload-receipt' => ['App\Http\Controllers\CostController', 'uploadReceipt'],
         'POST /api/payments/{payment_id}/confirm' => ['App\Http\Controllers\CostController', 'confirmPayment'],
         'POST /api/payments/{payment_id}/reject' => ['App\Http\Controllers\CostController', 'rejectPayment'],
+        'POST /api/payments/bulk-confirm' => ['App\Http\Controllers\CostController', 'bulkConfirmPayments'],
+        'POST /api/payments/bulk-reject' => ['App\Http\Controllers\CostController', 'bulkRejectPayments'],
         'GET /api/buildings/{building_id}/unit-balances' => ['App\Http\Controllers\CostController', 'unitBalances'],
         'GET /api/buildings/{building_id}/ledger' => ['App\Http\Controllers\CostController', 'ledger'],
         'GET /api/buildings/{building_id}/monthly-report' => ['App\Http\Controllers\CostController', 'monthlyReport'],

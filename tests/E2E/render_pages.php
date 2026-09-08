@@ -71,9 +71,10 @@ $e2e_ddl = [
         id INTEGER PRIMARY KEY AUTOINCREMENT, building_id INTEGER, message TEXT, created_by INTEGER,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP)",
     "CREATE TABLE IF NOT EXISTS invitations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, building_id INTEGER, phone TEXT, name TEXT,
+        id INTEGER PRIMARY KEY AUTOINCREMENT, building_id INTEGER,
+        invited_name TEXT DEFAULT NULL, invited_phone TEXT DEFAULT NULL,
         role TEXT, token TEXT, invited_by INTEGER, status TEXT, expires_at TEXT,
-        invited_email TEXT DEFAULT NULL, invited_phone TEXT DEFAULT NULL, accepted_at TEXT DEFAULT NULL,
+        invited_email TEXT DEFAULT NULL, accepted_at TEXT DEFAULT NULL, unit_id INTEGER DEFAULT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP)",
     "CREATE TABLE IF NOT EXISTS rate_limits (
         id INTEGER PRIMARY KEY AUTOINCREMENT, key_hash TEXT, hits INTEGER, window_start TEXT)",
@@ -122,7 +123,7 @@ $db->exec("INSERT INTO vote_options (vote_id, option_text) VALUES (1, 'گزین�
 $db->exec("INSERT INTO review_categories (name) VALUES ('نظافت')");
 $db->exec("INSERT INTO reviews (building_id, category_id, user_id, rating, review_text) VALUES ({$b}, 1, {$tenant}, 4, 'خوب')");
 $db->exec("INSERT INTO documents (building_id, title, file_path, stored_name, mime_type, file_size, is_visible_to_members, uploaded_by) VALUES ({$b}, 'سند تست', 'storage/documents/e2e-test-file.txt', 'e2e-test-file.txt', 'text/plain', 12, 1, {$manager})");
-$db->exec("INSERT INTO invitations (building_id, phone, name, role, token, invited_by, status, expires_at) VALUES ({$b}, '09300000099', 'مهمان جدید', 'tenant', 'e2e-invite-token', {$manager}, 'pending', '2099-01-01 00:00:00')");
+$db->exec("INSERT INTO invitations (building_id, invited_phone, invited_name, role, token, invited_by, status, expires_at) VALUES ({$b}, '09300000099', 'مهمان جدید', 'tenant', 'e2e-invite-token', {$manager}, 'pending', '2099-01-01 00:00:00')");
 $db->exec("INSERT INTO messages (building_id, sender_id, recipient_id, body) VALUES ({$b}, {$tenant}, {$manager}, 'سلام مدیر، سوالی درباره شارژ داشتم')");
 $db->exec("INSERT INTO messages (building_id, sender_id, recipient_id, body) VALUES ({$b}, {$manager}, {$tenant}, 'سلام، بفرمایید')");
 

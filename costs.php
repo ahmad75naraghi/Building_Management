@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action'])) {
     $action = $_POST['form_action'];
 
     // ---- اقدامات مدیریتی ----
-    $manager_actions = ['create_cost', 'update_cost', 'delete_cost', 'issue_cost', 'confirm_payment', 'reject_payment', 'create_monthly', 'save_charge_settings', 'create_penalty_setting', 'update_penalty_setting', 'delete_penalty_setting'];
+    $manager_actions = ['create_cost', 'update_cost', 'delete_cost', 'issue_cost', 'confirm_payment', 'reject_payment', 'bulk_confirm_payments', 'bulk_reject_payments', 'create_monthly', 'save_charge_settings', 'create_penalty_setting', 'update_penalty_setting', 'delete_penalty_setting'];
     if (in_array($action, $manager_actions, true) && !$is_manager) {
         $alert_message = 'این عملیات فقط برای مدیر ساختمان مجاز است.';
     } elseif ($action === 'save_charge_settings') {
@@ -145,6 +145,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action'])) {
                     $alert_type = 'success';
                 } else {
                     $alert_message = $response['message'] ?? 'خطا در رد پرداخت.';
+                }
+            }
+        }
+    } elseif ($action === 'bulk_confirm_payments' || $action === 'bulk_reject_payments') {
+        // اقدام گروهی روی پرداخت‌های انتخاب‌شده (تأیید/رد یک‌جا)
+        $payment_ids = array_values(array_unique(array_filter(
+            array_map('intval', (array) ($_POST['payment_ids'] ?? [])),
+            static fn ($v) => $v > 0
+        )));
+        if ($payment_ids === []) {
+            $alert_message = 'هیچ پرداختی انتخاب نشده است.';
+        } elseif ($action === 'bulk_confirm_payments') {
+            $response = callAPI('POST', '/payments/bulk-confirm', ['ids' => $payment_ids]);
+            $data = is_array($response['data'] ?? null) ? $response['data'] : [];
+            $failed = (int) ($data['failed'] ?? 0);
+            if (!empty($response['success']) && $failed === 0) {
+                $alert_message = $response['message'] ?? 'پرداخت‌های انتخاب‌شده تأیید شدند.';
+                $alert_type = 'success';
+            } elseif (!empty($response['success'])) {
+                $alert_message = ($response['message'] ?? '') . ' جزئیات: ' . implode('؛ ', array_slice((array) ($data['errors'] ?? []), 0, 3));
+            } else {
+                $alert_message = $response['message'] ?? 'خطا در تأیید گروهی پرداخت‌ها.';
+            }
+        } else {
+            $reason = trim((string) ($_POST['reject_reason'] ?? ''));
+            if ($reason === '') {
+                $alert_message = 'دلیل رد گروهی الزامی است.';
+                $reopen_modal = 'reject-payment-bulk';
+            } else {
+                $response = callAPI('POST', '/payments/bulk-reject', ['ids' => $payment_ids, 'reason' => $reason]);
+                $data = is_array($response['data'] ?? null) ? $response['data'] : [];
+                $failed = (int) ($data['failed'] ?? 0);
+                if (!empty($response['success']) && $failed === 0) {
+                    $alert_message = $response['message'] ?? 'پرداخت‌های انتخاب‌شده رد شدند.';
+                    $alert_type = 'success';
+                } elseif (!empty($response['success'])) {
+                    $alert_message = ($response['message'] ?? '') . ' جزئیات: ' . implode('؛ ', array_slice((array) ($data['errors'] ?? []), 0, 3));
+                } else {
+                    $alert_message = $response['message'] ?? 'خطا در رد گروهی پرداخت‌ها.';
+                    $reopen_modal = 'reject-payment-bulk';
                 }
             }
         }
@@ -554,7 +594,9 @@ require_once 'includes/header.php';
                                     data-set-due_date="<?= htmlspecialchars($cost['due_date'] ?? '') ?>">
                                 ویرایش
                             </button>
-                            <form method="POST" action="" data-confirm="این هزینه حذف شود؟" style="display:inline;">
+                            <form method="POST" action="" data-confirm="این هزینه حذف شود؟" data-confirm-sheet
+                                  data-sheet-title="حذف هزینه" data-sheet-name="هزینهٔ «<?= htmlspecialchars($c_title) ?>»"
+                                  data-sheet-confirm="حذف هزینه" style="display:inline;">
                                 <?= csrf_field() ?>
                                 <input type="hidden" name="form_action" value="delete_cost">
                                 <input type="hidden" name="cost_id" value="<?= $c_id ?>">
@@ -593,8 +635,13 @@ require_once 'includes/header.php';
         <div class="space-y-3" data-list-items="payments-list">
             <?php foreach ($visible_payments as $payment): ?>
                 <?php $p_id = (int) ($payment['id'] ?? 0); ?>
-                <div class="card p-4">
+                <div class="card p-4" data-payment-card>
                     <div class="flex items-start justify-between gap-3">
+                        <?php if ($is_manager && ($payment['status'] ?? '') !== 'confirmed'): ?>
+                            <label class="bulk-check-label" title="انتخاب برای اقدام گروهی">
+                                <input type="checkbox" class="bulk-check" data-payment-id="<?= $p_id ?>" aria-label="انتخاب پرداخت">
+                            </label>
+                        <?php endif; ?>
                         <div class="flex-1 min-w-0">
                             <h3 class="font-bold text-gray-800 text-sm"><?= htmlspecialchars($payment['user_name'] ?? 'کاربر') ?>
                                 <?php if (!empty($payment['unit_number'])): ?>
@@ -665,6 +712,25 @@ require_once 'includes/header.php';
             <?php endforeach; ?>
         </div>
         <div data-list-pager="payments-list"></div>
+
+        <?php if ($is_manager): ?>
+            <!-- نوار اقدام گروهی روی پرداخت‌های انتخاب‌شده -->
+            <div class="bulk-bar" id="bulk-pay-bar" hidden>
+                <label class="bulk-bar-check" title="انتخاب همهٔ موارد قابل اقدام در این صفحه">
+                    <input type="checkbox" id="bulk-pay-all"> همه
+                </label>
+                <span class="bulk-bar-count"><b id="bulk-pay-count">۰</b> پرداخت انتخاب شده</span>
+                <div class="bulk-bar-actions">
+                    <button type="button" class="btn-chip btn-chip-success" id="bulk-pay-confirm">✓ تأیید یک‌جا</button>
+                    <button type="button" class="btn-chip btn-chip-danger" id="bulk-pay-reject-open" data-modal-open="reject-payment-bulk">✕ رد یک‌جا</button>
+                </div>
+            </div>
+            <form method="POST" action="" id="bulk-pay-confirm-form" style="display:none;">
+                <?= csrf_field() ?>
+                <input type="hidden" name="form_action" value="bulk_confirm_payments">
+                <span data-bulk-ids></span>
+            </form>
+        <?php endif; ?>
     <?php endif; ?>
 
 </main>
@@ -703,6 +769,21 @@ require_once 'includes/header.php';
                 <p class="text-[11px] text-gray-400 mt-1">دلیل برای پرداخت‌کننده ارسال می‌شود و او می‌تواند پس از پرداخت واقعی دوباره رسید ثبت کند.</p>
             </div>
             <button type="submit" class="btn-primary" style="background:linear-gradient(135deg,#ef4444,#dc2626);">رد پرداخت</button>
+        </form>
+    <?php modal_end(); ?>
+
+    <?php modal_start('reject-payment-bulk', 'رد گروهی پرداخت‌ها', 'یک دلیل مشترک برای همهٔ پرداخت‌های انتخاب‌شده بنویسید'); ?>
+        <form method="POST" action="" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
+            <input type="hidden" name="form_action" value="bulk_reject_payments">
+            <span data-bulk-ids></span>
+            <p class="text-xs text-gray-600"><b id="bulk-reject-count">۰</b> پرداخت انتخاب شده رد می‌شود.</p>
+            <div>
+                <label class="form-label">دلیل رد *</label>
+                <textarea name="reject_reason" rows="2" required class="form-input" placeholder="مثال: مبلغ به حساب ساختمان واریز نشده است"></textarea>
+                <p class="text-[11px] text-gray-400 mt-1">دلیل برای همهٔ پرداخت‌کننده‌ها ارسال می‌شود.</p>
+            </div>
+            <button type="submit" class="btn-primary" style="background:linear-gradient(135deg,#ef4444,#dc2626);">رد پرداخت‌های انتخاب‌شده</button>
         </form>
     <?php modal_end(); ?>
 

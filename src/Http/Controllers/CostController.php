@@ -267,6 +267,77 @@ final class CostController
         }
     }
 
+    /** شناسه‌های پرداخت از بدنهٔ درخواست گروهی؛ حداکثر ۱۰۰ مورد در هر فراخوانی */
+    private function bulkPaymentIds(Request $request): ?array
+    {
+        $data = $request->getJsonBody() ?? [];
+        $ids = $data['ids'] ?? [];
+        if (!is_array($ids)) {
+            return null;
+        }
+        $clean = array_values(array_unique(array_filter(
+            array_map('intval', $ids),
+            static fn ($v) => $v > 0
+        )));
+        if ($clean === [] || count($clean) > 100) {
+            return null;
+        }
+        return $clean;
+    }
+
+    /** تأیید گروهی پرداخت‌ها توسط مدیر ساختمان */
+    public function bulkConfirmPayments(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        if (!$userId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication required',
+            ]);
+        }
+        $ids = $this->bulkPaymentIds($request);
+        if ($ids === null) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => 'شناسهٔ پرداخت‌ها معتبر نیست (حداکثر ۱۰۰ مورد).',
+            ]);
+        }
+        $result = $this->service->bulkConfirmPayments($ids, (int) $userId);
+        return (new Response())->setJson([
+            'success' => true,
+            'message' => sprintf('%d پرداخت تأیید شد؛ %d مورد ناموفق بود.', $result['processed'], $result['failed']),
+            'data' => $result,
+        ]);
+    }
+
+    /** رد گروهی پرداخت‌ها توسط مدیر ساختمان با دلیل مشترک */
+    public function bulkRejectPayments(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        if (!$userId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication required',
+            ]);
+        }
+        $ids = $this->bulkPaymentIds($request);
+        if ($ids === null) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => 'شناسهٔ پرداخت‌ها معتبر نیست (حداکثر ۱۰۰ مورد).',
+            ]);
+        }
+        $data = $request->getJsonBody() ?? [];
+        $reason = trim((string) ($data['reason'] ?? ''));
+        if ($reason === '') {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => 'دلیل رد گروهی الزامی است.',
+            ]);
+        }
+        $result = $this->service->bulkRejectPayments($ids, (int) $userId, $reason);
+        return (new Response())->setJson([
+            'success' => true,
+            'message' => sprintf('%d پرداخت رد شد؛ %d مورد ناموفق بود.', $result['processed'], $result['failed']),
+            'data' => $result,
+        ]);
+    }
+
     /** ماندهٔ بدهکار/طلبکار هر واحد ساختمان */
     public function unitBalances(Request $request): Response
     {

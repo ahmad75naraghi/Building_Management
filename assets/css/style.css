@@ -2124,3 +2124,161 @@
         }
         .list-pager-btn:disabled { opacity: 0.35; cursor: default; }
         .list-pager-info { font-size: 11.5px; font-weight: 700; color: var(--text-gray); }
+
+        /* ============================================================
+         * برگهٔ تأیید پایین صفحه (حذف و اقدامات حساس با نام مورد)
+         * ============================================================ */
+        .sheet-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(2, 10, 32, 0.55);
+            z-index: 130;
+            opacity: 0;
+            transition: opacity 0.22s ease;
+        }
+        .sheet-overlay.is-open { opacity: 1; }
+        .app-sheet {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 131;
+            max-width: 480px;
+            margin: 0 auto;
+            background: var(--text-white);
+            border-radius: 20px 20px 0 0;
+            padding: 20px 18px calc(20px + env(safe-area-inset-bottom));
+            transform: translateY(105%);
+            transition: transform 0.26s cubic-bezier(0.2, 0.9, 0.3, 1);
+            box-shadow: 0 -10px 40px rgba(2, 10, 32, 0.25);
+        }
+        html[data-theme="dark"] .app-sheet { background: var(--surface-2); }
+        .app-sheet.is-open { transform: translateY(0); }
+        .app-sheet-title {
+            font-size: 15px;
+            font-weight: 800;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+        }
+        html[data-theme="dark"] .app-sheet-title { color: #fff; }
+        .app-sheet-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--gold-primary);
+            background: rgba(212, 163, 115, 0.12);
+            border: 1px solid rgba(212, 163, 115, 0.35);
+            border-radius: 10px;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+        }
+        .app-sheet-message {
+            font-size: 12.5px;
+            line-height: 1.9;
+            color: var(--text-gray);
+            margin-bottom: 14px;
+        }
+        .app-sheet-actions { display: flex; gap: 10px; }
+        .app-sheet-btn {
+            flex: 1;
+            border: none;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            border-radius: 12px;
+            padding: 11px 14px;
+            cursor: pointer;
+        }
+        .app-sheet-btn-cancel { background: #f1f5f9; color: var(--text-dark); }
+        html[data-theme="dark"] .app-sheet-btn-cancel { background: var(--surface-3); color: #fff; }
+        .app-sheet-btn-danger { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; }
+
+        /* ============================================================
+         * نوار اقدام گروهی پرداخت‌ها
+         * ============================================================ */
+        .bulk-bar {
+            position: fixed;
+            bottom: calc(var(--app-nav-h) + 14px);
+            left: 12px;
+            right: 12px;
+            max-width: 480px;
+            margin: 0 auto;
+            z-index: 70;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--bg-dark-blue);
+            color: #fff;
+            border-radius: 16px;
+            padding: 10px 12px;
+            box-shadow: 0 12px 32px rgba(2, 10, 32, 0.4);
+            animation: toast-in 0.25s ease;
+        }
+        .bulk-bar-check {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .bulk-bar-count { font-size: 11px; flex: 1; min-width: 0; }
+        .bulk-bar-count b { color: var(--gold-primary); }
+        .bulk-bar-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .bulk-bar .btn-chip { font-size: 11px; padding: 7px 10px; }
+        .bulk-check-label {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            margin-top: 2px;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+        .bulk-check {
+            width: 17px;
+            height: 17px;
+            accent-color: var(--gold-primary);
+            cursor: pointer;
+        }
+
+        /* ============================================================
+         * انتقال نرم رنگ‌ها هنگام تغییر حالت شب/روز
+         * ============================================================ */
+        html.theme-transition body,
+        html.theme-transition .app-container,
+        html.theme-transition main,
+        html.theme-transition .card,
+        html.theme-transition .app-header,
+        html.theme-transition .app-nav,
+        html.theme-transition .app-nav-item,
+        html.theme-transition .section-title,
+        html.theme-transition .list-filter-bar,
+        html.theme-transition .chip,
+        html.theme-transition .form-input,
+        html.theme-transition .app-sheet {
+            transition: background-color 0.45s ease, color 0.45s ease, border-color 0.45s ease, box-shadow 0.45s ease;
+        }
+
+        /* ============================================================
+         * جداکنندهٔ گروه‌بندی روزانه در فهرست‌ها
+         * ============================================================ */
+        .list-day-divider {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 16px 0 8px;
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--text-gray);
+        }
+        .list-day-divider::before,
+        .list-day-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #eef2f7;
+        }
+        html[data-theme="dark"] .list-day-divider::before,
+        html[data-theme="dark"] .list-day-divider::after { background: var(--line); }

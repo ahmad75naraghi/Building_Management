@@ -45,7 +45,16 @@ require_once 'includes/page_head.php';
         </div>
     <?php else: ?>
         <div class="space-y-3">
+            <?php $current_day = null; ?>
             <?php foreach ($notifications as $notification): ?>
+                <?php
+                // گروه‌بندی روزانه: هنگام تغییر روز، جداکنندهٔ «امروز/دیروز/تاریخ» بگذار
+                $n_day = date('Y-m-d', strtotime((string) ($notification['created_at'] ?? 'now')));
+                if ($n_day !== $current_day):
+                    $current_day = $n_day;
+                ?>
+                    <div class="list-day-divider"><?= htmlspecialchars(fa_day_label($notification['created_at'] ?? 'now')) ?></div>
+                <?php endif; ?>
                 <div class="card p-4 <?= empty($notification['is_read']) ? 'border-r-4 border-r-blue-600 bg-blue-50/40' : '' ?>">
                     <div class="flex items-start justify-between gap-3">
                         <div class="flex items-center gap-3 flex-1 min-w-0">
@@ -61,7 +70,7 @@ require_once 'includes/page_head.php';
                                 <?php endif; ?>
                             </div>
                         </div>
-                        <span class="text-[11px] text-gray-400 flex-shrink-0"><?= fa_time_ago($notification['created_at'] ?? '') ?></span>
+                        <span class="text-[11px] text-gray-400 flex-shrink-0"><?= fa_smart_time($notification['created_at'] ?? '') ?></span>
                     </div>
                     <?php if (empty($notification['is_read'])): ?>
                         <form method="POST" action="" class="mt-3">

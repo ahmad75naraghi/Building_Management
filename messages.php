@@ -164,8 +164,18 @@ require_once 'includes/header.php';
             </div>
         <?php else: ?>
             <div class="space-y-2">
+                <?php $current_day = null; ?>
                 <?php foreach ($conversations as $conv): ?>
                     <?php $last = $conv['last_message'] ?? []; ?>
+                    <?php
+                    // گروه‌بندی روزانه بر اساس زمان آخرین پیام
+                    $c_ts = strtotime((string) ($last['created_at'] ?? ''));
+                    $c_day = $c_ts === false ? null : date('Y-m-d', $c_ts);
+                    if ($c_day !== null && $c_day !== $current_day):
+                        $current_day = $c_day;
+                    ?>
+                        <div class="list-day-divider"><?= htmlspecialchars(fa_day_label($last['created_at'])) ?></div>
+                    <?php endif; ?>
                     <a href="messages.php?building_id=<?= $building_id ?>&with=<?= (int) ($conv['other_id'] ?? 0) ?>"
                        class="card p-3 flex items-center gap-3" style="display:flex;text-decoration:none;">
                         <div class="w-11 h-11 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold flex-shrink-0">
@@ -175,7 +185,7 @@ require_once 'includes/header.php';
                             <div class="flex items-center justify-between gap-2">
                                 <p class="font-bold text-gray-800 text-sm truncate"><?= htmlspecialchars($conv['other_name'] ?? 'کاربر') ?></p>
                                 <span class="text-[10px] text-gray-400 flex-shrink-0">
-                                    <?= !empty($last['created_at']) ? fa_date($last['created_at']) : '' ?>
+                                    <?= !empty($last['created_at']) ? fa_smart_time($last['created_at']) : '' ?>
                                 </span>
                             </div>
                             <p class="text-xs text-gray-500 truncate mt-0.5">

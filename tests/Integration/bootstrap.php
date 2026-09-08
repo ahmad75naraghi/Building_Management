@@ -414,6 +414,22 @@ function test_db(): PDO
         UNIQUE (unit_id, period)
     )");
 
+    $pdo->exec("CREATE TABLE invitations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        invited_email TEXT DEFAULT NULL,
+        invited_phone TEXT DEFAULT NULL,
+        invited_name TEXT DEFAULT NULL,
+        role TEXT DEFAULT 'resident',
+        unit_id INTEGER DEFAULT NULL,
+        token TEXT UNIQUE NOT NULL,
+        status TEXT DEFAULT 'pending',
+        invited_by INTEGER NOT NULL,
+        expires_at TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        accepted_at TEXT DEFAULT NULL
+    )");
+
     // تزریق اتصال به Database از طریق Reflection
     $ref = new ReflectionClass(\App\Core\Database::class);
     $prop = $ref->getProperty('connection');
@@ -427,7 +443,7 @@ function test_db(): PDO
 function test_db_reset(): void
 {
     $db = test_db();
-    foreach (['debtor_sms_log','messages','reviews','vote_results','vote_options','votes','audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
+    foreach (['debtor_sms_log','messages','invitations','reviews','vote_results','vote_options','votes','audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
               'building_members','building_hierarchy_settings','buildings','otp_codes','users'] as $t) {
         $db->exec("DELETE FROM {$t}");
         $db->exec("DELETE FROM sqlite_sequence WHERE name = '{$t}'");

@@ -298,10 +298,24 @@ function api_internal_dispatch($method, $endpoint, $data = false): array
 
     $request = new \App\Core\Request();
     $ref = new ReflectionClass($request);
+    // شبیه‌سازی دقیق معنای HTTP: پارامترهای کوئری همیشه رشته می‌رسند.
+    // بدون این تبدیل، مقدار عددی (مثلاً building_id از صفحه‌ها) در
+    // حالت داخلی به Request تزریق می‌شد و خطای نوع می‌ساخت.
+    $query = [];
+    if ($method === 'GET' && is_array($data)) {
+        foreach ($data as $qk => $qv) {
+            if (is_bool($qv)) {
+                $query[$qk] = $qv ? '1' : '0';
+            } elseif (is_scalar($qv) || $qv === null) {
+                $query[$qk] = $qv === null ? '' : (string) $qv;
+            }
+        }
+    }
+
     foreach ([
         'method' => $method,
         'uri' => $uri,
-        'query' => $method === 'GET' && $data ? $data : [],
+        'query' => $query,
         'post' => ($method !== 'GET' && is_array($data)) ? $data : [],
         'headers' => $headers,
         'body' => $body,
@@ -438,6 +452,56 @@ function fa_time_ago($datetime)
         return 'دیروز';
     }
     return fa_digits((int) floor($diff / 86400)) . ' روز پیش';
+}
+
+/**
+ * نمایش زمان هوشمند و فشرده برای فهرست‌ها:
+ * امروز → «امروز ۱۴:۳۰» — دیروز → «دیروز» — تا یک هفته → «۳ روز پیش»
+ * قدیمی‌تر → تاریخ شمسی (با سال در صورت تغییر سال)
+ */
+function fa_smart_time($datetime)
+{
+    $ts = strtotime((string) $datetime);
+    if ($ts === false) {
+        return '';
+    }
+    $today = strtotime('today');
+    if ($ts >= $today) {
+        return 'امروز ' . fa_digits(date('H:i', $ts));
+    }
+    if ($ts >= $today - 86400) {
+        return 'دیروز';
+    }
+    $days = (int) floor(($today - $ts) / 86400);
+    if ($days <= 6) {
+        return fa_digits($days) . ' روز پیش';
+    }
+    $year = jdate('Y', $ts);
+    if ($year !== jdate('Y')) {
+        return fa_digits(JalaliHelper::format('j F Y', $ts));
+    }
+    return fa_digits(JalaliHelper::format('j F', $ts));
+}
+
+/**
+ * برچسب گروه‌بندی روزانه برای فهرست‌ها: امروز / دیروز / «۱۵ شهریور ۱۴۰۵»
+ * خروجی برای یک روز معین همیشه یکسان است تا بتوان مرز گروه‌ها را تشخیص داد.
+ */
+function fa_day_label($datetime)
+{
+    $ts = strtotime((string) $datetime);
+    if ($ts === false) {
+        return '';
+    }
+    $today = strtotime('today');
+    $startOfDay = $today;
+    if ($ts >= $startOfDay) {
+        return 'امروز';
+    }
+    if ($ts >= $startOfDay - 86400) {
+        return 'دیروز';
+    }
+    return fa_digits(JalaliHelper::format('j F Y', $ts));
 }
 
 // ---------- تقویم جلالی (شمسی) ----------

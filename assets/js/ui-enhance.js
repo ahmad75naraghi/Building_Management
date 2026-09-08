@@ -140,6 +140,194 @@
     }
 
     /* ----------------------------------------------------------
+     * ۴) برگهٔ تأیید پایین صفحه (با تکرار نام مورد)
+     * ---------------------------------------------------------- */
+    function confirmSheet(opts) {
+        opts = opts || {};
+        return new Promise(function (resolve) {
+            var overlay = document.createElement('div');
+            overlay.className = 'sheet-overlay';
+            var sheet = document.createElement('div');
+            sheet.className = 'app-sheet';
+            sheet.setAttribute('role', 'alertdialog');
+
+            var title = document.createElement('h3');
+            title.className = 'app-sheet-title';
+            title.textContent = opts.title || 'آیا مطمئن هستید؟';
+
+            sheet.appendChild(title);
+            if (opts.name) {
+                var name = document.createElement('p');
+                name.className = 'app-sheet-name';
+                name.textContent = opts.name;
+                sheet.appendChild(name);
+            }
+            if (opts.message) {
+                var msg = document.createElement('p');
+                msg.className = 'app-sheet-message';
+                msg.textContent = opts.message;
+                sheet.appendChild(msg);
+            }
+
+            var row = document.createElement('div');
+            row.className = 'app-sheet-actions';
+            var cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'app-sheet-btn app-sheet-btn-cancel';
+            cancelBtn.textContent = 'انصراف';
+            var okBtn = document.createElement('button');
+            okBtn.type = 'button';
+            okBtn.className = 'app-sheet-btn app-sheet-btn-danger';
+            okBtn.textContent = opts.confirmText || 'تأیید';
+            row.appendChild(cancelBtn);
+            row.appendChild(okBtn);
+            sheet.appendChild(row);
+
+            overlay.appendChild(sheet);
+            document.body.appendChild(overlay);
+
+            function close(result) {
+                overlay.classList.remove('is-open');
+                sheet.classList.remove('is-open');
+                document.body.classList.remove('modal-open');
+                document.removeEventListener('keydown', onKey);
+                window.setTimeout(function () { overlay.remove(); }, 240);
+                resolve(result);
+            }
+            function onKey(e) {
+                if (e.key === 'Escape') { close(false); }
+            }
+            cancelBtn.addEventListener('click', function () { close(false); });
+            okBtn.addEventListener('click', function () { close(true); });
+            overlay.addEventListener('click', function (e) {
+                if (e.target === overlay) { close(false); }
+            });
+            document.addEventListener('keydown', onKey);
+
+            document.body.classList.add('modal-open');
+            requestAnimationFrame(function () {
+                overlay.classList.add('is-open');
+                sheet.classList.add('is-open');
+            });
+            window.setTimeout(function () { okBtn.focus(); }, 260);
+        });
+    }
+
+    /** فرم‌های دارای data-confirm-sheet: برگهٔ تأیید با نام مورد، به‌جای confirm مرورگر */
+    function hookConfirmSheets() {
+        document.addEventListener('click', function (e) {
+            var form = e.target && e.target.closest ? e.target.closest('form[data-confirm-sheet]') : null;
+            if (!form) { return; }
+            if (form.dataset.sheetBusy === '1') { return; }
+            e.preventDefault();
+            e.stopPropagation();
+            confirmSheet({
+                title: form.getAttribute('data-sheet-title') || 'آیا مطمئن هستید؟',
+                name: form.getAttribute('data-sheet-name') || '',
+                message: form.getAttribute('data-confirm') || 'این عملیات قابل بازگشت نیست.',
+                confirmText: form.getAttribute('data-sheet-confirm') || 'تأیید',
+            }).then(function (ok) {
+                if (ok) {
+                    form.dataset.sheetBusy = '1';
+                    form.submit();
+                }
+            });
+        }, true);
+    }
+
+    /* ----------------------------------------------------------
+     * ۵) اقدام گروهی روی پرداخت‌ها
+     * ---------------------------------------------------------- */
+    function setupBulkPayments() {
+        var bar = document.getElementById('bulk-pay-bar');
+        if (!bar) { return; }
+        var checks = Array.prototype.slice.call(document.querySelectorAll('.bulk-check'));
+        var all = document.getElementById('bulk-pay-all');
+        var countEl = document.getElementById('bulk-pay-count');
+        var confirmBtn = document.getElementById('bulk-pay-confirm');
+        var confirmForm = document.getElementById('bulk-pay-confirm-form');
+        if (checks.length === 0) { bar.hidden = true; return; }
+
+        function selected() {
+            return checks.filter(function (c) { return c.checked; });
+        }
+
+        function fillHolders() {
+            var ids = selected().map(function (c) { return c.getAttribute('data-payment-id'); });
+            var holders = document.querySelectorAll('[data-bulk-ids]');
+            var html = ids.map(function (id) {
+                return '<input type="hidden" name="payment_ids[]" value="' + id + '">';
+            }).join('');
+            for (var i = 0; i < holders.length; i++) { holders[i].innerHTML = html; }
+            var rc = document.getElementById('bulk-reject-count');
+            if (rc) { rc.textContent = faNum(ids.length); }
+        }
+
+        function refresh() {
+            var sel = selected();
+            bar.hidden = sel.length === 0;
+            if (countEl) { countEl.textContent = faNum(sel.length); }
+            fillHolders();
+            if (all) { all.checked = sel.length === checks.length && sel.length > 0; }
+        }
+
+        checks.forEach(function (c) { c.addEventListener('change', refresh); });
+        if (all) {
+            all.addEventListener('change', function () {
+                checks.forEach(function (c) { c.checked = all.checked; });
+                refresh();
+            });
+        }
+        if (confirmBtn && confirmForm) {
+            confirmBtn.addEventListener('click', function () {
+                var n = selected().length;
+                if (n === 0) { return; }
+                confirmSheet({
+                    title: 'تأیید گروهی پرداخت‌ها',
+                    message: faNum(n) + ' پرداخت انتخاب‌شده یک‌جا تأیید و به حساب واحدشان ثبت می‌شود.',
+                    confirmText: 'تأیید پرداخت‌ها',
+                }).then(function (ok) {
+                    if (ok) { confirmForm.submit(); }
+                });
+            });
+        }
+        refresh();
+    }
+
+    /* ----------------------------------------------------------
+     * ۶) هماهنگ‌سازی دکمه‌های حالت نمایش (روشن/تاریک/خودکار)
+     * ---------------------------------------------------------- */
+    var THEME_ICONS = {
+        /* حالت فعلی روشن → کلیک به تاریک می‌برد */
+        light: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>',
+        /* حالت فعلی تاریک → کلیک به خودکار می‌برد */
+        dark: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>',
+        /* حالت خودکار (پیروی از سیستم) */
+        auto: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none" /></svg>',
+    };
+    var THEME_TITLES = {
+        light: 'حالت نمایش: روشن',
+        dark: 'حالت نمایش: تاریک',
+        auto: 'حالت نمایش: پیروی از سیستم',
+    };
+
+    function syncThemeButtons() {
+        var pref = 'auto';
+        try {
+            if (window.__bmThemePref) { pref = window.__bmThemePref(); }
+        } catch (e) { /* ignore */ }
+        var icon = THEME_ICONS[pref] || THEME_ICONS.auto;
+        var title = THEME_TITLES[pref] || THEME_TITLES.auto;
+        var btns = document.querySelectorAll('.theme-toggle-btn');
+        for (var i = 0; i < btns.length; i++) {
+            btns[i].innerHTML = icon;
+            btns[i].setAttribute('title', title + ' — برای تغییر بزنید');
+            btns[i].setAttribute('aria-label', title);
+        }
+    }
+    window.syncThemeButtons = syncThemeButtons;
+
+    /* ----------------------------------------------------------
      * ۳) جستجو + صفحه‌بندی فهرست‌ها
      * ---------------------------------------------------------- */
     function faNum(n) {
@@ -229,6 +417,9 @@
     ready(function () {
         convertServerAlerts();
         hookNavigationProgress();
+        hookConfirmSheets();
+        setupBulkPayments();
+        syncThemeButtons();
         var ids = {};
         var nodes = document.querySelectorAll('[data-list-items]');
         for (var i = 0; i < nodes.length; i++) {

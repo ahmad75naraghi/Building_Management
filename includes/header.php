@@ -71,23 +71,55 @@ if (!isset($unread_messages_nav)) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($page_title) ?> | مدیریت ساختمان</title>
-    <!-- حالت شب/روز: اعمال تم ذخیره‌شده پیش از رندر (جلوگیری از فلش صفحه روشن) -->
+    <!-- حالت شب/روز: روشن، تاریک، یا «پیروی از سیستم» — اعمال پیش از رندر (جلوگیری از فلش) -->
     <script>
         (function () {
-            try {
-                if (localStorage.getItem('bm_theme') === 'dark') {
-                    document.documentElement.setAttribute('data-theme', 'dark');
-                }
-            } catch (e) { /* دسترسی به حافظهٔ مرورگر ممکن است بسته باشد */ }
-        })();
-        function toggleAppTheme() {
             var root = document.documentElement;
-            var isDark = root.getAttribute('data-theme') === 'dark';
-            if (isDark) { root.removeAttribute('data-theme'); } else { root.setAttribute('data-theme', 'dark'); }
-            try { localStorage.setItem('bm_theme', isDark ? 'light' : 'dark'); } catch (e) { /* دسترسی به حافظهٔ مرورگر ممکن است بسته باشد */ }
-            var meta = document.querySelector('meta[name="theme-color"]');
-            if (meta) { meta.setAttribute('content', isDark ? '#010a21' : '#0b1322'); }
-        }
+            var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+            function storedPref() {
+                try { return localStorage.getItem('bm_theme') || 'auto'; }
+                catch (e) { return 'auto'; }
+            }
+            function resolved(pref) {
+                if (pref === 'dark') { return 'dark'; }
+                if (pref === 'light') { return 'light'; }
+                return (mq && mq.matches) ? 'dark' : 'light';
+            }
+            function applyTheme(mode) {
+                if (mode === 'dark') { root.setAttribute('data-theme', 'dark'); }
+                else { root.removeAttribute('data-theme'); }
+                var meta = document.querySelector('meta[name="theme-color"]');
+                if (meta) { meta.setAttribute('content', mode === 'dark' ? '#0b1322' : '#010a21'); }
+            }
+
+            applyTheme(resolved(storedPref()));
+
+            /* در حالت خودکار، تغییر تنظیم سیستم بلافاصله اعمال شود */
+            if (mq && mq.addEventListener) {
+                mq.addEventListener('change', function () {
+                    if (storedPref() === 'auto') { applyTheme(resolved('auto')); }
+                });
+            }
+
+            window.__bmThemePref = storedPref;
+
+            window.toggleAppTheme = function () {
+                var order = ['light', 'dark', 'auto'];
+                var cur = storedPref();
+                var idx = order.indexOf(cur);
+                var next = order[(idx + 1) % order.length];
+                try { localStorage.setItem('bm_theme', next); }
+                catch (e) { /* دسترسی به حافظهٔ مرورگر ممکن است بسته باشد */ }
+                /* انیمیشن نرم انتقال رنگ‌ها */
+                root.classList.add('theme-transition');
+                window.setTimeout(function () { root.classList.remove('theme-transition'); }, 520);
+                applyTheme(resolved(next));
+                if (window.syncThemeButtons) { window.syncThemeButtons(); }
+                var labels = { light: 'حالت نمایش: روشن', dark: 'حالت نمایش: تاریک', auto: 'حالت نمایش: پیروی از سیستم' };
+                if (window.showToast) { window.showToast(labels[next], 'success'); }
+            };
+        })();
     </script>
     <!-- PWA: نصب اپلیکیشن روی موبایل/دسکتاپ -->
     <link rel="manifest" href="manifest.json">

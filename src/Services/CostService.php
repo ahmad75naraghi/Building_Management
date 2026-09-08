@@ -1525,14 +1525,27 @@ final class CostService
 
     public function confirmPayment(int $paymentId, int $managerId): bool
     {
+        $payment = $this->getPaymentById($paymentId);
+        if (!$payment) {
+            throw new AppException('Payment not found');
+        }
+        $cost = $this->costRepo->findById($payment->cost_id);
+        if (!$cost) {
+            throw new AppException('Cost not found');
+        }
+        if (!$this->isManager($managerId, $cost->building_id)) {
+            throw new AppException('فقط مدیر ساختمان می‌تواند پرداخت را تأیید کند.');
+        }
+        if ($payment->status === 'confirmed') {
+            throw new AppException('این پرداخت قبلاً تأیید شده است.');
+        }
+
         // اگر مبلغ پرداختی ثبت نشده باشد (مثلاً ساکن فقط رسید آپلود کرده)،
         // هنگام تأیید سهم صادرشده به‌عنوان مبلغ پرداختی لحاظ می‌شود
-        $payment = $this->getPaymentById($paymentId);
-        if ($payment && $payment->amount_paid === null) {
+        if ($payment->amount_paid === null) {
             $fallback = $payment->share_amount;
             if ($fallback === null) {
-                $cost = $this->costRepo->findById($payment->cost_id);
-                $fallback = $cost?->amount;
+                $fallback = $cost->amount;
             }
             if ($fallback !== null) {
                 $this->paymentRepo->updateSubmission($paymentId, (float) $fallback, $payment->notes, $payment->status);
@@ -1630,6 +1643,61 @@ final class CostService
     }
 
     /**
+     * تأیید گروهی پرداخت‌ها: هر ردیف جداگانه بررسی می‌شود تا یک مورد نامعتبر
+     * کل عملیات را متوقف نکند. دسترسی مدیر برای هر پرداخت درون
+     * {@see confirmPayment} کنترل می‌شود.
+     *
+     * @param int[] $paymentIds
+     * @return array{processed: int, failed: int, errors: string[]}
+     */
+    public function bulkConfirmPayments(array $paymentIds, int $managerId): array
+    {
+        $processed = 0;
+        $failed = 0;
+        $errors = [];
+        foreach ($paymentIds as $paymentId) {
+            try {
+                if ($this->confirmPayment((int) $paymentId, $managerId)) {
+                    $processed++;
+                } else {
+                    $failed++;
+                }
+            } catch (\Throwable $e) {
+                $failed++;
+                $errors[] = 'پرداخت ' . (int) $paymentId . ': ' . $e->getMessage();
+            }
+        }
+        return ['processed' => $processed, 'failed' => $failed, 'errors' => $errors];
+    }
+
+    /**
+     * رد گروهی پرداخت‌ها با دلیل مشترک. مانند تأیید گروهی، خطای هر ردیف
+     * جداگانه جمع می‌شود و بقیه ادامه می‌یابند.
+     *
+     * @param int[] $paymentIds
+     * @return array{processed: int, failed: int, errors: string[]}
+     */
+    public function bulkRejectPayments(array $paymentIds, int $managerId, string $reason): array
+    {
+        $processed = 0;
+        $failed = 0;
+        $errors = [];
+        foreach ($paymentIds as $paymentId) {
+            try {
+                if ($this->rejectPayment((int) $paymentId, $managerId, $reason)) {
+                    $processed++;
+                } else {
+                    $failed++;
+                }
+            } catch (\Throwable $e) {
+                $failed++;
+                $errors[] = 'پرداخت ' . (int) $paymentId . ': ' . $e->getMessage();
+            }
+        }
+        return ['processed' => $processed, 'failed' => $failed, 'errors' => $errors];
+    }
+
+    /**
      * ماندهٔ مالی هر واحد ساختمان: جمع سهم‌های صادرشده در برابر پرداخت‌های
      * تأییدشده. ماندهٔ منفی یعنی واحد «بدهکار» و مثبت یعنی «طلبکار».
      *
@@ -1714,11 +1782,14 @@ final class CostService
         $p->id = (int) $row['id'];
         $p->cost_id = (int) $row['cost_id'];
         $p->user_id = (int) $row['user_id'];
+        $p->unit_id = isset($row['unit_id']) && $row['unit_id'] !== null ? (int) $row['unit_id'] : null;
         $p->amount_paid = $row['amount_paid'] !== null ? (float) $row['amount_paid'] : null;
+        $p->share_amount = isset($row['share_amount']) && $row['share_amount'] !== null ? (float) $row['share_amount'] : null;
         $p->status = $row['status'];
         $p->receipt_path = $row['receipt_path'];
         $p->receipt_is_public = (bool) $row['receipt_is_public'];
         $p->notes = $row['notes'];
+        $p->reject_reason = isset($row['reject_reason']) ? $row['reject_reason'] : null;
         $p->confirmed_by = $row['confirmed_by'] ? (int) $row['confirmed_by'] : null;
         $p->confirmed_at = $row['confirmed_at'];
         $p->created_at = $row['created_at'];

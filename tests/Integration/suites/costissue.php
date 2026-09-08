@@ -327,3 +327,90 @@ TestLog::run('شارژ ترکیبی: سهم هر واحد = ثابت + نفری 
     TestLog::assertSame('واحد ۲ نفره: ۲۰۰هزار + ۲×۵۰هزار', 300000.0, $byUnit[$u1] ?? 0.0);
     TestLog::assertSame('واحد خالی: فقط ثابت', 200000.0, $byUnit[$u2] ?? 0.0);
 });
+
+// ------------------------------------------------------------ اقدام گروهی روی پرداخت‌ها (تأیید/رد یک‌جا)
+
+TestLog::run('تأیید گروهی: همهٔ پرداخت‌های انتخاب‌شده تأیید می‌شوند', function () use ($svc, $manager) {
+    $b = make_building($manager);
+    $o1 = make_user('09132000070'); $o2 = make_user('09132000071');
+    make_unit($b, '1', ['owner_user_id' => $o1]);
+    make_unit($b, '2', ['owner_user_id' => $o2]);
+
+    $cost = $svc->createCost([
+        'building_id' => $b, 'title' => 'هزینه گروهی', 'amount' => 200000,
+        'target_audience' => 'owners', 'division_method' => 'fixed_share',
+    ], $manager);
+    $svc->issueCost((int) $cost->id, $manager);
+    $rows = cost_payments_of((int) $cost->id);
+    TestLog::assertSame('دو ردیف صادر شده', 2, count($rows));
+
+    $ids = array_map(static fn ($r) => (int) $r['id'], $rows);
+    $result = $svc->bulkConfirmPayments($ids, $manager);
+    TestLog::assertSame('هر دو تأیید شدند', 2, $result['processed']);
+    TestLog::assertSame('مورد ناموفق نداریم', 0, $result['failed']);
+
+    $after = cost_payments_of((int) $cost->id);
+    foreach ($after as $row) {
+        TestLog::assertSame('وضعیت نهایی تأیید است', 'confirmed', $row['status']);
+        TestLog::assertTrue('مبلغ سهم به‌عنوان پرداختی ثبت شده', (float) $row['amount_paid'] === 100000.0);
+    }
+});
+
+TestLog::run('تأیید مجدد پرداخت تأییدشده خطا می‌دهد و در شمارش ناموفق می‌نشیند', function () use ($svc, $manager) {
+    $b = make_building($manager);
+    $o = make_user('09132000072');
+    make_unit($b, '1', ['owner_user_id' => $o]);
+    $cost = $svc->createCost([
+        'building_id' => $b, 'title' => 'یک ردیفی', 'amount' => 50000,
+        'target_audience' => 'owners', 'division_method' => 'fixed_share',
+    ], $manager);
+    $svc->issueCost((int) $cost->id, $manager);
+    $rows = cost_payments_of((int) $cost->id);
+    $ids = [(int) $rows[0]['id']];
+
+    $svc->bulkConfirmPayments($ids, $manager);
+    $second = $svc->bulkConfirmPayments($ids, $manager);
+    TestLog::assertSame('تأیید مجدد ناموفق است', 0, $second['processed']);
+    TestLog::assertSame('یک خطا گزارش شده', 1, $second['failed']);
+    TestLog::assertTrue('پیام خطا به تأیید قبلی اشاره دارد', str_contains(implode('، ', $second['errors']), 'قبلاً تأیید'));
+});
+
+TestLog::run('رد گروهی: دلیل مشترک روی همه ثبت می‌شود', function () use ($svc, $manager) {
+    $b = make_building($manager);
+    $o1 = make_user('09132000073'); $o2 = make_user('09132000074');
+    make_unit($b, '1', ['owner_user_id' => $o1]);
+    make_unit($b, '2', ['owner_user_id' => $o2]);
+    $cost = $svc->createCost([
+        'building_id' => $b, 'title' => 'رد گروهی', 'amount' => 120000,
+        'target_audience' => 'owners', 'division_method' => 'fixed_share',
+    ], $manager);
+    $svc->issueCost((int) $cost->id, $manager);
+    $rows = cost_payments_of((int) $cost->id);
+    $ids = array_map(static fn ($r) => (int) $r['id'], $rows);
+
+    $result = $svc->bulkRejectPayments($ids, $manager, 'مبلغ واریز نشده');
+    TestLog::assertSame('هر دو رد شدند', 2, $result['processed']);
+    foreach (cost_payments_of((int) $cost->id) as $row) {
+        TestLog::assertSame('وضعیت رد', 'rejected', $row['status']);
+        TestLog::assertSame('دلیل رد ثبت شده', 'مبلغ واریز نشده', $row['reject_reason']);
+    }
+});
+
+TestLog::run('غیرمدیر نمی‌تواند پرداخت را تأیید کند (حتی گروهی)', function () use ($svc) {
+    $manager = make_user('09132000075', 'مدیر ساختمان الف');
+    $outsider = make_user('09132000076', 'ساکن ساختمان دیگر');
+    $b = make_building($manager);
+    $o = make_user('09132000077');
+    make_unit($b, '1', ['owner_user_id' => $o]);
+    $cost = $svc->createCost([
+        'building_id' => $b, 'title' => 'محرمانه', 'amount' => 10000,
+        'target_audience' => 'owners', 'division_method' => 'fixed_share',
+    ], $manager);
+    $svc->issueCost((int) $cost->id, $manager);
+    $rows = cost_payments_of((int) $cost->id);
+
+    TestLog::assertThrows('تأیید تک‌موردی توسط غیرمدیر', fn () => $svc->confirmPayment((int) $rows[0]['id'], $outsider), 'مدیر');
+    $result = $svc->bulkConfirmPayments([(int) $rows[0]['id']], $outsider);
+    TestLog::assertSame('تأیید گروهی توسط غیرمدیر ناموفق است', 0, $result['processed']);
+    TestLog::assertSame('وضعیت دست‌نخورده می‌ماند', 'pending', cost_payments_of((int) $cost->id)[0]['status']);
+});
