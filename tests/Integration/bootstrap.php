@@ -402,6 +402,18 @@ function test_db(): PDO
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )");
 
+    $pdo->exec("CREATE TABLE debtor_sms_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        unit_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        phone TEXT NOT NULL,
+        amount REAL NOT NULL,
+        period TEXT NOT NULL,
+        sent_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (unit_id, period)
+    )");
+
     // تزریق اتصال به Database از طریق Reflection
     $ref = new ReflectionClass(\App\Core\Database::class);
     $prop = $ref->getProperty('connection');
@@ -415,7 +427,7 @@ function test_db(): PDO
 function test_db_reset(): void
 {
     $db = test_db();
-    foreach (['messages','reviews','vote_results','vote_options','votes','audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
+    foreach (['debtor_sms_log','messages','reviews','vote_results','vote_options','votes','audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
               'building_members','building_hierarchy_settings','buildings','otp_codes','users'] as $t) {
         $db->exec("DELETE FROM {$t}");
         $db->exec("DELETE FROM sqlite_sequence WHERE name = '{$t}'");

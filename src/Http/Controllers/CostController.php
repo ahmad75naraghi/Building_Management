@@ -565,6 +565,29 @@ final class CostController
         }
     }
 
+    /** گزارش ریز مانده‌ها به تفکیک ماه شمسی */
+    public function monthlyReport(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        $buildingId = (int) ($request->getAttribute('building_id') ?? 0);
+        if (!$userId || !$buildingId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication or building required',
+            ]);
+        }
+        $unitFilter = (int) ($request->getQueryParam('unit_id') ?? 0);
+        try {
+            return (new Response())->setJson([
+                'success' => true,
+                'data' => $this->service->getMonthlyReport($buildingId, (int) $userId, $unitFilter > 0 ? $unitFilter : null),
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
     /** ثبت مستقیم پرداخت برای واحد توسط مدیر */
     public function directPayment(Request $request): Response
     {

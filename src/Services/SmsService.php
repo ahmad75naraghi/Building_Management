@@ -136,6 +136,36 @@ final class SmsService
     }
 
     /**
+     * پیامک یادآوری بدهی برای واحدهای بدهکار — ارسال خودکار توسط کران روزانه.
+     *
+     * اگر `MELIPAYAMAK_DEBTOR_BODY_ID` تنظیم شده باشد، پترن جداگانه با
+     * آرگومان‌های [نام، مبلغ بدهی، نام ساختمان، مهلت] ارسال می‌شود؛
+     * در غیر این صورت متن کامل با پترن پیش‌فرض ارسال می‌گردد.
+     * متن قالب از `SMS_DEBTOR_TEMPLATE` خوانده می‌شود و جای‌دارهای
+     * {نام} {مبلغ} {ساختمان} {مهلت} را پشتیبانی می‌کند.
+     */
+    public function sendDebtorReminderSms(string $to, string $name, string $buildingName, string $amount, string $deadline): bool
+    {
+        $env = \App\Config\AppConfig::env(...);
+        $template = trim((string) $env('SMS_DEBTOR_TEMPLATE', ''));
+        if ($template === '') {
+            $template = "کاربر گرامی {نام}، مانده بدهی شما بابت شارژ ساختمان «{ساختمان}» مبلغ {مبلغ} تومان است. لطفاً تا {مهلت} نسبت به پرداخت اقدام فرمایید.";
+        }
+        $text = strtr($template, [
+            '{نام}' => $name,
+            '{مبلغ}' => $amount,
+            '{ساختمان}' => $buildingName,
+            '{مهلت}' => $deadline,
+        ]);
+
+        $debtorBodyId = (int) $env('MELIPAYAMAK_DEBTOR_BODY_ID', '0');
+        if ($debtorBodyId > 0) {
+            return $this->sendByBaseNumber($to, $text, [$name, $amount, $buildingName, $deadline], $debtorBodyId);
+        }
+        return $this->sendByBaseNumber($to, $text);
+    }
+
+    /**
      * پیامک یادآوری رویداد (جلسه یا رزرو مشاعات) — ارسال توسط اسکریپت کران یادآوری‌ها.
      *
      * اگر `MELIPAYAMAK_REMINDER_BODY_ID` تنظیم شده باشد، پترن جداگانه با

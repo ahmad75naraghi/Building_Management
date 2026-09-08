@@ -95,6 +95,7 @@ final class Routes
         'POST /api/payments/{payment_id}/reject' => ['App\Http\Controllers\CostController', 'rejectPayment'],
         'GET /api/buildings/{building_id}/unit-balances' => ['App\Http\Controllers\CostController', 'unitBalances'],
         'GET /api/buildings/{building_id}/ledger' => ['App\Http\Controllers\CostController', 'ledger'],
+        'GET /api/buildings/{building_id}/monthly-report' => ['App\Http\Controllers\CostController', 'monthlyReport'],
         'POST /api/buildings/{building_id}/direct-payments' => ['App\Http\Controllers\CostController', 'directPayment'],
         'POST /api/buildings/{building_id}/unit-charges' => ['App\Http\Controllers\CostController', 'unitCharge'],
         'POST /api/buildings/{building_id}/recurring-generate' => ['App\Http\Controllers\CostController', 'recurringGenerate'],

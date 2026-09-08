@@ -5,6 +5,7 @@
  *   ۱. برای ساختمان‌هایی که «شارژ ماهیانه» فعال دارند، شارژ ماه جاری را می‌سازد
  *      و صادر می‌کند (اعلان برای ساکنین) — اگر ماه قبل ثبت نشده باشد، ماه قبل هم.
  *   ۲. هزینه‌های دوره‌ای (هفتگی/ماهانه/…) که نوبتشان رسیده را نمونه‌سازی و صادر می‌کند.
+ *   ۳. برای واحدهای بدهکار پیامک یادآوری می‌فرستد (هر واحد حداکثر یک‌بار در هر ماه شمسی).
  *
  * اجرا:
  *   php scripts/cron_daily.php
@@ -26,6 +27,7 @@ require __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../config/app.php';
 
 use App\Services\CostService;
+use App\Services\DebtorReminderService;
 
 $service = new CostService();
 
@@ -35,11 +37,16 @@ $recurring = $service->generateDueRecurringCosts();
 // ۲) شارژ ماهیانهٔ ساختمان‌ها
 $monthly = $service->generateAllMonthlyCharges();
 
+// ۳) یادآوری پیامکی بدهکاران (حداکثر یک پیامک برای هر واحد در هر ماه شمسی)
+$reminder = (new DebtorReminderService())->run();
+
 echo date('Y-m-d H:i:s')
     . " | هزینه‌های دوره‌ای صادرشده: {$recurring['generated']}"
     . " | قالب‌های تمام‌شده: {$recurring['ended']}"
     . " | شارژ ماهیانه صادرشده: {$monthly['created']}"
     . " | ردشده/تکراری: {$monthly['skipped']}"
+    . " | یادآوری بدهکاران: ارسال {$reminder['sent']} / ردشده(تکراری) {$reminder['skipped']}"
+    . ($reminder['sms_disabled'] ? ' [پیامک غیرفعال]' : '')
     . PHP_EOL;
 
 exit(0);

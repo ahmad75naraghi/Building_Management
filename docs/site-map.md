@@ -58,7 +58,7 @@ dashboard.php ◄══════════════ منوی پایین:
    │                        visitors / maintenance / documents / votes /
    │                        reviews / emergency_contacts
    │
-   ├─► reports.php (گزارش‌ها + خروجی CSV — با لینک به ریز هر بخش)
+   ├─► reports.php (گزارش‌ها + ریز مانده‌ها به تفکیک ماه + خروجی CSV/اکسل — با لینک به ریز هر بخش)
    ├─► audit_logs.php (لاگ اقدامات — مدیر)
    └─► calendar.php (تقویم شمسی جلسات/رزروها)
 

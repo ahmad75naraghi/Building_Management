@@ -3989,6 +3989,31 @@
       }
      },
      "response": []
+    },
+    {
+     "name": "گزارش ماهانه (ریز مانده‌ها)",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/buildings/1/monthly-report?unit_id=0",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "buildings",
+        "1",
+        "monthly-report"
+       ],
+       "query": [
+        {
+         "key": "unit_id",
+         "value": "0"
+        }
+       ]
+      }
+     },
+     "response": []
     }
    ]
   },

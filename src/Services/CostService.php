@@ -637,6 +637,202 @@ final class CostService
         ];
     }
 
+    /**
+     * گزارش ریز مانده‌ها به تفکیک ماه شمسی.
+     *
+     * برای هر واحد: بدهی صادرشده و پرداخت تأییدشدهٔ هر ماه + ماندهٔ پایان ماه
+     * (مانده بدهکار/طلبکار با همان تعریف یکتای لجر). برای کل ساختمان هم جمع ماهانه.
+     *
+     * @param int|null $unitFilter فقط رویدادهای یک واحد (اختیاری)
+     * @return array{units: array, months: array, totals: array}
+     */
+    public function getMonthlyReport(int $buildingId, int $userId, ?int $unitFilter = null): array
+    {
+        if (!$this->isBuildingMember($userId, $buildingId)) {
+            throw new AppException('شما عضو این ساختمان نیستید.');
+        }
+
+        $db = Database::getConnection();
+        $sql = "SELECT cp.unit_id, cp.share_amount, cp.amount_paid, cp.status,
+                       cp.payment_date, cp.confirmed_at, cp.created_at,
+                       c.cost_type, un.unit_number
+                FROM cost_payments cp
+                INNER JOIN costs c ON cp.cost_id = c.id
+                LEFT JOIN units un ON cp.unit_id = un.id
+                WHERE c.building_id = ? AND cp.unit_id IS NOT NULL AND c.deleted_at IS NULL";
+        $params = [$buildingId];
+        if ($unitFilter !== null && $unitFilter > 0) {
+            $sql .= ' AND cp.unit_id = ?';
+            $params[] = $unitFilter;
+        }
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        $monthKey = static function (?string $ts): ?string {
+            $time = $ts !== null && $ts !== '' ? strtotime($ts) : false;
+            if ($time === false) {
+                return null;
+            }
+            [$jy, $jm] = \App\Utilities\JalaliHelper::toJalali(
+                (int) date('Y', $time),
+                (int) date('n', $time),
+                (int) date('j', $time)
+            );
+            return sprintf('%04d-%02d', $jy, $jm);
+        };
+
+        // buckets[unitId][jy-jm] = ['charge'=>..,'paid'=>..]
+        $buckets = [];
+        $unitMeta = [];
+        $buildingBuckets = [];
+        foreach ($rows as $r) {
+            $uid = (int) $r['unit_id'];
+            $unitMeta[$uid] = (string) ($r['unit_number'] ?? $uid);
+
+            $share = (float) ($r['share_amount'] ?? 0);
+            if ($share > 0) {
+                $key = $monthKey((string) ($r['created_at'] ?? ''));
+                if ($key !== null) {
+                    $buckets[$uid][$key]['charge'] = ($buckets[$uid][$key]['charge'] ?? 0.0) + $share;
+                    $buildingBuckets[$key]['charge'] = ($buildingBuckets[$key]['charge'] ?? 0.0) + $share;
+                }
+            }
+            $paid = (float) ($r['amount_paid'] ?? 0);
+            if (($r['status'] ?? '') === 'confirmed' && $paid > 0) {
+                $key = $monthKey((string) ($r['confirmed_at'] ?? $r['payment_date'] ?? $r['created_at'] ?? ''));
+                if ($key !== null) {
+                    $buckets[$uid][$key]['paid'] = ($buckets[$uid][$key]['paid'] ?? 0.0) + $paid;
+                    $buildingBuckets[$key]['paid'] = ($buildingBuckets[$key]['paid'] ?? 0.0) + $paid;
+                }
+            }
+        }
+
+        $formatMonth = static function (string $key): array {
+            [$jy, $jm] = array_map('intval', explode('-', $key));
+            return [
+                'key' => $key,
+                'year' => $jy,
+                'month' => $jm,
+                'label' => \App\Utilities\JalaliHelper::MONTH_NAMES[$jm] . ' ' . \App\Utilities\JalaliHelper::faDigits((string) $jy),
+            ];
+        };
+
+        $units = [];
+        foreach ($buckets as $uid => $months) {
+            ksort($months);
+            $running = 0.0;
+            $list = [];
+            foreach ($months as $key => $b) {
+                $charge = round((float) ($b['charge'] ?? 0), 2);
+                $paid = round((float) ($b['paid'] ?? 0), 2);
+                $running = round($running + $paid - $charge, 2);
+                $list[] = $formatMonth($key) + [
+                    'charge' => $charge,
+                    'paid' => $paid,
+                    'balance_end' => $running,
+                ];
+            }
+            $units[] = [
+                'unit_id' => (int) $uid,
+                'unit_number' => $unitMeta[$uid] ?? (string) $uid,
+                'months' => $list,
+                'balance_now' => $running,
+            ];
+        }
+        usort($units, static fn(array $a, array $b): int => strnatcmp($a['unit_number'], $b['unit_number']));
+
+        ksort($buildingBuckets);
+        $buildingMonths = [];
+        $buildingRunning = 0.0;
+        foreach ($buildingBuckets as $key => $b) {
+            $charge = round((float) ($b['charge'] ?? 0), 2);
+            $paid = round((float) ($b['paid'] ?? 0), 2);
+            $buildingRunning = round($buildingRunning + $paid - $charge, 2);
+            $buildingMonths[] = $formatMonth($key) + [
+                'charge' => $charge,
+                'paid' => $paid,
+                'net' => round($paid - $charge, 2),
+                'balance_end' => $buildingRunning,
+            ];
+        }
+
+        return [
+            'building_id' => $buildingId,
+            'units' => $units,
+            'months' => $buildingMonths,
+            'totals' => [
+                'charge' => round(array_sum(array_map(static fn($m) => $m['charge'], $buildingMonths)), 2),
+                'paid' => round(array_sum(array_map(static fn($m) => $m['paid'], $buildingMonths)), 2),
+                'balance_now' => $buildingRunning,
+            ],
+        ];
+    }
+
+    /**
+     * فهرست واحدهای بدهکار برای یادآوری پیامکی.
+     *
+     * منبع مانده همان تعریف یکتای بدهکار/طلبکار است. واحدهایی که مانده‌شان
+     * از آستانهٔ تعیین‌شده منفی‌تر باشد برگردانده می‌شوند همراه مبلغ بدهی
+     * و مشخصات پرداخت‌کنندهٔ مسئول (ترجیح با مالک، سپس مستأجر).
+     *
+     * @param float $minAmount حداقل بدهی برای ورود به فهرست (تومان)
+     * @return array<int, array{building_id:int, unit_id:int, unit_number:string, debt:float, user_id:int, name:string, phone:string}>
+     */
+    public function getDebtorUnits(float $minAmount = 0.0): array
+    {
+        $db = Database::getConnection();
+        $stmt = $db->query('SELECT id FROM buildings WHERE deleted_at IS NULL ORDER BY id');
+        $buildings = $stmt ? $stmt->fetchAll(\PDO::FETCH_COLUMN) : [];
+
+        $debtors = [];
+        foreach ($buildings as $buildingId) {
+            $buildingId = (int) $buildingId;
+            $buildingName = '';
+            $bStmt = $db->prepare('SELECT name FROM buildings WHERE id = ?');
+            $bStmt->execute([$buildingId]);
+            $buildingName = (string) ($bStmt->fetchColumn() ?: '');
+
+            foreach ($this->paymentRepo->unitBalancesByBuilding($buildingId) as $b) {
+                $balance = (float) ($b['balance'] ?? 0);
+                if ($balance >= -$minAmount || $balance >= 0.0) {
+                    continue; // مانده صفر/طلبکار یا کمتر از آستانه
+                }
+                $unitId = (int) ($b['unit_id'] ?? 0);
+
+                // مسئول پرداخت: ترجیح با مالک، سپس مستأجر (هم‌راستا با منطق صدور سهم)
+                $uStmt = $db->prepare(
+                    'SELECT unit_number, owner_user_id, tenant_user_id FROM units WHERE id = ?'
+                );
+                $uStmt->execute([$unitId]);
+                $unit = $uStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+                $payerId = (int) ($unit['owner_user_id'] ?: ($unit['tenant_user_id'] ?? 0));
+                if ($payerId <= 0) {
+                    continue; // واحد بدون ساکن قابل شناسایی
+                }
+                $pStmt = $db->prepare('SELECT name, phone FROM users WHERE id = ? AND deleted_at IS NULL');
+                $pStmt->execute([$payerId]);
+                $payer = $pStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+                $phone = \App\Utilities\PhoneHelper::normalize((string) ($payer['phone'] ?? ''));
+                if ($phone === '' || !\App\Utilities\PhoneHelper::isValid($phone)) {
+                    continue;
+                }
+
+                $debtors[] = [
+                    'building_id' => $buildingId,
+                    'building_name' => $buildingName,
+                    'unit_id' => $unitId,
+                    'unit_number' => (string) ($unit['unit_number'] ?? $unitId),
+                    'debt' => round(-$balance, 2),
+                    'user_id' => $payerId,
+                    'name' => (string) ($payer['name'] ?? 'کاربر'),
+                    'phone' => $phone,
+                ];
+            }
+        }
+        return $debtors;
+    }
+
 
     /**
      * آیا کاربر مدیر این ساختمان است؟
