@@ -269,7 +269,8 @@ function callAPI_dispatch($method, $endpoint, $data = false) {
  *
  * @return array پاسخ جی‌سان + کد وضعیت
  */
-function api_internal_dispatch($method, $endpoint, $data = false): array
+/** ساخت (یا بازیابی) کرنل مشترک برای دیسپچ داخلی */
+function api_internal_kernel(): \App\Core\Kernel
 {
     static $kernel = null;
     if ($kernel === null) {
@@ -278,6 +279,12 @@ function api_internal_dispatch($method, $endpoint, $data = false): array
         require_once dirname(__DIR__) . '/config/routes.php';
         $kernel = new \App\Core\Kernel();
     }
+    return $kernel;
+}
+
+function api_internal_dispatch($method, $endpoint, $data = false): array
+{
+    $kernel = api_internal_kernel();
 
     $method = strtoupper((string) $method);
     $uri = '/api/' . ltrim((string) $endpoint, '/');
@@ -350,8 +357,32 @@ function api_internal_dispatch($method, $endpoint, $data = false): array
  * @param array<string, string> $fields فیلدهای متنی فرم
  * @param array<string, string> $files   نگاشت نام فیلد به مسیر فایل روی سرور (tmp_name)
  */
+/**
+ * نرمال‌سازی مشخصهٔ فایل برای آپلود.
+ * ورودی می‌تواند رشته (مسیر) یا آرایهٔ ['path' => ..., 'name' => نام اصلی] باشد.
+ *
+ * @return array{0: ?string, 1: ?string} [مسیر فایل، نام اصلی]
+ */
+function api_upload_spec($spec): array
+{
+    if (is_string($spec)) {
+        return [$spec, null];
+    }
+    if (is_array($spec)) {
+        $path = isset($spec['path']) && is_string($spec['path']) ? $spec['path'] : null;
+        $name = isset($spec['name']) && is_string($spec['name']) && $spec['name'] !== '' ? $spec['name'] : null;
+        return [$path, $name];
+    }
+    return [null, null];
+}
+
 function callAPIUpload($endpoint, $fields = [], $files = [])
 {
+    // حالت تست/E2E: آپلود چندبخشی هم از مسیر واقعی کرنل عبور می‌کند
+    if (defined('API_INTERNAL_DISPATCH') && API_INTERNAL_DISPATCH === true) {
+        return api_internal_dispatch_upload($endpoint, $fields, $files);
+    }
+
     $curl = curl_init();
 
     $endpoint = ltrim($endpoint, '/');
@@ -366,10 +397,11 @@ function callAPIUpload($endpoint, $fields = [], $files = [])
     }
 
     $postFields = $fields;
-    foreach ($files as $field => $filePath) {
-        if (is_string($filePath) && is_file($filePath)) {
+    foreach ($files as $field => $fileSpec) {
+        [$filePath, $originalName] = api_upload_spec($fileSpec);
+        if ($filePath !== null && is_file($filePath)) {
             $mime = function_exists('mime_content_type') ? mime_content_type($filePath) : 'application/octet-stream';
-            $postFields[$field] = new CURLFile($filePath, (string) $mime, basename($filePath));
+            $postFields[$field] = new CURLFile($filePath, (string) $mime, $originalName ?? basename($filePath));
         }
     }
 
@@ -397,6 +429,73 @@ function callAPIUpload($endpoint, $fields = [], $files = [])
     }
     $response['http_code'] = $http_status;
     return $response;
+}
+
+/**
+ * دیسپچ داخلی درخواست چندبخشی (آپلود فایل) برای حالت تست.
+ * فایل‌ها با ساختار استاندارد $_شبیه‌سازی و از مسیر واقعی کرنل عبور می‌کنند.
+ *
+ * @param array<string, string> $files نگاشت نام فیلد به مسیر فایل روی دیسک
+ */
+function api_internal_dispatch_upload($endpoint, array $fields = [], array $files = []): array
+{
+    $kernel = api_internal_kernel();
+
+    $filesSuper = [];
+    foreach ($files as $field => $fileSpec) {
+        [$filePath, $originalName] = api_upload_spec($fileSpec);
+        if ($filePath !== null && is_file($filePath)) {
+            $mime = function_exists('mime_content_type') ? (mime_content_type($filePath) ?: 'application/octet-stream') : 'application/octet-stream';
+            $filesSuper[$field] = [
+                'name' => $originalName ?? basename($filePath),
+                'type' => $mime,
+                'tmp_name' => $filePath,
+                'error' => UPLOAD_ERR_OK,
+                'size' => filesize($filePath),
+            ];
+        }
+    }
+
+    $headers = [
+        'content-type' => 'multipart/form-data',
+        'accept' => 'application/json',
+    ];
+    if (!empty($_SESSION['token'])) {
+        $headers['authorization'] = 'Bearer ' . $_SESSION['token'];
+    }
+
+    $request = new \App\Core\Request();
+    $ref = new ReflectionClass($request);
+    foreach ([
+        'method' => 'POST',
+        'uri' => '/api/' . ltrim((string) $endpoint, '/'),
+        'query' => [],
+        'post' => $fields,
+        'headers' => $headers,
+        'body' => null,
+        'files' => $filesSuper,
+    ] as $prop => $value) {
+        $p = $ref->getProperty($prop);
+        $p->setAccessible(true);
+        $p->setValue($request, $value);
+    }
+
+    try {
+        $response = $kernel->handle($request);
+        $status = $response->getStatusCode();
+        $decoded = json_decode((string) $response->getContent(), true);
+        if (!is_array($decoded)) {
+            $decoded = ['success' => false, 'message' => 'پاسخ داخلی قابل تفسیر نبود.'];
+        }
+        $decoded['http_code'] = $status;
+        return $decoded;
+    } catch (\Throwable $e) {
+        return [
+            'success' => false,
+            'message' => 'خطای داخلی: ' . $e->getMessage(),
+            'http_code' => 500,
+        ];
+    }
 }
 
 // ---------- توابع کمکی نمایش اعداد و زمان فارسی ----------

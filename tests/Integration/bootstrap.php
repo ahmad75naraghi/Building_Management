@@ -430,6 +430,17 @@ function test_db(): PDO
         accepted_at TEXT DEFAULT NULL
     )");
 
+    $pdo->exec("CREATE TABLE receipts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cost_payment_id INTEGER NOT NULL UNIQUE,
+        file_path TEXT NOT NULL,
+        file_size INTEGER DEFAULT NULL,
+        mime_type TEXT DEFAULT NULL,
+        original_name TEXT DEFAULT NULL,
+        is_public INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )");
+
     // تزریق اتصال به Database از طریق Reflection
     $ref = new ReflectionClass(\App\Core\Database::class);
     $prop = $ref->getProperty('connection');
@@ -443,7 +454,7 @@ function test_db(): PDO
 function test_db_reset(): void
 {
     $db = test_db();
-    foreach (['debtor_sms_log','messages','invitations','reviews','vote_results','vote_options','votes','audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
+    foreach (['debtor_sms_log','messages','invitations','receipts','reviews','vote_results','vote_options','votes','audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
               'building_members','building_hierarchy_settings','buildings','otp_codes','users'] as $t) {
         $db->exec("DELETE FROM {$t}");
         $db->exec("DELETE FROM sqlite_sequence WHERE name = '{$t}'");

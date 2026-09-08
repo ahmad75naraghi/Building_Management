@@ -173,6 +173,10 @@ final class CostController
         ]);
     }
 
+    /**
+     * ثبت پرداخت توسط ساکن — فیش واریزی (تصویر رسید) «الزامی» است و همراه
+     * فرم به‌صورت چندبخشی ارسال می‌شود.
+     */
     public function submitPayment(Request $request): Response
     {
         $userId = $request->getAttribute('user_id');
@@ -182,11 +186,37 @@ final class CostController
             ]);
         }
         $data = $request->getJsonBody() ?? [];
+        if ($data === []) {
+            $data = array_filter(
+                [
+                    'payment_id' => $request->getPostParam('payment_id'),
+                    'cost_id' => $request->getPostParam('cost_id'),
+                    'amount_paid' => $request->getPostParam('amount_paid'),
+                    'notes' => $request->getPostParam('notes'),
+                ],
+                static fn ($v) => $v !== null
+            );
+        }
+
+        $receiptContent = null;
+        $receiptName = null;
+        $file = $request->getFile('receipt');
+        if (is_array($file) && ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+            $content = file_get_contents((string) $file['tmp_name']);
+            if ($content === false) {
+                return (new Response())->setStatusCode(400)->setJson([
+                    'success' => false, 'message' => 'خواندن فایل فیش واریزی ناموفق بود.',
+                ]);
+            }
+            $receiptContent = $content;
+            $receiptName = (string) ($file['name'] ?? 'receipt');
+        }
+
         try {
-            $payment = $this->service->submitPayment($data, (int) $userId);
+            $payment = $this->service->submitPayment($data, (int) $userId, $receiptContent, $receiptName);
             return (new Response())->setStatusCode(201)->setJson([
                 'success' => true,
-                'message' => 'Payment submitted. Please upload receipt.',
+                'message' => 'پرداخت شما همراه با فیش واریزی ثبت شد و برای تأیید مدیر ارسال شد.',
                 'data' => $payment->toArray(),
             ]);
         } catch (\Exception $e) {
@@ -195,6 +225,50 @@ final class CostController
                 'message' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * جزئیات یک پرداخت برای مالک ردیف یا مدیر ساختمان (نمایش فیش واریزی).
+     * برای سایر کاربران 403 برمی‌گرداند.
+     */
+    public function showPayment(Request $request): Response
+    {
+        $userId = (int) ($request->getAttribute('user_id') ?? 0);
+        $paymentId = (int) ($request->getAttribute('payment_id') ?? 0);
+        if (!$userId || !$paymentId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication or payment required',
+            ]);
+        }
+
+        $payment = $this->service->getPaymentById($paymentId);
+        if (!$payment) {
+            return (new Response())->setStatusCode(404)->setJson([
+                'success' => false, 'message' => 'Payment not found',
+            ]);
+        }
+        $cost = $this->service->getCostById($payment->cost_id);
+        if (!$cost) {
+            return (new Response())->setStatusCode(404)->setJson([
+                'success' => false, 'message' => 'Cost not found',
+            ]);
+        }
+        $isPayer = $payment->user_id === $userId;
+        $isManager = $this->service->isManagerOfBuilding($userId, $cost->building_id);
+        if (!$isPayer && !$isManager) {
+            return (new Response())->setStatusCode(403)->setJson([
+                'success' => false, 'message' => 'به این پرداخت دسترسی ندارید.',
+            ]);
+        }
+
+        $data = $payment->toArray();
+        $data['receipt_path'] = $payment->receipt_path;
+        $data['cost_title'] = $cost->title;
+        $data['building_id'] = $cost->building_id;
+        return (new Response())->setJson([
+            'success' => true,
+            'data' => $data,
+        ]);
     }
 
     public function uploadReceipt(Request $request): Response

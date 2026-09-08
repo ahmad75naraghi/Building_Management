@@ -89,6 +89,7 @@ final class Routes
         'PUT /api/costs/{id}' => ['App\Http\Controllers\CostController', 'update'],
         'DELETE /api/costs/{id}' => ['App\Http\Controllers\CostController', 'destroy'],
         'GET /api/payments' => ['App\Http\Controllers\CostController', 'indexPayments'],
+        'GET /api/payments/{payment_id}' => ['App\Http\Controllers\CostController', 'showPayment'],
         'POST /api/payments/submit' => ['App\Http\Controllers\CostController', 'submitPayment'],
         'POST /api/payments/{payment_id}/upload-receipt' => ['App\Http\Controllers\CostController', 'uploadReceipt'],
         'POST /api/payments/{payment_id}/confirm' => ['App\Http\Controllers\CostController', 'confirmPayment'],

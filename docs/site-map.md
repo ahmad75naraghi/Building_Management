@@ -80,8 +80,8 @@ dashboard.php ◄══════════════ منوی پایین:
 ### 🏗️ ساختار فیزیکی (۴)
 `floors` · `blocks` · `units` · `common_areas`
 
-### 💰 مالی (۴)
-`costs` (هزینه‌ها و شارژ) · `accounting` (حسابداری مدیر) · `consumption` (مصرف انرژی) · `reports` (گزارش‌ها)
+### 💰 مالی (۴ + دانلود امن)
+`costs` (هزینه‌ها و شارژ + ثبت پرداخت با فیش واریزی اجباری) · `accounting` (حسابداری مدیر) · `consumption` (مصرف انرژی) · `reports` (گزارش‌ها) · `receipt_download` (نمایش امن فیش واریزی)
 
 ### 📋 ماژول‌های عملیاتی (۱۲)
 `tickets` + `ticket_view` · `announcements` · `meetings` · `bookings` · `visitors` ·

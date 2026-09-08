@@ -24,9 +24,17 @@ final class FileStorage
     /** سقف حجم فایل سند: ۱۰ مگابایت */
     public const MAX_DOCUMENT_BYTES = 10485760;
 
-    public static function saveReceipt(string $content, int $buildingId, int $paymentId, string $originalName): ?string
+    /**
+     * ذخیرهٔ فیش واریزی در پوشهٔ اختصاصی ساختمان و واحد:
+     *   storage/buildings/{buildingId}/receipts/unit-{شماره واحد}/...
+     * واحدِ بدون شماره در پوشهٔ «بدون-واحد» قرار می‌گیرد تا هیچ رسیدی
+     * خارج از ساختار ساختمان/واحد ذخیره نشود.
+     */
+    public static function saveReceipt(string $content, int $buildingId, string $unitSlug, int $paymentId, string $originalName): ?string
     {
-        $dir = AppConfig::getStoragePath('buildings', $buildingId) . '/receipts/' . $paymentId;
+        $safeSlug = trim((string) preg_replace('/[^a-zA-Z0-9\-]/', '-', $unitSlug), '-');
+        $unitFolder = $safeSlug !== '' ? 'unit-' . $safeSlug : 'بدون-واحد';
+        $dir = AppConfig::getStoragePath('buildings', $buildingId) . '/receipts/' . $unitFolder;
         if (!is_dir($dir)) {
             mkdir($dir, 0755, true);
         }

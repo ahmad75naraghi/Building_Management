@@ -189,30 +189,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action'])) {
             }
         }
     } elseif ($action === 'submit_payment') {
-        // پرداخت توسط ساکن/مالک/مستأجر (ردیف مشخص یا مسیر قدیمی هزینه)
+        // پرداخت توسط ساکن/مالک/مستأجر — فیش واریزی (تصویر) اجباری است
         $cost_id = (int) ($_POST['cost_id'] ?? 0);
         $pay_row_id = (int) ($_POST['payment_id'] ?? 0);
         if ($cost_id > 0 || $pay_row_id > 0) {
-            $amount_paid = en_digits($_POST['amount_paid'] ?? '');
-            $response = callAPI('POST', '/payments/submit', [
-                'cost_id' => $cost_id,
-                'payment_id' => $pay_row_id,
-                'amount_paid' => $amount_paid !== '' ? (float) $amount_paid : null,
-                'notes' => trim($_POST['notes'] ?? ''),
-            ]);
-            if (!empty($response['success'])) {
-                $alert_message = 'پرداخت شما ثبت شد. حالا رسید را آپلود کنید.';
-                $alert_type = 'success';
-            } else {
-                $alert_message = $response['message'] ?? 'خطا در ثبت پرداخت.';
+            if (!isset($_FILES['receipt']) || $_FILES['receipt']['error'] !== UPLOAD_ERR_OK) {
+                $alert_message = 'فیش واریزی الزامی است. لطفاً تصویر رسید پرداخت را پیوست کنید.';
                 $reopen_modal = 'pay-cost';
+            } else {
+                $amount_paid = en_digits($_POST['amount_paid'] ?? '');
+                $fields = [
+                    'cost_id' => (string) $cost_id,
+                    'payment_id' => (string) $pay_row_id,
+                    'amount_paid' => $amount_paid !== '' ? $amount_paid : '',
+                    'notes' => trim($_POST['notes'] ?? ''),
+                ];
+                $files = ['receipt' => ['path' => $_FILES['receipt']['tmp_name'], 'name' => (string) $_FILES['receipt']['name']]];
+                $response = callAPIUpload('/payments/submit', $fields, $files);
+                if (!empty($response['success'])) {
+                    $alert_message = 'پرداخت شما همراه با فیش واریزی ثبت شد و برای تأیید مدیر ارسال شد.';
+                    $alert_type = 'success';
+                } else {
+                    $alert_message = $response['message'] ?? 'خطا در ثبت پرداخت.';
+                    $reopen_modal = 'pay-cost';
+                }
             }
         }
     } elseif ($action === 'upload_receipt') {
         $payment_id = (int) ($_POST['payment_id'] ?? 0);
         if ($payment_id > 0 && isset($_FILES['receipt']) && $_FILES['receipt']['error'] === UPLOAD_ERR_OK) {
             $fields = ['is_public' => isset($_POST['is_public']) ? '1' : '0'];
-            $files = ['receipt' => $_FILES['receipt']['tmp_name']];
+            $files = ['receipt' => ['path' => $_FILES['receipt']['tmp_name'], 'name' => (string) $_FILES['receipt']['name']]];
             $response = callAPIUpload('/payments/' . $payment_id . '/upload-receipt', $fields, $files);
             if (!empty($response['success'])) {
                 $alert_message = 'رسید با موفقیت آپلود شد. در انتظار تأیید مدیر.';
@@ -695,6 +702,15 @@ require_once 'includes/header.php';
                         </form>
                     <?php endif; ?>
 
+                    <?php if (!empty($payment['receipt_path'])): ?>
+                        <div class="card-actions">
+                            <a class="btn-chip btn-chip-neutral" style="text-decoration:none;"
+                               href="receipt_download.php?payment_id=<?= $p_id ?>" target="_blank" rel="noopener">
+                                🧾 مشاهده فیش واریزی
+                            </a>
+                        </div>
+                    <?php endif; ?>
+
                     <?php if ($is_manager && ($payment['status'] ?? '') !== 'confirmed'): ?>
                         <div class="card-actions" style="gap:8px;">
                             <form method="POST" action="" data-confirm="پرداخت این ردیف تأیید و به حساب واحد ثبت شود؟" style="flex:1;">
@@ -741,8 +757,8 @@ require_once 'includes/header.php';
 
 <!-- ==================== پاپ‌آپ‌ها ==================== -->
 
-<?php modal_start('pay-cost', 'پرداخت شارژ', 'پس از ثبت، رسید را آپلود کنید'); ?>
-    <form method="POST" action="" class="space-y-4" data-loading>
+<?php modal_start('pay-cost', 'پرداخت شارژ', 'فیش واریزی الزامی است؛ پس از ثبت، برای تأیید مدیر ارسال می‌شود'); ?>
+    <form method="POST" action="" class="space-y-4" data-loading enctype="multipart/form-data">
         <?= csrf_field() ?>
         <input type="hidden" name="form_action" value="submit_payment">
         <input type="hidden" name="cost_id" value="">
@@ -753,10 +769,16 @@ require_once 'includes/header.php';
             <p class="text-[11px] text-gray-400 mt-1">اگر خالی بگذارید، کل مبلغ هزینه ثبت می‌شود.</p>
         </div>
         <div>
+            <label for="pay_receipt" class="form-label">فیش واریزی (تصویر) *</label>
+            <input type="file" id="pay_receipt" name="receipt" accept="image/*" required class="form-input"
+                   style="padding:9px 10px;font-size:12px;color:var(--text-gray);">
+            <p class="text-[11px] text-gray-400 mt-1">عکس واضح از رسید انتقال وجه؛ بدون فیش، پرداخت ثبت نمی‌شود.</p>
+        </div>
+        <div>
             <label for="pay_notes" class="form-label">توضیح (اختیاری)</label>
             <textarea id="pay_notes" name="notes" rows="2" class="form-input" placeholder="مثال: پرداخت از طریق کارت به کارت"></textarea>
         </div>
-        <button type="submit" class="btn-primary">ثبت پرداخت</button>
+        <button type="submit" class="btn-primary">ثبت پرداخت با فیش</button>
     </form>
 <?php modal_end(); ?>
 

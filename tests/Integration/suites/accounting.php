@@ -207,7 +207,7 @@ TestLog::run('پرداخت عادی تأییدشده هم بدهی واحد را
     // مستأجر واحد ۲ پرداخت می‌کند و مدیر تأیید می‌کند
     $db = test_db();
     $paymentId = (int) $db->query("SELECT cp.id FROM cost_payments cp JOIN costs c ON cp.cost_id=c.id WHERE c.building_id={$b} AND cp.user_id={$t2} LIMIT 1")->fetchColumn();
-    $svc->submitPayment(['payment_id' => $paymentId, 'cost_id' => null, 'amount_paid' => 40000], $t2);
+    $svc->submitPayment(['payment_id' => $paymentId, 'cost_id' => null, 'amount_paid' => 40000], $t2, receipt_png_bytes(), 'fish.png');
     $svc->confirmPayment($paymentId, $manager);
 
     $ledger = $svc->getBuildingLedger($b, $manager);

@@ -5157,6 +5157,59 @@
                 ]
             }
         },
+        "/payments/{payment_id}": {
+            "get": {
+                "tags": [
+                    "پرداخت‌ها"
+                ],
+                "summary": "دریافت /api/payments/{payment_id}",
+                "responses": {
+                    "200": {
+                        "description": "پاسخ موفق",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "نیازمند احراز هویت",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "payment_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "building_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/payments/{payment_id}/confirm": {
             "post": {
                 "tags": [

@@ -35,7 +35,7 @@ TestLog::run('اقدام‌های مالی به‌ترتیب ثبت می‌شو�
     $rows = cost_payments_of((int) $cost->id);
     $pid = (int) $rows[0]['id'];
 
-    $svc->submitPayment(['payment_id' => $pid, 'amount_paid' => 50000], $o1);
+    $svc->submitPayment(['payment_id' => $pid, 'amount_paid' => 50000], $o1, receipt_png_bytes(), 'fish.png');
     TestLog::assertSame('payment.submit ثبت شد', 1, audit_count('payment.submit'));
 
     $svc->confirmPayment($pid, $manager);

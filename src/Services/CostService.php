@@ -1409,13 +1409,23 @@ final class CostService
         return $list;
     }
 
-    public function submitPayment(array $data, int $userId): CostPayment
+    /**
+     * ثبت پرداخت توسط ساکن همراه با فیش واریزی «الزامی».
+     * رسید در پوشهٔ ساختمان/واحد ذخیره می‌شود و وضعیت مستقیماً به
+     * «در انتظار تأیید مدیر» می‌رود (مرحلهٔ جداگانهٔ آپلود حذف شده است).
+     */
+    public function submitPayment(array $data, int $userId, ?string $receiptContent = null, ?string $receiptName = null): CostPayment
     {
         // ردیف مشخص (پرداخت واحد-محور) یا مسیر قدیمی (هزینه + کاربر)
         $paymentId = (int) ($data['payment_id'] ?? 0);
         $costId = (int) ($data['cost_id'] ?? 0);
         if ($paymentId <= 0 && $costId <= 0) {
             throw new AppException('payment_id or cost_id is required');
+        }
+
+        // فیش واریزی برای پرداخت ساکن اجباری است
+        if ($receiptContent === null || trim($receiptContent) === '') {
+            throw new ValidationException('فیش واریزی الزامی است. لطفاً تصویر رسید پرداخت را پیوست کنید.');
         }
 
         $existing = null;
@@ -1442,13 +1452,16 @@ final class CostService
         $amountPaid = isset($data['amount_paid']) ? (float) $data['amount_paid']
             : ($existing?->share_amount ?? $cost->amount);
         $notes = $data['notes'] ?? null;
+        $isPublic = (bool) ($data['receipt_is_public'] ?? false);
 
         // اگر قبلاً ردیف صادرشده‌ای برای این کاربر وجود دارد، همان به‌روز می‌شود (ردیف تکراری ساخته نمی‌شود)
         if ($existing) {
-            $this->paymentRepo->updateSubmission((int) $existing->id, $amountPaid, $notes, 'upload_receipt');
+            $this->paymentRepo->updateSubmission((int) $existing->id, $amountPaid, $notes, 'pending');
             $existing->amount_paid = $amountPaid;
             $existing->notes = $notes;
-            $existing->status = 'upload_receipt';
+            $existing->status = 'pending';
+            $receiptPath = $this->storeReceiptForPayment((int) $existing->id, $existing, $cost, $receiptContent, $receiptName ?? 'receipt', $isPublic);
+            $existing->receipt_path = $receiptPath;
             \App\Core\Audit::log($userId, 'payment.submit', 'payment', (int) $existing->id, $cost->building_id, [
                 'cost_id' => $costId, 'amount_paid' => $amountPaid, 'unit_id' => $existing->unit_id,
             ]);
@@ -1459,12 +1472,15 @@ final class CostService
         $payment->cost_id = $costId;
         $payment->user_id = $userId;
         $payment->amount_paid = $amountPaid;
-        $payment->status = 'upload_receipt';
-        $payment->receipt_is_public = (bool) ($data['receipt_is_public'] ?? false);
+        $payment->status = 'pending';
+        $payment->receipt_is_public = $isPublic;
         $payment->notes = $notes;
 
         $id = $this->paymentRepo->create($payment);
         $payment->id = $id;
+
+        $receiptPath = $this->storeReceiptForPayment($id, $payment, $cost, $receiptContent, $receiptName ?? 'receipt', $isPublic);
+        $payment->receipt_path = $receiptPath;
 
         \App\Core\Audit::log($userId, 'payment.submit', 'payment', $id, $cost->building_id, [
             'cost_id' => $costId, 'amount_paid' => $amountPaid, 'unit_id' => $payment->unit_id,
@@ -1473,55 +1489,82 @@ final class CostService
         return $payment;
     }
 
+    /**
+     * ذخیرهٔ فیش واریزی در «پوشهٔ ساختمان/واحد»، ثبت مسیر روی ردیف پرداخت
+     * و نگهداری متادیتا در جدول receipts. وضعیت پرداخت «در انتظار تأیید» می‌شود.
+     */
+    private function storeReceiptForPayment(int $paymentId, CostPayment $payment, Cost $cost, string $content, string $originalName, bool $isPublic = false): string
+    {
+        // عنوان پوشهٔ واحد از شمارهٔ واحد ساخته می‌شود
+        $unitSlug = '';
+        if ($payment->unit_id !== null) {
+            $db = Database::getConnection();
+            $unitStmt = $db->prepare('SELECT unit_number FROM units WHERE id = ?');
+            $unitStmt->execute([$payment->unit_id]);
+            $unitSlug = (string) ($unitStmt->fetchColumn() ?: '');
+        }
+
+        $path = FileStorage::saveReceipt($content, $cost->building_id, $unitSlug, $paymentId, $originalName);
+        if ($path === null) {
+            throw new AppException('ذخیرهٔ فیش واریزی ناموفق بود.');
+        }
+
+        $db = Database::getConnection();
+        $stmt = $db->prepare('UPDATE cost_payments SET receipt_path = ?, receipt_is_public = ?, status = ? WHERE id = ?');
+        $stmt->execute([$path, (int) $isPublic, 'pending', $paymentId]);
+
+        // متادیتای رسید (درج یا به‌روزرسانی سازگار با همهٔ درایورها)
+        $mime = null;
+        if (function_exists('finfo_open')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo) {
+                $mime = finfo_buffer($finfo, $content);
+                finfo_close($finfo);
+            }
+        }
+        $checkStmt = $db->prepare('SELECT id FROM receipts WHERE cost_payment_id = ?');
+        $checkStmt->execute([$paymentId]);
+        $existingReceiptId = $checkStmt->fetchColumn();
+        if ($existingReceiptId) {
+            $upStmt = $db->prepare(
+                'UPDATE receipts SET file_path = ?, file_size = ?, mime_type = ?, original_name = ?, is_public = ? WHERE id = ?'
+            );
+            $upStmt->execute([$path, strlen($content), $mime, $originalName, (int) $isPublic, (int) $existingReceiptId]);
+        } else {
+            $insStmt = $db->prepare(
+                'INSERT INTO receipts (cost_payment_id, file_path, file_size, mime_type, original_name, is_public) VALUES (?, ?, ?, ?, ?, ?)'
+            );
+            $insStmt->execute([$paymentId, $path, strlen($content), $mime, $originalName, (int) $isPublic]);
+        }
+
+        \App\Core\Audit::log($payment->user_id, 'payment.receipt', 'payment', $paymentId, $cost->building_id, [
+            'cost_id' => $payment->cost_id, 'original_name' => $originalName,
+        ]);
+
+        return $path;
+    }
+
+    /**
+     * بارگذاری (یا بارگذاری مجدد پس از ردشدن) فیش واریزی برای یک پرداخت.
+     * فایل در همان ساختار «ساختمان/واحد» ذخیره می‌شود و وضعیت به
+     * «در انتظار تأیید» بازمی‌گردد.
+     */
     public function uploadReceipt(int $paymentId, string $fileContent, string $originalName, int $userId, bool $isPublic = false): ?string
     {
         $payment = $this->getPaymentById($paymentId);
         if (!$payment || $payment->user_id !== $userId) {
             throw new AppException('Payment not found or access denied');
         }
-
-        $path = FileStorage::saveReceipt($fileContent, $payment->cost_id, $paymentId, $originalName);
-        if ($path) {
-            $db = \App\Core\Database::getConnection();
-
-            // Update payment with receipt path and status
-            $stmt = $db->prepare("UPDATE cost_payments SET receipt_path = ?, receipt_is_public = ?, status = ? WHERE id = ?");
-            $stmt->execute([$path, (int) $isPublic, 'upload_receipt', $paymentId]);
-
-            // ثبت متادیتای رسید در جدول receipts (cost_payment_id یکتاست)
-            $mime = null;
-            if (function_exists('finfo_open')) {
-                $finfo = finfo_open(FILEINFO_MIME_TYPE);
-                if ($finfo) {
-                    $mime = finfo_buffer($finfo, $fileContent);
-                    finfo_close($finfo);
-                }
-            }
-            $receiptStmt = $db->prepare(
-                "INSERT INTO receipts (cost_payment_id, file_path, file_size, mime_type, original_name, is_public)
-                 VALUES (?, ?, ?, ?, ?, ?)
-                 ON DUPLICATE KEY UPDATE
-                     file_path = VALUES(file_path),
-                     file_size = VALUES(file_size),
-                     mime_type = VALUES(mime_type),
-                     original_name = VALUES(original_name),
-                     is_public = VALUES(is_public)"
-            );
-            $receiptStmt->execute([
-                $paymentId,
-                $path,
-                strlen($fileContent),
-                $mime,
-                $originalName,
-                (int) $isPublic,
-            ]);
-
-            $cost = $this->costRepo->findById($payment->cost_id);
-            \App\Core\Audit::log($userId, 'payment.receipt', 'payment', $paymentId, $cost?->building_id, [
-                'cost_id' => $payment->cost_id, 'original_name' => $originalName,
-            ]);
+        if ($payment->status === 'confirmed') {
+            throw new AppException('پرداخت تأییدشده دیگر قابل تغییر رسید نیست.');
         }
-        return $path;
+
+        $cost = $this->costRepo->findById($payment->cost_id);
+        if (!$cost) {
+            throw new AppException('Cost not found');
+        }
+
+        return $this->storeReceiptForPayment($paymentId, $payment, $cost, $fileContent, $originalName, $isPublic);
     }
 
     public function confirmPayment(int $paymentId, int $managerId): bool
@@ -1775,6 +1818,18 @@ final class CostService
         $stmt->execute([$id]);
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         return $row ? $this->mapPaymentRow($row) : null;
+    }
+
+    /** دسترسی عمومی به هزینه (برای کنترلرهایی مثل نمایش فیش پرداخت) */
+    public function getCostById(int $costId): ?Cost
+    {
+        return $this->costRepo->findById($costId);
+    }
+
+    /** آیا کاربر مدیر فعال این ساختمان است؟ (نسخهٔ عمومی برای کنترلرها) */
+    public function isManagerOfBuilding(int $userId, int $buildingId): bool
+    {
+        return $this->isManager($userId, $buildingId);
     }
 
     private function mapPaymentRow(array $row): CostPayment

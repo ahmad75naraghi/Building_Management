@@ -167,10 +167,10 @@ TestLog::run('پرداخت ساکن ردیف صادرشده را به‌روز �
     $cost = $svc->createCost(['building_id' => $b, 'title' => 'رنگ', 'amount' => 40000, 'target_audience' => 'owners'], $manager);
     $svc->issueCost((int) $cost->id, $manager);
 
-    $payment = $svc->submitPayment(['cost_id' => (int) $cost->id, 'amount_paid' => 40000], $o1);
+    $payment = $svc->submitPayment(['cost_id' => (int) $cost->id, 'amount_paid' => 40000], $o1, receipt_png_bytes(), 'fish.png');
     $rows = cost_payments_of((int) $cost->id);
     TestLog::assertSame('یک ردیف باقی می‌ماند', 1, count($rows));
-    TestLog::assertSame('وضعیت در انتظار رسید', 'upload_receipt', $payment->status);
+    TestLog::assertSame('با فیش، مستقیم در انتظار تأیید مدیر', 'pending', $payment->status);
     TestLog::assertSame('مبلغ پرداخت ثبت شد', 40000.0, (float) $rows[0]['amount_paid']);
 });
 
@@ -199,7 +199,7 @@ TestLog::run('تغییر مخاطب پس از ثبت پرداخت مسدود م�
     make_unit($b, '2', ['owner_user_id' => $o2]);
     $cost = $svc->createCost(['building_id' => $b, 'title' => 'نما', 'amount' => 100000, 'target_audience' => 'owners'], $manager);
     $svc->issueCost((int) $cost->id, $manager);
-    $svc->submitPayment(['cost_id' => (int) $cost->id, 'amount_paid' => 50000], $o1);
+    $svc->submitPayment(['cost_id' => (int) $cost->id, 'amount_paid' => 50000], $o1, receipt_png_bytes(), 'fish.png');
 
     TestLog::assertThrows('تغییر مخاطب ممنوع', fn() => $svc->updateCost((int) $cost->id, [
         'target_audience' => 'tenants',
@@ -246,8 +246,8 @@ TestLog::run('رد پرداخت فقط با دلیل و فقط توسط مدیر
     TestLog::assertTrue('اعلان رد برای پرداخت‌کننده ثبت شد', (int) $stmt->fetchColumn() >= 1);
 
     // پرداخت‌کننده پس از رد می‌تواند دوباره پرداخت/رسید ثبت کند
-    $p = $svc->submitPayment(['payment_id' => $pid, 'amount_paid' => 80000], $o1);
-    TestLog::assertSame('به چرخه بررسی برگشت', 'upload_receipt', $p->status);
+    $p = $svc->submitPayment(['payment_id' => $pid, 'amount_paid' => 80000], $o1, receipt_png_bytes(), 'fish.png');
+    TestLog::assertSame('با فیش، برای تأیید مدیر آماده است', 'pending', $p->status);
 });
 
 TestLog::run('مانده واحد: بدهکار، طلبکار و دسترسی اعضا', function () use ($svc, $manager) {
@@ -267,7 +267,7 @@ TestLog::run('مانده واحد: بدهکار، طلبکار و دسترسی �
     }
 
     // واحد ۱ بیشتر از سهمش پرداخت و تأیید می‌کند → طلبکار؛ واحد ۲ هیچ → بدهکار
-    $svc->submitPayment(['payment_id' => $byUser[$o1], 'amount_paid' => 60000], $o1);
+    $svc->submitPayment(['payment_id' => $byUser[$o1], 'amount_paid' => 60000], $o1, receipt_png_bytes(), 'fish.png');
     $svc->confirmPayment($byUser[$o1], $manager);
 
     $balances = $svc->getUnitBalances($b, $manager);
@@ -413,4 +413,133 @@ TestLog::run('غیرمدیر نمی‌تواند پرداخت را تأیید ک
     $result = $svc->bulkConfirmPayments([(int) $rows[0]['id']], $outsider);
     TestLog::assertSame('تأیید گروهی توسط غیرمدیر ناموفق است', 0, $result['processed']);
     TestLog::assertSame('وضعیت دست‌نخورده می‌ماند', 'pending', cost_payments_of((int) $cost->id)[0]['status']);
+});
+
+// ------------------------------------------------------------ فیش واریزی اجباری + ذخیره در پوشهٔ ساختمان/واحد
+
+/** بایت‌های یک پیکسل تصویر PNG معتبر برای تست آپلود */
+function receipt_png_bytes(): string
+{
+    return base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
+}
+
+/** ساختمان با مالک و هزینهٔ صادرشده برای تست‌های رسید می‌سازد */
+function receipt_fixture(CostService $svc, int $manager, string $phone): array
+{
+    $b = make_building($manager);
+    $owner = make_user($phone);
+    $unit = make_unit($b, '7', ['owner_user_id' => $owner]);
+    $cost = $svc->createCost([
+        'building_id' => $b, 'title' => 'هزینهٔ رسید', 'amount' => 80000,
+        'target_audience' => 'owners', 'division_method' => 'fixed_share',
+    ], $manager);
+    $svc->issueCost((int) $cost->id, $manager);
+    $row = cost_payments_of((int) $cost->id)[0];
+    return [$b, $owner, $unit, (int) $cost->id, (int) $row['id']];
+}
+
+TestLog::run('ثبت پرداخت بدون فیش واریزی رد می‌شود', function () use ($svc, $manager) {
+    [, $owner, , $costId, $payId] = receipt_fixture($svc, $manager, '09132000086');
+    TestLog::assertThrows('بدون فیش خطا می‌دهد', fn () => $svc->submitPayment([
+        'payment_id' => $payId, 'amount_paid' => 80000,
+    ], $owner, null, null), 'فیش واریزی الزامی');
+    $row = cost_payments_of($costId)[0];
+    TestLog::assertSame('وضعیت دست‌نخورده می‌ماند', 'pending', $row['status']);
+    TestLog::assertTrue('رسیدی ذخیره نشده', empty($row['receipt_path']));
+});
+
+TestLog::run('ثبت پرداخت با فیش: وضعیت در انتظار + فایل در پوشهٔ ساختمان/واحد', function () use ($svc, $manager) {
+    [$b, $owner, $unit, $costId, $payId] = receipt_fixture($svc, $manager, '09132000087');
+
+    $payment = $svc->submitPayment([
+        'payment_id' => $payId, 'amount_paid' => 80000, 'notes' => 'کارت به کارت',
+    ], $owner, receipt_png_bytes(), 'fish-varizi.png');
+
+    TestLog::assertSame('وضعیت در انتظار تأیید مدیر', 'pending', $payment->status);
+    TestLog::assertTrue('مسیر رسید ثبت شده', is_string($payment->receipt_path) && $payment->receipt_path !== '');
+    TestLog::assertTrue('فایل واقعاً روی دیسک ساخته شده', is_file((string) $payment->receipt_path));
+    TestLog::assertSame('محتوای فایل دقیقاً همان تصویر ارسالی است', receipt_png_bytes(), file_get_contents((string) $payment->receipt_path));
+
+    $expectedDir = '/buildings/' . $b . '/receipts/unit-7/';
+    TestLog::assertTrue('در پوشهٔ همان ساختمان و همان واحد ذخیره شده: ' . (string) $payment->receipt_path, str_contains((string) $payment->receipt_path, $expectedDir));
+
+    // متادیتای جدول receipts
+    $stmt = test_db()->prepare('SELECT * FROM receipts WHERE cost_payment_id = ?');
+    $stmt->execute([$payId]);
+    $meta = $stmt->fetch(PDO::FETCH_ASSOC);
+    TestLog::assertTrue('ردیف متادیتای رسید ساخته شده', is_array($meta));
+    TestLog::assertSame('نام اصلی فایل ذخیره شده', 'fish-varizi.png', $meta['original_name']);
+    TestLog::assertSame('mime تصویر شناسایی شده', 'image/png', $meta['mime_type']);
+    TestLog::assertSame('حجم فایل درست ثبت شده', strlen(receipt_png_bytes()), (int) $meta['file_size']);
+
+    $row = test_db()->query("SELECT * FROM cost_payments WHERE id = {$payId}")->fetch(PDO::FETCH_ASSOC);
+    TestLog::assertSame('مسیر رسید روی ردیف پرداخت هم نشست', $payment->receipt_path, $row['receipt_path']);
+    TestLog::assertSame('مبلغ پرداختی ثبت شده', 80000.0, (float) $row['amount_paid']);
+});
+
+TestLog::run('ثبت مجدد پرداخت، همان ردیف را به‌روز می‌کند و رسید جایگزین می‌شود', function () use ($svc, $manager) {
+    [, $owner, , , $payId] = receipt_fixture($svc, $manager, '09132000088');
+    $first = $svc->submitPayment(['payment_id' => $payId, 'amount_paid' => 50000], $owner, receipt_png_bytes(), 'a.png');
+    $second = $svc->submitPayment(['payment_id' => $payId, 'amount_paid' => 60000, 'notes' => 'مبلغ اصلاح شد'], $owner, receipt_png_bytes(), 'b.png');
+
+    TestLog::assertSame('ردیف تکراری ساخته نمی‌شود', (int) $first->id, (int) $second->id);
+    TestLog::assertSame('مبلغ اصلاح شده', 60000.0, (float) $second->amount_paid);
+    $count = (int) test_db()->query('SELECT COUNT(*) FROM receipts WHERE cost_payment_id = ' . $payId)->fetchColumn();
+    TestLog::assertSame('متادیتای رسید هم یک ردیف می‌ماند', 1, $count);
+});
+
+TestLog::run('آپلود مجدد پس از ردشدن: وضعیت به در انتظار بازمی‌گردد', function () use ($svc, $manager) {
+    [$b, $owner, , $costId, $payId] = receipt_fixture($svc, $manager, '09132000089');
+    $svc->submitPayment(['payment_id' => $payId, 'amount_paid' => 80000], $owner, receipt_png_bytes(), 'a.png');
+    $svc->rejectPayment($payId, $manager, 'مبلغ کمتر از سهم است');
+
+    $path = $svc->uploadReceipt($payId, receipt_png_bytes(), 'fish-dobare.png', $owner);
+    TestLog::assertTrue('رسید جدید ذخیره شد', is_string($path) && is_file((string) $path));
+    TestLog::assertTrue('باز هم در پوشهٔ ساختمان/واحد است', str_contains((string) $path, '/buildings/' . $b . '/receipts/unit-7/'));
+    $row = test_db()->query("SELECT status FROM cost_payments WHERE id = {$payId}")->fetch(PDO::FETCH_ASSOC);
+    TestLog::assertSame('وضعیت برای تأیید دوباره', 'pending', $row['status']);
+});
+
+TestLog::run('غیرمالک نمی‌تواند برای پرداخت دیگران رسید بفرستد', function () use ($svc, $manager) {
+    [, , , , $payId] = receipt_fixture($svc, $manager, '09132000090');
+    $stranger = make_user('09132000091', 'غریبه');
+    TestLog::assertThrows('دسترسی رد می‌شود', fn () => $svc->uploadReceipt($payId, receipt_png_bytes(), 'x.png', $stranger), 'access denied');
+    TestLog::assertThrows('ثبت پرداخت غریبه هم رد می‌شود', fn () => $svc->submitPayment(['payment_id' => $payId], $stranger, receipt_png_bytes(), 'x.png'), 'access denied');
+});
+
+TestLog::run('پرداخت تأییدشده دیگر قابل تغییر رسید نیست', function () use ($svc, $manager) {
+    [, $owner, , , $payId] = receipt_fixture($svc, $manager, '09132000092');
+    $svc->submitPayment(['payment_id' => $payId, 'amount_paid' => 80000], $owner, receipt_png_bytes(), 'a.png');
+    $svc->confirmPayment($payId, $manager);
+    TestLog::assertThrows('آپلود پس از تأیید مسدود است', fn () => $svc->uploadReceipt($payId, receipt_png_bytes(), 'b.png', $owner), 'تأییدشده');
+});
+
+TestLog::run('فایل غیرتصویری رد می‌شود', function () use ($svc, $manager) {
+    [, $owner, , , $payId] = receipt_fixture($svc, $manager, '09132000093');
+    TestLog::assertThrows('محتوای متنی به‌جای تصویر پذیرفته نمی‌شود', fn () => $svc->submitPayment(
+        ['payment_id' => $payId, 'amount_paid' => 80000], $owner, 'این تصویر نیست', 'script.php'
+    ), 'Invalid file type');
+});
+
+TestLog::run('پرداخت مستقیم مدیر نیازی به فیش ندارد (مسیر جداگانه)', function () use ($svc, $manager) {
+    $b = make_building($manager);
+    $owner = make_user('09132000095');
+    $u = make_unit($b, '3', ['owner_user_id' => $owner]);
+    $payment = $svc->recordDirectPayment($b, $u, 45000, 'دریافت نقدی', $manager);
+    TestLog::assertSame('مستقیم تأیید می‌شود', 'confirmed', $payment->status);
+    TestLog::assertTrue('بدون مسیر رسید', $payment->receipt_path === null || $payment->receipt_path === '');
+});
+
+TestLog::run('تأیید پرداخت دارای فیش، مبلغ را به حساب واحد می‌نشاند', function () use ($svc, $manager) {
+    [$b, $owner, $unit, $costId, $payId] = receipt_fixture($svc, $manager, '09132000094');
+    $svc->submitPayment(['payment_id' => $payId, 'amount_paid' => 80000], $owner, receipt_png_bytes(), 'a.png');
+    $svc->confirmPayment($payId, $manager);
+
+    $row = test_db()->query("SELECT * FROM cost_payments WHERE id = {$payId}")->fetch(PDO::FETCH_ASSOC);
+    TestLog::assertSame('وضعیت نهایی تأیید', 'confirmed', $row['status']);
+    TestLog::assertSame('مسیر رسید پس از تأیید حفظ می‌شود', true, str_contains((string) $row['receipt_path'], '/buildings/' . $b . '/receipts/unit-7/'));
+    TestLog::assertTrue('توسط مدیر تأیید شده', (int) $row['confirmed_by'] === $manager);
+
+    $ledger = $svc->getBuildingLedger($b, $manager);
+    TestLog::assertSame('بدهی واحد پس از پرداخت کامل صفر می‌شود', 0.0, round((float) $ledger['units'][$unit]['balance'], 2));
 });
