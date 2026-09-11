@@ -19,6 +19,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['notification_id'])) {
     }
 }
 
+// خواندن همهٔ اعلان‌ها با یک کلیک
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($_POST['form_action'] ?? '') === 'mark_all_read')) {
+    $response = callAPI('POST', '/notifications/read-all');
+    if (isset($response['success']) && $response['success'] === true) {
+        $marked = (int) ($response['data']['marked'] ?? 0);
+        $alert_message = $marked > 0
+            ? 'همهٔ اعلان‌ها (' . fa_digits($marked) . ' مورد) خوانده شدند.'
+            : 'اعلان خوانده‌نشده‌ای وجود نداشت.';
+    }
+}
+
 // دریافت لیست اعلانات
 $notifications = [];
 $list_response = callAPI('GET', '/notifications');
@@ -36,7 +47,24 @@ require_once 'includes/page_head.php';
 <main class="p-5">
 
     <!-- لیست اعلانات -->
-    <h2 class="section-title">همه اعلانات</h2>
+    <div class="section-header-row" style="margin: 0 0 12px;">
+        <h2 class="section-title">همه اعلانات</h2>
+        <?php
+        $unread_count = 0;
+        foreach ($notifications as $n) {
+            if (empty($n['is_read'])) {
+                $unread_count++;
+            }
+        }
+        ?>
+        <?php if ($unread_count > 0): ?>
+            <form method="POST" action="">
+                <?= csrf_field() ?>
+                <input type="hidden" name="form_action" value="mark_all_read">
+                <button type="submit" class="btn-chip btn-chip-neutral" title="خواندن همهٔ اعلان‌ها">✅ خواندن همه</button>
+            </form>
+        <?php endif; ?>
+    </div>
 
     <?php if (empty($notifications)): ?>
         <div class="card empty-state">

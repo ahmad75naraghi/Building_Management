@@ -48,6 +48,12 @@ final class NotificationService
         return $this->repo->markAsRead($notificationId);
     }
 
+    /** خوانده‌شدن همهٔ اعلان‌های کاربر؛ تعداد اعلان‌های به‌روزشده برمی‌گردد */
+    public function markAllAsRead(int $userId): int
+    {
+        return $this->repo->markAllRead($userId);
+    }
+
     /**
      * ارسال اعلان به همهٔ اعضای فعال یک ساختمان (پخش سراسری).
      *

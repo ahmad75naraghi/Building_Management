@@ -101,8 +101,39 @@
         }, 420);
     }
 
+    /* اسکلت ناوبری: اگر رفتن به صفحهٔ جدید کمی طول بکشد، اسکلت بارگذاری
+       روی صفحهٔ فعلی ظاهر می‌شود تا کاربر بازخورد فوری ببیند. */
+    var navSkelTimer = null;
+    function scheduleNavSkeleton() {
+        if (navSkelTimer || document.getElementById('nav-skeleton')) { return; }
+        navSkelTimer = window.setTimeout(function () {
+            navSkelTimer = null;
+            if (document.getElementById('nav-skeleton')) { return; }
+            var cards = '';
+            for (var i = 0; i < 5; i++) { cards += '<div class="skel skel-card"></div>'; }
+            var el = document.createElement('div');
+            el.id = 'nav-skeleton';
+            el.className = 'nav-skeleton-overlay';
+            el.setAttribute('aria-hidden', 'true');
+            el.innerHTML =
+                '<div class="nav-skel-head">' +
+                '  <div class="skel nav-skel-circle"></div>' +
+                '  <div style="flex:1;">' +
+                '    <div class="skel skel-line w-40" style="height:14px;"></div>' +
+                '    <div class="skel skel-line w-60" style="height:10px;margin-bottom:0;"></div>' +
+                '  </div>' +
+                '</div>' + cards;
+            document.body.appendChild(el);
+        }, 220);
+    }
+    function clearNavSkeleton() {
+        if (navSkelTimer) { window.clearTimeout(navSkelTimer); navSkelTimer = null; }
+        var el = document.getElementById('nav-skeleton');
+        if (el && el.parentNode) { el.parentNode.removeChild(el); }
+    }
+
     function hookNavigationProgress() {
-        // کلیک روی لینک‌های داخلی → شروع نوار پیشرفت
+        // کلیک روی لینک‌های داخلی → شروع نوار پیشرفت + اسکلت ناوبری
         document.addEventListener('click', function (e) {
             var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
             if (!a) { return; }
@@ -111,13 +142,16 @@
             if (href.indexOf('#') === 0 || href.indexOf('javascript:') === 0) { return; }
             if (a.hasAttribute('data-modal-open') || a.hasAttribute('data-modal-close')) { return; }
             progressStart();
+            scheduleNavSkeleton();
         }, true);
 
-        // ارسال فرم → نوار پیشرفت + اسپینر روی دکمهٔ ارسال
+        // ارسال فرم → نوار پیشرفت + اسکلت ناوبری + اسپینر روی دکمهٔ ارسال
         document.addEventListener('submit', function (e) {
             var form = e.target;
             if (!form || form.tagName !== 'FORM') { return; }
             progressStart();
+            // فرم‌های گفتگو/جستجوی درجا صفحه را عوض نمی‌کنند؛ اسکلت نمی‌خواهند
+            if (!form.hasAttribute('data-no-nav-skeleton')) { scheduleNavSkeleton(); }
             var btn = form.querySelector('[type="submit"]');
             if (btn && !btn.classList.contains('is-submitting')) {
                 btn.classList.add('is-submitting');
@@ -136,7 +170,7 @@
             }
         }, true);
 
-        window.addEventListener('pageshow', progressDone);
+        window.addEventListener('pageshow', function () { progressDone(); clearNavSkeleton(); });
     }
 
     /* ----------------------------------------------------------
@@ -377,13 +411,17 @@
     }
 
     function setupListWidget(id) {
-        var itemsEl = document.querySelector('[data-list-items="' + id + '"]');
-        if (!itemsEl) { return; }
+        // چند کانتینر با یک شناسه = لیست گروه‌بندی‌شده (مثلاً اسناد بر اساس دسته)
+        var itemsEls = Array.prototype.slice.call(document.querySelectorAll('[data-list-items="' + id + '"]'));
+        if (!itemsEls.length) { return; }
         var searchEl = document.querySelector('[data-list-search="' + id + '"]');
         var pagerEl = document.querySelector('[data-list-pager="' + id + '"]');
         var countEl = document.querySelector('[data-list-count="' + id + '"]');
 
-        var items = Array.prototype.slice.call(itemsEl.children);
+        var items = [];
+        itemsEls.forEach(function (container) {
+            Array.prototype.push.apply(items, Array.prototype.slice.call(container.children));
+        });
         var texts = items.map(function (el) { return normalize(el.textContent); });
         var state = { q: '', page: 1 };
 
@@ -407,6 +445,20 @@
             for (var k = 0; k < items.length; k++) {
                 items[k].style.display = visible[k] ? '' : 'none';
             }
+
+            // در لیست‌های گروه‌بندی‌شده، گروهِ بدون آیتمِ قابل‌نمایش پنهان می‌شود
+            itemsEls.forEach(function (container) {
+                var anyVisible = false;
+                Array.prototype.forEach.call(container.children, function (child) {
+                    if (child.style.display !== 'none') { anyVisible = true; }
+                });
+                container.style.display = anyVisible ? '' : 'none';
+                // عنوان گروه (مثل دستهٔ اسناد) همراه با فهرست خالی پنهان می‌شود
+                var group = container.parentElement;
+                if (group && group.classList && group.classList.contains('doc-group')) {
+                    group.style.display = anyVisible ? '' : 'none';
+                }
+            });
 
             if (countEl) {
                 countEl.textContent = idx.length === items.length

@@ -1016,8 +1016,10 @@
         .app-alert span { overflow-wrap: anywhere; word-break: break-word; }
         .app-alert-success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
         .app-alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+        .app-alert-info { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
         html[data-theme="dark"] .app-alert-success { background: #0c2f22; color: #a7f3d0; border-color: #14532d; }
         html[data-theme="dark"] .app-alert-error { background: #3b1216; color: #fecaca; border-color: #7f1d1d; }
+        html[data-theme="dark"] .app-alert-info { background: #12233f; color: #93c5fd; border-color: #1e3a5f; }
 
         /* دکمه بازگشت و عنوان صفحات داخلی */
         .subpage-back-btn {
@@ -1147,6 +1149,16 @@
         .chip-green { background: rgba(16, 185, 129, 0.12); color: #047857; }
         .chip-amber { background: rgba(245, 158, 11, 0.14); color: #b45309; }
         .chip-blue  { background: rgba(14, 165, 233, 0.13); color: #0369a1; }
+        /* نسخهٔ تیرهٔ چیپ‌های رنگی */
+        html[data-theme="dark"] .chip-gold  { background: rgba(212, 163, 115, 0.18); color: #e6c39a; }
+        html[data-theme="dark"] .chip-gray  { background: var(--surface-3); color: var(--text-gray); }
+        html[data-theme="dark"] .chip-green { background: rgba(16, 185, 129, 0.16); color: #6ee7b7; }
+        html[data-theme="dark"] .chip-amber { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+        html[data-theme="dark"] .chip-blue  { background: rgba(14, 165, 233, 0.18); color: #7dd3fc; }
+        html[data-theme="dark"] .chip-red   { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
+        /* کاشی‌های آیکون با پس‌زمینهٔ روشنِ اینلاین در حالت تیره */
+        html[data-theme="dark"] [style*="#eff6ff"],
+        html[data-theme="dark"] [style*="#dbeafe"] { background: var(--surface-3) !important; }
 
         /* کارت راهنما */
         .hint-card {
@@ -2071,6 +2083,23 @@
         .skel-line.w-60 { width: 60%; }
         .skel-line.w-40 { width: 40%; }
         .skel-card { height: 76px; margin-bottom: 10px; }
+
+        /* اسکلت ناوبری: هنگام رفتن به صفحهٔ بعد، روی صفحهٔ فعلی می‌نشیند
+           تا بارگذاری صفحهٔ جدید «خالی» به نظر نرسد */
+        .nav-skeleton-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 90;
+            background: var(--text-white);
+            padding: calc(var(--app-header-h, 56px) + 14px) 16px 90px;
+            animation: nav-skel-fade 0.18s ease;
+        }
+        html[data-theme="dark"] .nav-skeleton-overlay { background: var(--bg-light-canvas); }
+        .nav-skeleton-overlay .nav-skel-head {
+            display: flex; align-items: center; gap: 12px; margin-bottom: 18px;
+        }
+        .nav-skeleton-overlay .nav-skel-circle { width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0; }
+        @keyframes nav-skel-fade { from { opacity: 0; } to { opacity: 1; } }
 
         /* ============================================================
          * نوار فیلتر چسبان + صفحه‌بندی فهرست‌ها

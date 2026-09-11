@@ -48,6 +48,23 @@ final class NotificationController
         ]);
     }
 
+    /** خواندن همهٔ اعلان‌ها با یک کلیک */
+    public function markAllAsRead(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        if (!$userId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication required',
+            ]);
+        }
+        $count = $this->service->markAllAsRead((int) $userId);
+        return (new Response())->setJson([
+            'success' => true,
+            'message' => 'همهٔ اعلان‌ها خوانده شدند.',
+            'data' => ['marked' => $count],
+        ]);
+    }
+
     public function store(Request $request): Response
     {
         // Internal/admin endpoint to create notifications

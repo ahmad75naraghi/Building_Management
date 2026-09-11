@@ -759,6 +759,20 @@ final class BuildingController
                 'message' => 'You are not a member of this building',
             ]);
         }
+        return (new Response())->setJson([
+            'success' => true,
+            'data' => $this->buildingMembersWithUnits($buildingId),
+        ]);
+    }
+
+    /**
+     * اعضای ساختمان + واحدهای مرتبط هر عضو (مالک/مستأجر).
+     * واحدها یک‌بار خوانده و بین اعضا تقسیم می‌شوند (بدون کوئری اضافی).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildingMembersWithUnits(int $buildingId): array
+    {
         $db = \App\Core\Database::getConnection();
         $stmt = $db->prepare(
             "SELECT bm.*, u.name, u.email, u.phone
@@ -769,7 +783,6 @@ final class BuildingController
         $stmt->execute([$buildingId]);
         $members = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
-        // همهٔ واحدهای ساختمان یک‌بار خوانده و بین اعضا تقسیم می‌شود (بدون کوئری اضافی)
         $unitStmt = $db->prepare(
             "SELECT id, unit_number, owner_user_id, tenant_user_id, owner_resident, parking_no, storage_no
              FROM units
@@ -779,7 +792,7 @@ final class BuildingController
         $unitStmt->execute([$buildingId]);
         $allUnits = $unitStmt->fetchAll(\PDO::FETCH_ASSOC);
 
-        $members = array_map(function (array $m) use ($allUnits): array {
+        return array_map(function (array $m) use ($allUnits): array {
             $memberId = (int) $m['user_id'];
             $m['units'] = [];
             foreach ($allUnits as $u) {
@@ -802,10 +815,84 @@ final class BuildingController
             }
             return $m;
         }, $members);
+    }
+
+    /**
+     * دادهٔ تجمیعی داشبورد ساختمان — همهٔ نیازهای صفحهٔ داشبورد در «یک» پاسخ
+     * (به‌جای ~۱۰ درخواست مجزا): ساختمان، اعضا، واحدها، بلوک‌ها، طبقات،
+     * ماندهٔ واحدها، پرداخت‌ها، هزینه‌ها، اطلاعیه‌ها، تعمیرات و خلاصهٔ مالی.
+     */
+    public function dashboardData(Request $request): Response
+    {
+        $userId = (int) ($request->getAttribute('user_id') ?? 0);
+        $buildingId = (int) $request->getAttribute('building_id');
+        if (!$userId || !$buildingId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false,
+                'message' => 'Authentication and building id required',
+            ]);
+        }
+        if (!$this->isBuildingMember($userId, $buildingId)) {
+            return (new Response())->setStatusCode(403)->setJson([
+                'success' => false,
+                'message' => 'You are not a member of this building',
+            ]);
+        }
+
+        $building = $this->service->getBuildingById($buildingId, $userId);
+        if (!$building) {
+            return (new Response())->setStatusCode(404)->setJson([
+                'success' => false,
+                'message' => 'Building not found',
+            ]);
+        }
+
+        $costService = new \App\Services\CostService();
+        $extraService = new \App\Services\ExtraModulesService();
+        $db = \App\Core\Database::getConnection();
+
+        // شارژ ماهیانهٔ ماه جاری پیش از خلاصهٔ مالی صادر شود (هم‌راستا با /costs)
+        try {
+            $costService->ensureMonthlyCharge($buildingId, $userId);
+        } catch (\Throwable $e) {
+            \App\Core\Logger::warning('dashboard', 'صدور شارژ ماهیانه در داشبورد ناموفق بود', [
+                'building_id' => $buildingId,
+                'reason' => $e->getMessage(),
+            ]);
+        }
+
+        $blockStmt = $db->prepare("SELECT * FROM blocks WHERE building_id = ? ORDER BY id ASC");
+        $blockStmt->execute([$buildingId]);
+        $blocks = $blockStmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $floorStmt = $db->prepare("SELECT * FROM floors WHERE building_id = ? ORDER BY floor_number ASC");
+        $floorStmt->execute([$buildingId]);
+        $floors = $floorStmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        try {
+            $data = [
+                'building' => $building->toArray(),
+                'members' => $this->buildingMembersWithUnits($buildingId),
+                'units' => array_map(fn($u) => $u->toArray(), $this->unitService()->listUnitsByBuilding($buildingId)),
+                'blocks' => $blocks,
+                'floors' => $floors,
+                'unit_balances' => $costService->getUnitBalances($buildingId, $userId),
+                'payments' => $costService->listPaymentsByBuilding($buildingId),
+                'costs' => array_map(fn($c) => $c->toArray(), $costService->listCostsByBuilding($buildingId)),
+                'announcements' => array_map(fn($a) => $a->toArray(), $extraService->listAnnouncements($buildingId, $userId, 50)),
+                'maintenance' => array_map(fn($m) => $m->toArray(), $extraService->listMaintenanceRequests($buildingId, $userId, 50)),
+                'financial_summary' => $costService->getFinancialSummary($buildingId),
+            ];
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        }
 
         return (new Response())->setJson([
             'success' => true,
-            'data' => $members,
+            'data' => $data,
         ]);
     }
 

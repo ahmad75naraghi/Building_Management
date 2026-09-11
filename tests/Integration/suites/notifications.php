@@ -134,3 +134,89 @@ TestLog::run('پخش سراسری فقط اعضای فعال و بدون است�
     TestLog::assertSame('عضو یک گرفت', 1, notif_count_for($u1, 'general'));
     TestLog::assertSame('عضو استثنا نگرفت', 0, notif_count_for($u2, 'general'));
 });
+
+// ------------------------------------------------------------ رزرو و تعمیرات
+
+/** شمارش اعلان‌ها با عنوان مشخص */
+function notif_count_title(int $userId, string $titleLike): int
+{
+    $stmt = test_db()->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND title LIKE ?");
+    $stmt->execute([$userId, $titleLike]);
+    return (int) $stmt->fetchColumn();
+}
+
+TestLog::run('رزرو جدید به مدیر ساختمان اعلان می‌دهد', function () use ($svc, $manager, $resident) {
+    $b = make_building($manager);
+    add_member($b, $resident, 'tenant');
+
+    $before = notif_count_title($manager, 'رزرو جدید');
+    $svc->createBooking([
+        'building_id' => $b, 'date' => date('Y-m-d', time() + 86400), 'start_time' => '18:00',
+    ], $resident);
+    TestLog::assertSame('مدیر اعلان رزرو گرفت', $before + 1, notif_count_title($manager, 'رزرو جدید'));
+});
+
+TestLog::run('رزرو توسط خود مدیر، اعلان اضافی نمی‌سازد', function () use ($svc) {
+    $m = make_user('09137000020', 'مدیر رزروکننده');
+    $b = make_building($m);
+
+    $before = notif_count_title($m, 'رزرو جدید');
+    $svc->createBooking(['building_id' => $b, 'date' => date('Y-m-d')], $m);
+    TestLog::assertSame('اعلانی برای خود مدیر ساخته نشد', $before, notif_count_title($m, 'رزرو جدید'));
+});
+
+TestLog::run('تعمیرات جدید به مدیر ساختمان اعلان می‌دهد', function () use ($svc, $manager, $resident) {
+    $b = make_building($manager);
+    add_member($b, $resident, 'tenant');
+
+    $before = notif_count_title($manager, 'درخواست تعمیرات جدید');
+    $svc->createMaintenanceRequest([
+        'building_id' => $b, 'title' => 'چکه شیر آب', 'description' => 'شیر پارکینگ چکه می‌کند.',
+    ], $resident);
+    TestLog::assertSame('مدیر اعلان تعمیرات گرفت', $before + 1, notif_count_title($manager, 'درخواست تعمیرات جدید'));
+});
+
+TestLog::run('تأیید رزرو به رزروکننده اعلان می‌دهد', function () use ($svc, $manager, $resident) {
+    $b = make_building($manager);
+    add_member($b, $resident, 'tenant');
+
+    $booking = $svc->createBooking(['building_id' => $b, 'date' => date('Y-m-d', time() + 86400)], $resident);
+
+    $before = notif_count_title($resident, 'به‌روزرسانی وضعیت');
+    $svc->updateEntityStatus('bookings', (int) $booking->id, 'confirmed', $manager);
+    TestLog::assertSame('رزروکننده اعلان تأیید گرفت', $before + 1, notif_count_title($resident, 'به‌روزرسانی وضعیت'));
+});
+
+TestLog::run('تغییر وضعیت تعمیرات به ایجادکننده اعلان می‌دهد و تغییر توسط خود او نه', function () use ($svc, $manager, $resident) {
+    $b = make_building($manager);
+    add_member($b, $resident, 'tenant');
+
+    $req = $svc->createMaintenanceRequest(['building_id' => $b, 'title' => 'خرابی آسانسور'], $resident);
+
+    $before = notif_count_title($resident, 'به‌روزرسانی وضعیت');
+    $svc->updateEntityStatus('maintenance', (int) $req->id, 'in_progress', $manager);
+    TestLog::assertSame('اعلان شروع رسیدگی', $before + 1, notif_count_title($resident, 'به‌روزرسانی وضعیت'));
+
+    $between = notif_count_title($resident, 'به‌روزرسانی وضعیت');
+    $svc->updateEntityStatus('maintenance', (int) $req->id, 'resolved', $resident);
+    TestLog::assertSame('تغییر توسط خود ایجادکننده اعلان ندارد', $between, notif_count_title($resident, 'به‌روزرسانی وضعیت'));
+});
+
+// ------------------------------------------------------------ خواندن دسته‌جمعی
+
+TestLog::run('«خواندن همه» فقط اعلان‌های خوانده‌نشده را علامت می‌زند و تعداد می‌دهد', function () {
+    $user = make_user('09137000090', 'کاربر خواندن دسته‌جمعی');
+    $db = test_db();
+    $ins = $db->prepare('INSERT INTO notifications (user_id, title, message, is_read) VALUES (?, ?, ?, ?)');
+    $ins->execute([$user, 'اعلان یک', 'پیام یک', 0]);
+    $ins->execute([$user, 'اعلان دو', 'پیام دو', 0]);
+    $ins->execute([$user, 'اعلان سه (خوانده)', 'پیام سه', 1]);
+
+    $svc = new \App\Services\NotificationService();
+    $marked = $svc->markAllAsRead($user);
+
+    TestLog::assertSame('فقط خوانده‌نشده‌ها شمرده می‌شوند', 2, $marked);
+    $unread = (int) $db->query("SELECT COUNT(*) FROM notifications WHERE user_id = {$user} AND is_read = 0")->fetchColumn();
+    TestLog::assertSame('اعلان خوانده‌نشده‌ای باقی نمی‌ماند', 0, $unread);
+    TestLog::assertSame('فراخوانی مجدد صفر گزارش می‌دهد', 0, $svc->markAllAsRead($user));
+});

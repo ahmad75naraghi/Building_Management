@@ -1543,6 +1543,59 @@
                 ]
             }
         },
+        "/buildings/{building_id}/dashboard": {
+            "get": {
+                "tags": [
+                    "ساختمان‌ها"
+                ],
+                "summary": "دریافت /api/buildings/{building_id}/dashboard",
+                "responses": {
+                    "200": {
+                        "description": "پاسخ موفق",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "نیازمند احراز هویت",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "building_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "building_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/buildings/{building_id}/direct-payments": {
             "post": {
                 "tags": [
@@ -4830,6 +4883,62 @@
                     "اعلانات"
                 ],
                 "summary": "ایجاد اعلان",
+                "responses": {
+                    "200": {
+                        "description": "پاسخ موفق",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "نیازمند احراز هویت",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "building_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": true
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/notifications/read-all": {
+            "post": {
+                "tags": [
+                    "اعلانات"
+                ],
+                "summary": "/api/notifications/read-all",
                 "responses": {
                     "200": {
                         "description": "پاسخ موفق",

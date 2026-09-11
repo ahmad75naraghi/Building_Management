@@ -61,6 +61,7 @@ final class Routes
         'POST /api/buildings/{building_id}/invitations' => ['App\Http\Controllers\BuildingController', 'createInvitation'],
         'GET /api/buildings/{building_id}/invitations' => ['App\Http\Controllers\BuildingController', 'indexInvitations'],
         'GET /api/buildings/{building_id}/members' => ['App\Http\Controllers\BuildingController', 'members'],
+        'GET /api/buildings/{building_id}/dashboard' => ['App\Http\Controllers\BuildingController', 'dashboardData'],
         'POST /api/invitations/accept' => ['App\Http\Controllers\BuildingController', 'acceptInvitation'],
         'POST /api/invitations/{id}/resend' => ['App\Http\Controllers\BuildingController', 'resendInvitation'],
         'DELETE /api/invitations/{id}' => ['App\Http\Controllers\BuildingController', 'revokeInvitation'],
@@ -77,6 +78,7 @@ final class Routes
         'GET /api/tickets/{id}/comments' => ['App\Http\Controllers\TicketController', 'comments'],
         'GET /api/notifications' => ['App\Http\Controllers\NotificationController', 'index'],
         'POST /api/notifications/{id}/read' => ['App\Http\Controllers\NotificationController', 'markAsRead'],
+        'POST /api/notifications/read-all' => ['App\Http\Controllers\NotificationController', 'markAllAsRead'],
         'POST /api/notifications' => ['App\Http\Controllers\NotificationController', 'store'],
 
         // Costs & Payments (Phase 3)

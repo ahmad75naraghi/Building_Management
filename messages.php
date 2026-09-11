@@ -119,8 +119,13 @@ require_once 'includes/header.php';
                                       border-radius:14px;padding:8px 12px;font-size:13px;line-height:1.8;
                                       box-shadow:0 1px 2px rgba(3,12,34,.06);">
                             <p style="white-space:pre-wrap;word-break:break-word;"><?= htmlspecialchars($msg['body'] ?? '') ?></p>
-                            <p style="font-size:9px;opacity:.7;margin-top:2px;text-align:left;">
+                            <p style="font-size:9px;opacity:.75;margin-top:2px;text-align:left;display:flex;align-items:center;justify-content:flex-end;gap:4px;">
                                 <?= !empty($msg['created_at']) ? fa_datetime($msg['created_at']) : '' ?>
+                                <?php if ($mine): ?>
+                                    <?php $seen = !empty($msg['is_read']); ?>
+                                    <span title="<?= $seen ? 'خوانده شده' : 'ارسال شده' ?>"
+                                          style="font-weight:900;letter-spacing:-1px;opacity:<?= $seen ? '1' : '.6' ?>;font-size:10px;"><?= $seen ? '✓✓' : '✓' ?></span>
+                                <?php endif; ?>
                             </p>
                         </div>
                     </div>

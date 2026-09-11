@@ -88,35 +88,41 @@ if (isset($notif_response['success']) && $notif_response['success'] === true) {
 
 // ---------- داده‌های واقعی داشبورد (بر اساس ساختمان فعال) ----------
 
-// اعضای ساختمان (فهرست کامل — هم برای آمار و هم برای بخش‌های پروفایل ساختمان)
+// ---------- دادهٔ تجمیعی داشبورد — یک درخواست به‌جای ~۱۰ درخواست مجزا ----------
 $members = [];
-$members_count = 0;
-if ($building_id > 0) {
-    $members_response = callAPI('GET', '/buildings/' . $building_id . '/members');
-    if (isset($members_response['success']) && $members_response['success'] === true) {
-        $members = is_array($members_response['data']) ? $members_response['data'] : [];
-        $members_count = count($members);
-    }
-}
-
-// واحدها، بلوک‌ها و طبقات — برای بخش‌های «پروفایل ساختمان» در همین صفحه
 $units = [];
 $blocks = [];
 $floors = [];
+$unit_balances_by_unit = [];
+$all_payments = [];
+$all_costs = [];
+$announcements = [];
+$maintenance_requests = [];
+$financial = [
+    'total_costs' => 0,
+    'total_collected' => 0,
+    'total_remaining' => 0,
+    'collection_percentage' => 0,
+];
 if ($building_id > 0) {
-    $units_response = callAPI('GET', '/buildings/' . $building_id . '/units');
-    if (isset($units_response['success']) && $units_response['success'] === true) {
-        $units = $units_response['data']['units'] ?? [];
-    }
-    $blocks_response = callAPI('GET', '/buildings/' . $building_id . '/blocks');
-    if (isset($blocks_response['success']) && $blocks_response['success'] === true) {
-        $blocks = $blocks_response['data']['blocks'] ?? [];
-    }
-    $floors_response = callAPI('GET', '/buildings/' . $building_id . '/floors');
-    if (isset($floors_response['success']) && $floors_response['success'] === true) {
-        $floors = $floors_response['data']['floors'] ?? [];
+    $dash_response = callAPI('GET', '/buildings/' . $building_id . '/dashboard');
+    if (!empty($dash_response['success']) && is_array($dash_response['data'] ?? null)) {
+        $d = $dash_response['data'];
+        $members = is_array($d['members'] ?? null) ? $d['members'] : [];
+        $units = is_array($d['units'] ?? null) ? $d['units'] : [];
+        $blocks = is_array($d['blocks'] ?? null) ? $d['blocks'] : [];
+        $floors = is_array($d['floors'] ?? null) ? $d['floors'] : [];
+        foreach ($d['unit_balances'] ?? [] as $bal) {
+            $unit_balances_by_unit[(int) ($bal['unit_id'] ?? 0)] = $bal;
+        }
+        $all_payments = is_array($d['payments'] ?? null) ? $d['payments'] : [];
+        $all_costs = is_array($d['costs'] ?? null) ? $d['costs'] : [];
+        $announcements = is_array($d['announcements'] ?? null) ? $d['announcements'] : [];
+        $maintenance_requests = is_array($d['maintenance'] ?? null) ? $d['maintenance'] : [];
+        $financial = array_merge($financial, is_array($d['financial_summary'] ?? null) ? $d['financial_summary'] : []);
     }
 }
+$members_count = count($members);
 
 // ---------- «واحد من»: واحدِ کاربر جاری، مانده و پرداخت‌نشده‌ها ----------
 $my_user_id = (int) ($_SESSION['user_id'] ?? 0);
@@ -127,17 +133,6 @@ foreach ($units as $u) {
         break;
     }
 }
-
-// ماندهٔ واحدها (هم برای کارت «واحد من» و هم بخش‌های پروفایل ساختمان)
-$unit_balances_by_unit = [];
-if ($building_id > 0) {
-    $balances_response = callAPI('GET', '/buildings/' . $building_id . '/unit-balances');
-    if (!empty($balances_response['success'])) {
-        foreach ($balances_response['data'] ?? [] as $bal) {
-            $unit_balances_by_unit[(int) ($bal['unit_id'] ?? 0)] = $bal;
-        }
-    }
-}
 $my_balance = $my_unit ? ($unit_balances_by_unit[(int) ($my_unit['id'] ?? 0)] ?? null) : null;
 
 // جمع پرداخت‌نشده‌های من + نزدیک‌ترین مهلت پرداخت
@@ -146,48 +141,24 @@ $my_unpaid_count = 0;
 $my_next_due = null;
 if ($my_user_id > 0 && $building_id > 0) {
     $my_pending_cost_ids = [];
-    $payments_response = callAPI('GET', '/payments', ['building_id' => $building_id]);
-    if (!empty($payments_response['success'])) {
-        foreach ($payments_response['data'] ?? [] as $p) {
-            if ((int) ($p['user_id'] ?? 0) !== $my_user_id || ($p['status'] ?? '') === 'confirmed') {
-                continue;
-            }
-            $my_unpaid_total += (float) ($p['share_amount'] ?? 0);
-            $my_unpaid_count++;
-            $my_pending_cost_ids[] = (int) ($p['cost_id'] ?? 0);
+    foreach ($all_payments as $p) {
+        if ((int) ($p['user_id'] ?? 0) !== $my_user_id || ($p['status'] ?? '') === 'confirmed') {
+            continue;
         }
+        $my_unpaid_total += (float) ($p['share_amount'] ?? 0);
+        $my_unpaid_count++;
+        $my_pending_cost_ids[] = (int) ($p['cost_id'] ?? 0);
     }
     if ($my_pending_cost_ids) {
-        $costs_response = callAPI('GET', '/costs', ['building_id' => $building_id]);
-        if (!empty($costs_response['success'])) {
-            foreach ($costs_response['data'] ?? [] as $c) {
-                if (!in_array((int) ($c['id'] ?? 0), $my_pending_cost_ids, true)) {
-                    continue;
-                }
-                $due = (string) ($c['due_date'] ?? '');
-                if ($due !== '' && ($my_next_due === null || $due < $my_next_due)) {
-                    $my_next_due = $due;
-                }
+        foreach ($all_costs as $c) {
+            if (!in_array((int) ($c['id'] ?? 0), $my_pending_cost_ids, true)) {
+                continue;
+            }
+            $due = (string) ($c['due_date'] ?? '');
+            if ($due !== '' && ($my_next_due === null || $due < $my_next_due)) {
+                $my_next_due = $due;
             }
         }
-    }
-}
-
-// اعلان‌های اخیر (ماژول اطلاعیه‌ها)
-$announcements = [];
-if ($building_id > 0) {
-    $announcements_response = callAPI('GET', '/announcements?building_id=' . $building_id);
-    if (isset($announcements_response['success']) && $announcements_response['success'] === true) {
-        $announcements = is_array($announcements_response['data']) ? $announcements_response['data'] : [];
-    }
-}
-
-// درخواست‌های اخیر (ماژول تعمیرات)
-$maintenance_requests = [];
-if ($building_id > 0) {
-    $maintenance_response = callAPI('GET', '/maintenance?building_id=' . $building_id);
-    if (isset($maintenance_response['success']) && $maintenance_response['success'] === true) {
-        $maintenance_requests = is_array($maintenance_response['data']) ? $maintenance_response['data'] : [];
     }
 }
 
@@ -196,20 +167,6 @@ $active_requests_count = 0;
 foreach ($maintenance_requests as $mr) {
     if (in_array($mr['status'] ?? '', ['pending', 'in_progress'], true)) {
         $active_requests_count++;
-    }
-}
-
-// وضعیت مالی ساختمان
-$financial = [
-    'total_costs' => 0,
-    'total_collected' => 0,
-    'total_remaining' => 0,
-    'collection_percentage' => 0,
-];
-if ($building_id > 0) {
-    $financial_response = callAPI('GET', '/costs/summary?building_id=' . $building_id);
-    if (isset($financial_response['success']) && $financial_response['success'] === true) {
-        $financial = array_merge($financial, $financial_response['data']);
     }
 }
 
@@ -294,7 +251,7 @@ require_once 'includes/header.php';
         </section>
 
         <?php if (!$is_manager): ?>
-        <div class="app-alert" style="background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;border-radius:14px;padding:10px 14px;font-size:12px;margin:12px 0 0;">
+        <div class="app-alert app-alert-info" style="margin:12px 0 0;font-size:12px;">
             شما با نقش «<?= htmlspecialchars(member_role_label($my_role)) ?>» وارد شده‌اید؛ دسترسی‌های مدیریتی برای شما نمایش داده نمی‌شود.
         </div>
         <?php endif; ?>
