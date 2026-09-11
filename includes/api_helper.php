@@ -850,17 +850,19 @@ function building_default_images()
 }
 
 /**
- * آدرس کاور ساختمان: عکس پیش‌فرض انتخاب‌شده، وگرنه لوگوی سفارشی، وگرنه b1.
+ * آدرس کاور ساختمان: تصویر سفارشی آپلودشده (اولویت اول)، وگرنه عکس پیش‌فرض
+ * انتخاب‌شده، وگرنه b1. تصویر سفارشی از مسیر محافظت‌شدهٔ building_image.php
+ * ارائه می‌شود (دسترسی مستقیم وب به پوشهٔ ذخیره‌سازی وجود ندارد).
  */
 function building_cover($building)
 {
+    if (!empty($building['custom_logo_path']) && !empty($building['id'])) {
+        return 'building_image.php?id=' . (int) $building['id'];
+    }
     $images = building_default_images();
     $key = $building['default_image'] ?? '';
     if (!empty($key) && isset($images[$key]) && is_file(__DIR__ . '/../' . $images[$key])) {
         return $images[$key];
-    }
-    if (!empty($building['custom_logo_path'])) {
-        return $building['custom_logo_path'];
     }
     return $images['b1'];
 }

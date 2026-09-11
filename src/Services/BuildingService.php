@@ -238,6 +238,12 @@ final class BuildingService
         if (array_key_exists('default_image', $data)) {
             $building->default_image = (string) $data['default_image'];
         }
+        if (array_key_exists('custom_logo_path', $data)) {
+            // رشتهٔ خالی = حذف تصویر سفارشی و بازگشت به عکس پیش‌فرض
+            $building->custom_logo_path = trim((string) $data['custom_logo_path']) !== ''
+                ? (string) $data['custom_logo_path']
+                : null;
+        }
         if (array_key_exists('parking_spots', $data)) {
             $building->parking_spots = max(0, (int) $data['parking_spots']);
         }

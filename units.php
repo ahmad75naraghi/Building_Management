@@ -186,7 +186,11 @@ require_once 'includes/header.php';
             <button type="button" class="empty-action" data-modal-open="add-unit">➕ افزودن اولین واحد</button>
         </div>
     <?php else: ?>
-        <div class="space-y-3">
+                <div class="list-filter-bar">
+            <input type="search" class="form-input" data-list-search="units-list" placeholder="🔍 جستجوی شماره واحد، مالک یا ساکن…" style="flex:1;">
+            <span class="list-count-chip" data-list-count="units-list"></span>
+        </div>
+        <div class="space-y-3" data-list-items="units-list">
             <?php foreach ($units as $unit): ?>
                 <?php
                 $u_id = (int) ($unit['id'] ?? 0);
@@ -261,6 +265,7 @@ require_once 'includes/header.php';
                 </div>
             <?php endforeach; ?>
         </div>
+        <div data-list-pager="units-list"></div>
     <?php endif; ?>
 
 </main>

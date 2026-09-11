@@ -8,6 +8,7 @@
  * خروجی در قالب SpreadsheetML (سازگار با اکسل، راست‌به‌چپ) دانلود می‌شود.
  */
 require_once 'includes/api_helper.php';
+require_once 'includes/xls.php';
 
 if (!isset($_SESSION['token']) || empty($_SESSION['token'])) {
     header('Location: auth.php');
@@ -28,23 +29,6 @@ $building_name = 'ساختمان';
 $building_response = callAPI('GET', '/buildings/' . $building_id);
 if (!empty($building_response['success'])) {
     $building_name = (string) ($building_response['data']['name'] ?? $building_name);
-}
-
-/** ساخت سلول متنی/عددی */
-function xls_cell($value, bool $isNumber = false, string $style = ''): string
-{
-    $styleAttr = $style !== '' ? ' ss:StyleID="' . $style . '"' : '';
-    if ($isNumber) {
-        return '<Cell' . $styleAttr . '><Data ss:Type="Number">' . $value . '</Data></Cell>';
-    }
-    return '<Cell' . $styleAttr . '><Data ss:Type="String">'
-        . htmlspecialchars((string) $value, ENT_XML1, 'UTF-8')
-        . '</Data></Cell>';
-}
-
-function xls_row(array $cells): string
-{
-    return '<Row>' . implode('', $cells) . '</Row>';
 }
 
 $sheets = [];
@@ -170,28 +154,7 @@ if ($type === 'monthly') {
     $sheets[] = ['name' => 'لجر واحدها', 'rows' => $rows];
 }
 
-// ---------------- ساخت فایل SpreadsheetML ----------------
-$wb = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-$wb .= '<?mso-application progid="Excel.Sheet"?>' . "\n";
-$wb .= '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">' . "\n";
-$wb .= '<Styles>'
-    . '<Style ss:ID="hdr"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#010A21" ss:Pattern="Solid"/></Style>'
-    . '</Styles>' . "\n";
-foreach ($sheets as $sheet) {
-    $name = htmlspecialchars($sheet['name'], ENT_XML1, 'UTF-8');
-    $wb .= '<Worksheet ss:Name="' . $name . '"><Table>' . "\n"
-        . implode("\n", $sheet['rows']) . "\n"
-        . '</Table>'
-        . '<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><DisplayRightToLeft/></WorksheetOptions>'
-        . '</Worksheet>' . "\n";
-}
-$wb .= '</Workbook>';
-
 [$jy, $jm] = \App\Utilities\JalaliHelper::toJalali((int) date('Y'), (int) date('n'), (int) date('j'));
 $filename = ($type === 'monthly' ? 'monthly-report' : 'ledger') . '-' . $building_id . '-' . sprintf('%04d-%02d', $jy, $jm) . '.xls';
 
-header('Content-Type: application/vnd.ms-excel; charset=utf-8');
-header('Content-Disposition: attachment; filename="' . $filename . '"');
-header('Cache-Control: no-store');
-echo $wb;
-exit;
+xls_send($sheets, $filename);

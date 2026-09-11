@@ -78,6 +78,12 @@ final class ExtraModulesService
 
         $id = $this->repo->createBooking($booking);
         $booking->id = $id;
+
+        // اعلان رزرو جدید به مدیر ساختمان (اگر رزروکننده خودش مدیر نباشد)
+        $this->notifyManagerNewRecord($buildingId, $userId, 'رزرو جدید', 'رزرو جدیدی برای مشاعات ثبت شده و نیازمند بررسی است.', [
+            'booking_id' => $id,
+        ]);
+
         return $booking;
     }
 
@@ -160,6 +166,12 @@ final class ExtraModulesService
 
         $id = $this->repo->createMaintenanceRequest($request);
         $request->id = $id;
+
+        // اعلان درخواست تعمیرات جدید به مدیر ساختمان
+        $this->notifyManagerNewRecord($buildingId, $userId, 'درخواست تعمیرات جدید', 'درخواست تعمیرات «' . $request->title . '» ثبت شد.', [
+            'maintenance_id' => $id,
+        ]);
+
         return $request;
     }
 
@@ -727,7 +739,103 @@ final class ExtraModulesService
             return $this->repo->checkoutVisitor($id);
         }
 
-        return $this->repo->updateModuleStatus($module, $id, $status);
+        $updated = $this->repo->updateModuleStatus($module, $id, $status);
+
+        // اعلان تغییر وضعیت رزرو/تعمیرات به ایجادکننده (اگر خودش تغییر نداد)
+        if ($updated && in_array($module, ['bookings', 'maintenance'], true)) {
+            $this->notifyModuleStatusChange($module, $id, $status, $userId, $buildingId);
+        }
+
+        return $updated;
+    }
+
+    /**
+     * اعلان «رکورد جدید» به مدیر ساختمان — برای رزرو و درخواست تعمیرات.
+     * اگر ایجادکننده خودش مدیر باشد، اعلانی فرستاده نمی‌شود.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function notifyManagerNewRecord(int $buildingId, int $creatorId, string $title, string $message, array $data = []): void
+    {
+        $managerId = $this->buildingManagerId($buildingId);
+        if ($managerId <= 0 || $managerId === $creatorId) {
+            return;
+        }
+        try {
+            (new NotificationService())->createNotification([
+                'user_id' => $managerId,
+                'building_id' => $buildingId,
+                'notification_type' => 'general',
+                'title' => $title,
+                'message' => $message,
+                'data' => $data,
+            ]);
+        } catch (\Throwable $e) {
+            \App\Core\Logger::error('ExtraModules', 'اعلان رکورد جدید به مدیر ارسال نشد', [
+                'building_id' => $buildingId,
+            ], $e);
+        }
+    }
+
+    /**
+     * اعلان تغییر وضعیت رزرو/تعمیرات به ایجادکنندهٔ رکورد.
+     */
+    private function notifyModuleStatusChange(string $module, int $id, string $status, int $actorUserId, int $buildingId): void
+    {
+        $row = $this->repo->findModuleEntity($module, $id);
+        if ($row === null) {
+            return;
+        }
+        $ownerId = (int) ($row['user_id'] ?? 0);
+        if ($ownerId <= 0 || $ownerId === $actorUserId) {
+            return;
+        }
+
+        if ($module === 'bookings') {
+            $labels = [
+                'pending' => 'در انتظار تأیید است',
+                'confirmed' => 'تأیید شد ✅',
+                'cancelled' => 'لغو شد',
+                'completed' => 'به پایان رسید',
+            ];
+            $subject = 'رزرو شما';
+        } else {
+            $labels = [
+                'pending' => 'در انتظار بررسی است',
+                'in_progress' => 'در حال انجام است',
+                'resolved' => 'حل شد ✅',
+                'closed' => 'بسته شد',
+            ];
+            $subject = 'درخواست تعمیرات «' . (string) ($row['title'] ?? '') . '»';
+        }
+
+        try {
+            (new NotificationService())->createNotification([
+                'user_id' => $ownerId,
+                'building_id' => $buildingId,
+                'notification_type' => 'general',
+                'title' => 'به‌روزرسانی وضعیت',
+                'message' => $subject . ' ' . ($labels[$status] ?? 'به‌روزرسانی شد') . '.',
+                'data' => [$module === 'bookings' ? 'booking_id' : 'maintenance_id' => $id],
+            ]);
+        } catch (\Throwable $e) {
+            \App\Core\Logger::error('ExtraModules', 'اعلان تغییر وضعیت ارسال نشد', [
+                'module' => $module,
+                'id' => $id,
+            ], $e);
+        }
+    }
+
+    /** شناسهٔ مدیر ساختمان (اولین عضو فعال با نقش مدیر) */
+    private function buildingManagerId(int $buildingId): int
+    {
+        $stmt = \App\Core\Database::getConnection()->prepare(
+            "SELECT user_id FROM building_members
+             WHERE building_id = ? AND role = 'manager' AND status = 'active'
+             ORDER BY id LIMIT 1"
+        );
+        $stmt->execute([$buildingId]);
+        return (int) ($stmt->fetchColumn() ?: 0);
     }
 
     /**

@@ -156,7 +156,11 @@ require_once 'includes/header.php';
             <?php endif; ?>
         </div>
     <?php else: ?>
-        <div class="space-y-3">
+                <div class="list-filter-bar">
+            <input type="search" class="form-input" data-list-search="votes-list" placeholder="🔍 جستجوی عنوان رأی‌گیری…" style="flex:1;">
+            <span class="list-count-chip" data-list-count="votes-list"></span>
+        </div>
+        <div class="space-y-3" data-list-items="votes-list">
             <?php foreach ($votes as $vote): ?>
                 <?php
                 $v_status = $vote['status'] ?? 'active';
@@ -218,6 +222,7 @@ require_once 'includes/header.php';
                                 <span><?= $user_has_voted ? 'نتیجه رأی‌گیری' : 'نتیجه نهایی رأی‌گیری' ?></span>
                                 <span><?= fa_digits($total_votes) ?> رأی</span>
                             </div>
+        <div data-list-pager="votes-list"></div>
                             <?php foreach ($result_options as $ro): ?>
                                 <?php $pct = (float) ($ro['percentage'] ?? 0); ?>
                                 <div class="<?= ((int) ($ro['option_id'] ?? 0) === $my_option_id) ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50' ?> rounded-xl p-3">

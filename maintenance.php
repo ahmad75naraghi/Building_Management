@@ -127,7 +127,11 @@ require_once 'includes/header.php';
             <button type="button" class="empty-action" data-modal-open="add-maintenance">🔧 ثبت اولین درخواست</button>
         </div>
     <?php else: ?>
-        <div class="space-y-3">
+                <div class="list-filter-bar">
+            <input type="search" class="form-input" data-list-search="maintenance-list" placeholder="🔍 جستجوی عنوان یا وضعیت درخواست تعمیرات…" style="flex:1;">
+            <span class="list-count-chip" data-list-count="maintenance-list"></span>
+        </div>
+        <div class="space-y-3" data-list-items="maintenance-list">
             <?php foreach ($requests as $request): ?>
                 <?php
                 $r_id = (int) ($request['id'] ?? 0);
@@ -193,6 +197,7 @@ require_once 'includes/header.php';
                 </div>
             <?php endforeach; ?>
         </div>
+        <div data-list-pager="maintenance-list"></div>
     <?php endif; ?>
 
 </main>

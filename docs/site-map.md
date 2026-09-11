@@ -75,13 +75,13 @@ dashboard.php ◄══════════════ منوی پایین:
 
 ### 🏢 ساختمان‌ها — قطب‌ها (۵)
 `dashboard` (هاب یگانهٔ ساختمان؛ شامل پروفایل ساختمان یکپارچه) · `index` (لیست ساختمان‌ها) ·
-`building_add` · `building_edit` · `building_delete` · (`building_view` فقط ریدایرکت به داشبورد)
+`building_add` · `building_edit` (با آپلود تصویر دلخواه ساختمان) · `building_delete` · (`building_view` فقط ریدایرکت به داشبورد)
 
 ### 🏗️ ساختار فیزیکی (۴)
 `floors` · `blocks` · `units` · `common_areas`
 
-### 💰 مالی (۴ + دانلود امن)
-`costs` (هزینه‌ها و شارژ + ثبت پرداخت با فیش واریزی اجباری) · `accounting` (حسابداری مدیر) · `consumption` (مصرف انرژی) · `reports` (گزارش‌ها) · `receipt_download` (نمایش امن فیش واریزی)
+### 💰 مالی (۴ + دانلود امن + خروجی اکسل)
+`costs` (هزینه‌ها و شارژ + ثبت پرداخت با فیش واریزی اجباری) · `accounting` (حسابداری مدیر) · `consumption` (مصرف انرژی) · `reports` (گزارش‌ها) · `receipt_download` (نمایش امن فیش واریزی) · `reports_export` + `list_export` (خروجی اکسل گزارش‌ها/اعضا/پرداخت‌ها/تیکت‌ها — فقط مدیر)
 
 ### 📋 ماژول‌های عملیاتی (۱۲)
 `tickets` + `ticket_view` · `announcements` · `meetings` · `bookings` · `visitors` ·

@@ -217,6 +217,10 @@ require_once 'includes/header.php';
             <?php endif; ?>
         </div>
     <?php else: ?>
+        <div class="list-filter-bar">
+            <input type="search" class="form-input" data-list-search="documents-list" placeholder="🔍 جستجوی عنوان سند…" style="flex:1;">
+            <span class="list-count-chip" data-list-count="documents-list"></span>
+        </div>
         <?php foreach (Document::CATEGORIES as $cat_key => $cat_label): ?>
             <?php if (empty($grouped[$cat_key])) { continue; } ?>
             <div class="doc-group">
@@ -225,7 +229,7 @@ require_once 'includes/header.php';
                     <span class="doc-group-count"><?= fa_digits(count($grouped[$cat_key])) ?></span>
                 </div>
 
-                <div class="space-y-3">
+                <div class="space-y-3" data-list-items="documents-list">
                     <?php foreach ($grouped[$cat_key] as $document): ?>
                         <?php
                         $d_id = (int) ($document['id'] ?? 0);
@@ -287,6 +291,7 @@ require_once 'includes/header.php';
                 </div>
             </div>
             <?php endforeach; ?>
+        <div data-list-pager="documents-list"></div>
     <?php endif; ?>
 
 </main>

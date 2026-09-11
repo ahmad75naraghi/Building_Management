@@ -8,6 +8,8 @@ if (!isset($_SESSION['token']) || empty($_SESSION['token'])) {
 }
 
 $building_id = (int) ($_GET['building_id'] ?? $_SESSION['active_building_id'] ?? 0);
+$ctx = $building_id > 0 ? building_role_context($building_id) : null;
+$is_manager = !empty($ctx['is_manager']);
 
 $alert_message = '';
 $alert_type = 'error';
@@ -88,6 +90,9 @@ require_once 'includes/header.php';
 
     <div class="section-header-row" style="margin: 18px 0 12px;">
         <h2 class="section-title">تیکت‌های من و ساختمان (<?= fa_digits(count($tickets)) ?>)</h2>
+        <?php if ($is_manager && !empty($tickets)): ?>
+            <a class="btn-chip" href="list_export.php?type=tickets&building_id=<?= (int) $building_id ?>" title="خروجی اکسل تیکت‌ها">📥 اکسل</a>
+        <?php endif; ?>
     </div>
 
     <?php if (empty($tickets)): ?>
@@ -97,7 +102,11 @@ require_once 'includes/header.php';
             <button type="button" class="empty-action" data-modal-open="add-ticket">🎫 ثبت اولین تیکت</button>
         </div>
     <?php else: ?>
-        <div class="space-y-3">
+        <div class="list-filter-bar">
+            <input type="search" class="form-input" data-list-search="tickets-list" placeholder="🔍 جستجوی عنوان، دسته یا وضعیت تیکت…" style="flex:1;">
+            <span class="list-count-chip" data-list-count="tickets-list"></span>
+        </div>
+        <div class="space-y-3" data-list-items="tickets-list">
             <?php foreach ($tickets as $ticket): ?>
                 <a href="ticket_view.php?id=<?= (int) $ticket['id'] ?>" class="card p-4 block hover:shadow-md transition-all">
                     <div class="flex items-start justify-between gap-3">
@@ -122,6 +131,7 @@ require_once 'includes/header.php';
                 </a>
             <?php endforeach; ?>
         </div>
+        <div data-list-pager="tickets-list"></div>
     <?php endif; ?>
 
 </main>

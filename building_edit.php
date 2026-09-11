@@ -40,28 +40,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($name === '' || $address === '') {
         $alert_message = 'نام و آدرس ساختمان الزامی است.';
     } else {
-        $payload = [
-            'name' => $name,
-            'address' => $address,
-            'custom_name' => trim($_POST['custom_name'] ?? ''),
-            'theme_color' => trim($_POST['theme_color'] ?? '#1a73e8'),
-            'total_units' => en_digits($_POST['total_units'] ?? '') !== '' ? max(0, (int) en_digits($_POST['total_units'])) : null,
-            'total_floors' => en_digits($_POST['total_floors'] ?? '') !== '' ? max(0, (int) en_digits($_POST['total_floors'])) : null,
-            'has_blocks' => isset($_POST['has_blocks']) && $_POST['has_blocks'] === '1',
-            'default_image' => in_array(($_POST['default_image'] ?? 'b1'), ['b1', 'b2', 'b3', 'b4'], true) ? $_POST['default_image'] : 'b1',
-            'parking_spots' => max(0, (int) en_digits($_POST['parking_spots'] ?? 0)),
-            'monthly_charge' => max(0, (float) en_digits($_POST['monthly_charge'] ?? 0)),
-            'monthly_charge_enabled' => !empty($_POST['monthly_charge_enabled']),
-            'charge_mode' => in_array(($_POST['charge_mode'] ?? 'fixed'), ['fixed', 'per_person', 'custom', 'combined'], true) ? $_POST['charge_mode'] : 'fixed',
-            'charge_per_person' => max(0, (float) en_digits($_POST['charge_per_person'] ?? 0)),
-        ];
-        $response = callAPI('PUT', '/buildings/' . $building_id, $payload);
-        if (isset($response['success']) && $response['success'] === true) {
-            $alert_message = 'اطلاعات ساختمان با موفقیت به‌روزرسانی شد.';
-            $alert_type = 'success';
-            $building = array_merge($building, $payload);
-        } else {
-            $alert_message = $response['message'] ?? 'خطا در ذخیره تغییرات.';
+        // --- تصویر دلخواه ساختمان (آپلود یا حذف) ---
+        // $custom_image_change: null = بدون تغییر | '' = حذف تصویر | مسیر فایل = تصویر جدید
+        $custom_image_change = null;
+        $upload = $_FILES['building_image'] ?? null;
+        if (is_array($upload) && ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            if (($upload['error'] ?? UPLOAD_ERR_OK) === UPLOAD_ERR_OK) {
+                try {
+                    $content = file_get_contents((string) ($upload['tmp_name'] ?? ''));
+                    $custom_image_change = \App\Utilities\FileStorage::saveBuildingImage(
+                        $content === false ? '' : $content,
+                        $building_id,
+                        (string) ($upload['name'] ?? '')
+                    );
+                } catch (Throwable $e) {
+                    $alert_message = $e->getMessage();
+                }
+            } else {
+                $alert_message = 'بارگذاری تصویر ساختمان ناموفق بود.';
+            }
+        }
+        if ($alert_message === '' && !empty($_POST['remove_building_image'])) {
+            $custom_image_change = '';
+        }
+
+        if ($alert_message === '') {
+            $payload = [
+                'name' => $name,
+                'address' => $address,
+                'custom_name' => trim($_POST['custom_name'] ?? ''),
+                'theme_color' => trim($_POST['theme_color'] ?? '#1a73e8'),
+                'total_units' => en_digits($_POST['total_units'] ?? '') !== '' ? max(0, (int) en_digits($_POST['total_units'])) : null,
+                'total_floors' => en_digits($_POST['total_floors'] ?? '') !== '' ? max(0, (int) en_digits($_POST['total_floors'])) : null,
+                'has_blocks' => isset($_POST['has_blocks']) && $_POST['has_blocks'] === '1',
+                'default_image' => in_array(($_POST['default_image'] ?? 'b1'), ['b1', 'b2', 'b3', 'b4'], true) ? $_POST['default_image'] : 'b1',
+                'parking_spots' => max(0, (int) en_digits($_POST['parking_spots'] ?? 0)),
+                'monthly_charge' => max(0, (float) en_digits($_POST['monthly_charge'] ?? 0)),
+                'monthly_charge_enabled' => !empty($_POST['monthly_charge_enabled']),
+                'charge_mode' => in_array(($_POST['charge_mode'] ?? 'fixed'), ['fixed', 'per_person', 'custom', 'combined'], true) ? $_POST['charge_mode'] : 'fixed',
+                'charge_per_person' => max(0, (float) en_digits($_POST['charge_per_person'] ?? 0)),
+            ];
+            if ($custom_image_change !== null) {
+                $payload['custom_logo_path'] = $custom_image_change;
+            }
+            $old_custom_path = (string) ($building['custom_logo_path'] ?? '');
+            $response = callAPI('PUT', '/buildings/' . $building_id, $payload);
+            if (isset($response['success']) && $response['success'] === true) {
+                $alert_message = 'اطلاعات ساختمان با موفقیت به‌روزرسانی شد.';
+                $alert_type = 'success';
+                // حذف فایل تصویر قبلی پس از اعمال موفق تغییر (بهترین تلاش)
+                if ($custom_image_change !== null && $old_custom_path !== '') {
+                    \App\Utilities\FileStorage::deleteFile($old_custom_path);
+                }
+                $building = array_merge($building, $payload);
+                if ($custom_image_change !== null) {
+                    $building['custom_logo_path'] = $custom_image_change !== '' ? $custom_image_change : null;
+                }
+            } else {
+                // اگر ذخیره ناموفق بود، تصویر آپلودشدهٔ تازه پاک شود تا فایل یتیم نماند
+                if ($custom_image_change !== null && $custom_image_change !== '') {
+                    \App\Utilities\FileStorage::deleteFile($custom_image_change);
+                }
+                $alert_message = $response['message'] ?? 'خطا در ذخیره تغییرات.';
+            }
         }
     }
 }
@@ -87,7 +128,7 @@ require_once 'includes/page_head.php';
             </svg>
             ویرایش اطلاعات ساختمان
         </h3>
-        <form method="POST" action="" class="space-y-4">
+        <form method="POST" action="" enctype="multipart/form-data" class="space-y-4">
             <?= csrf_field() ?>
             <input type="hidden" name="form_action" value="update">
             <div>
@@ -130,14 +171,31 @@ require_once 'includes/page_head.php';
 
             <div>
                 <label class="form-label">عکس ساختمان</label>
-                <div class="grid grid-cols-4 gap-2">
+                <?php $has_custom_image = !empty($building['custom_logo_path']); ?>
+                <?php if ($has_custom_image): ?>
+                    <div class="flex items-center gap-3 mb-3" style="flex-wrap:wrap;">
+                        <img src="building_image.php?id=<?= (int) $building_id ?>&t=<?= (int) @filemtime((string) $building['custom_logo_path']) ?>"
+                             alt="تصویر دلخواه ساختمان"
+                             class="rounded-xl h-20 w-32 object-cover border-2" style="border-color:#d4a373;">
+                        <label class="flex items-center gap-2 text-xs text-red-600 cursor-pointer">
+                            <input type="checkbox" name="remove_building_image" value="1" class="rounded">
+                            حذف تصویر دلخواه و بازگشت به عکس پیش‌فرض
+                        </label>
+                    </div>
+                <?php endif; ?>
+                <div class="grid grid-cols-4 gap-2 <?= $has_custom_image ? 'opacity-60' : '' ?>">
                     <?php foreach ($images as $key => $src): ?>
                         <label class="cursor-pointer">
-                            <input type="radio" name="default_image" value="<?= $key ?>" class="hidden peer" <?= $current_image === $key ? 'checked' : '' ?>>
+                            <input type="radio" name="default_image" value="<?= $key ?>" class="hidden peer" <?= ($current_image === $key && !$has_custom_image) ? 'checked' : '' ?>>
                             <img src="<?= htmlspecialchars($src) ?>" alt="<?= $key ?>"
                                  class="rounded-xl border-2 border-transparent peer-checked:border-blue-600 h-16 w-full object-cover">
                         </label>
                     <?php endforeach; ?>
+                </div>
+                <div class="hint-card" style="margin-top:10px;">
+                    📤 تصویر دلخواه خود را بارگذاری کنید (JPG، PNG یا WebP — حداکثر ۲ مگابایت).
+                    تصویر دلخواه بر عکس‌های پیش‌فرض اولویت دارد.
+                    <input type="file" name="building_image" accept="image/jpeg,image/png,image/webp" class="form-input" style="margin-top:8px;">
                 </div>
                 <div class="flex items-center gap-3 mt-3">
                     <label for="theme_color" class="form-label" style="margin:0;">رنگ تم</label>

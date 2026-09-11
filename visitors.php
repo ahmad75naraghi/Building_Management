@@ -113,7 +113,11 @@ require_once 'includes/header.php';
             <button type="button" class="empty-action" data-modal-open="add-visitor">🚶 ثبت اولین مهمان</button>
         </div>
     <?php else: ?>
-        <div class="space-y-3">
+                <div class="list-filter-bar">
+            <input type="search" class="form-input" data-list-search="visitors-list" placeholder="🔍 جستجوی نام مهمان یا پلاک خودرو…" style="flex:1;">
+            <span class="list-count-chip" data-list-count="visitors-list"></span>
+        </div>
+        <div class="space-y-3" data-list-items="visitors-list">
             <?php foreach ($visitors as $visitor): ?>
                 <?php
                 $v_id = (int) ($visitor['id'] ?? 0);
@@ -172,6 +176,7 @@ require_once 'includes/header.php';
                 </div>
             <?php endforeach; ?>
         </div>
+        <div data-list-pager="visitors-list"></div>
     <?php endif; ?>
 
 </main>

@@ -118,7 +118,11 @@ require_once 'includes/header.php';
             <?php endif; ?>
         </div>
     <?php else: ?>
-        <div class="space-y-3">
+                <div class="list-filter-bar">
+            <input type="search" class="form-input" data-list-search="announcements-list" placeholder="🔍 جستجوی عنوان یا متن اطلاعیه…" style="flex:1;">
+            <span class="list-count-chip" data-list-count="announcements-list"></span>
+        </div>
+        <div class="space-y-3" data-list-items="announcements-list">
             <?php foreach ($announcements as $announcement): ?>
                 <?php
                 $a_id = (int) ($announcement['id'] ?? 0);
@@ -170,6 +174,7 @@ require_once 'includes/header.php';
                 </div>
             <?php endforeach; ?>
         </div>
+        <div data-list-pager="announcements-list"></div>
     <?php endif; ?>
 
 </main>

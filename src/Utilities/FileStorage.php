@@ -155,6 +155,45 @@ final class FileStorage
         }
     }
 
+    /**
+     * ذخیرهٔ تصویر دلخواه ساختمان (کاور) در پوشهٔ اختصاصی ساختمان.
+     *
+     * فقط تصویر (jpeg/png/webp) و حداکثر ۲ مگابایت پذیرفته می‌شود.
+     * مسیر مطلق فایل ذخیره‌شده برمی‌گردد؛ نمایش از مسیر محافظت‌شدهٔ
+     * `building_image.php` انجام می‌شود (نه دسترسی مستقیم وب).
+     */
+    public static function saveBuildingImage(string $content, int $buildingId, string $originalName = ''): string
+    {
+        $maxBytes = 2 * 1024 * 1024;
+        if (strlen($content) > $maxBytes) {
+            throw new \InvalidArgumentException('حجم تصویر نباید بیشتر از ۲ مگابایت باشد.');
+        }
+
+        $fileInfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeType = finfo_buffer($fileInfo, $content);
+        finfo_close($fileInfo);
+
+        $extension = match ($mimeType) {
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            default => throw new \InvalidArgumentException('فقط تصاویر JPG، PNG یا WebP مجاز هستند.'),
+        };
+
+        $dir = AppConfig::getStoragePath('buildings', $buildingId) . '/image';
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        $filename = time() . '_' . uniqid() . '.' . $extension;
+        $path = $dir . '/' . $filename;
+        if (file_put_contents($path, $content) === false) {
+            throw new \RuntimeException('ذخیرهٔ تصویر ساختمان ناموفق بود.');
+        }
+
+        return $path;
+    }
+
     public static function deleteFile(string $path): bool
     {
         return file_exists($path) ? unlink($path) : true;

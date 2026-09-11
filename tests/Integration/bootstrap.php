@@ -455,6 +455,47 @@ function test_db(): PDO
         UNIQUE (unit_id, period)
     )");
 
+    $pdo->exec("CREATE TABLE bookings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        common_area_id INTEGER DEFAULT NULL,
+        user_id INTEGER NOT NULL,
+        booking_date TEXT NOT NULL,
+        start_time TEXT DEFAULT NULL,
+        end_time TEXT DEFAULT NULL,
+        status TEXT DEFAULT 'pending',
+        notes TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TEXT DEFAULT NULL
+    )");
+
+    $pdo->exec("CREATE TABLE maintenance_requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT DEFAULT NULL,
+        status TEXT DEFAULT 'pending',
+        assigned_technician_id INTEGER DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TEXT DEFAULT NULL
+    )");
+
+    $pdo->exec("CREATE TABLE event_reminders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_type TEXT NOT NULL,
+        event_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        building_id INTEGER NOT NULL,
+        remind_at TEXT NOT NULL,
+        channel TEXT NOT NULL DEFAULT 'notification',
+        sent_at TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (event_type, event_id, user_id, channel)
+    )");
+
     $pdo->exec("CREATE TABLE invitations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         building_id INTEGER NOT NULL,
@@ -495,7 +536,7 @@ function test_db(): PDO
 function test_db_reset(): void
 {
     $db = test_db();
-    foreach (['debtor_sms_log','messages','invitations','receipts','ticket_comments','tickets','announcements','notifications','reviews','vote_results','vote_options','votes','audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
+    foreach (['event_reminders','maintenance_requests','bookings','debtor_sms_log','messages','invitations','receipts','ticket_comments','tickets','announcements','notifications','reviews','vote_results','vote_options','votes','audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
               'building_members','building_hierarchy_settings','buildings','otp_codes','users'] as $t) {
         $db->exec("DELETE FROM {$t}");
         $db->exec("DELETE FROM sqlite_sequence WHERE name = '{$t}'");

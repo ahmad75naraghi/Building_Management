@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 /**
- * تسک خودکار یادآوری رویدادها (جلسه‌ها و رزرو مشاعات).
+ * تسک خودکار یادآوری رویدادها (جلسه‌ها و رزرو مشاعات) و مهلت پرداخت هزینه‌ها.
  *
  * رویدادهایی که زمان آن‌ها در بازه «اکنون تا پنجره یادآوری» قرار دارد پیدا می‌کند و:
  *   ۱. برای کاربران مربوطه «اعلان درون‌اپ» می‌سازد (جلسه → همه اعضای فعال ساختمان،
  *      رزرو → فقط کاربر رزروکننده)
  *   ۲. در صورت داشتن شماره موبایل معتبر، پیامک یادآوری ارسال می‌کند
+ *
+ * همچنین هزینه‌های صادرشده‌ای که مهلتشان نزدیک است (پیش‌فرض ۳ روز آینده،
+ * `REMINDER_DUE_DAYS`) به پرداخت‌کننده‌های پرداخت‌نکرده اعلان + پیامک می‌دهد.
  *
  * ارسال هر یادآوری در جدول `event_reminders` ثبت می‌شود (کلید یکتا بر اساس
  * رویداد + کاربر + کانال) تا اجرای مکرر کران باعث ارسال تکراری نشود.
@@ -29,6 +32,7 @@ require __DIR__ . '/../vendor/autoload.php';
 use App\Core\Database;
 use App\Core\Logger;
 use App\Services\NotificationService;
+use App\Services\PaymentDueReminderService;
 use App\Services\SmsService;
 use App\Utilities\JalaliHelper;
 use App\Utilities\PhoneHelper;
@@ -209,5 +213,18 @@ echo sprintf(
     $notifySent,
     $smsSent,
     $windowHours,
+    PHP_EOL
+);
+
+// ------------------------------------------------------------------
+// یادآوری مهلت پرداخت هزینه‌ها (پنجرهٔ روزانه؛ جدا از رویدادهای ساعتی)
+// ------------------------------------------------------------------
+$due = (new PaymentDueReminderService())->run();
+echo sprintf(
+    "Payment due: %d cost(s) in window, %d notification(s), %d SMS sent, %d skipped.%s",
+    $due['candidates'],
+    $due['notified'],
+    $due['sms_sent'],
+    $due['skipped'],
     PHP_EOL
 );

@@ -140,6 +140,9 @@ require_once 'includes/header.php';
         <div class="list-filter-bar">
             <input type="search" class="form-input" data-list-search="members" placeholder="🔍 جستجوی نام، شماره یا واحد…" style="flex:1;">
             <span class="list-count-chip" data-list-count="members"></span>
+            <?php if ($is_manager): ?>
+                <a class="btn-chip" href="list_export.php?type=members&building_id=<?= (int) $building_id ?>" title="خروجی اکسل اعضا">📥 اکسل</a>
+            <?php endif; ?>
         </div>
         <div class="space-y-3" data-list-items="members">
             <?php foreach ($members as $member): ?>
