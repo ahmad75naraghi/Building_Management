@@ -255,6 +255,26 @@ final class CostService
     {
         $today = date('Y-m-d', strtotime($today ?: date('Y-m-d')));
         $templates = $this->costRepo->findDueRecurringTemplates($today);
+        return $this->processDueRecurringTemplates($templates, $today);
+    }
+
+    /**
+     * اجرای موتور دوره‌ای فقط برای یک ساختمان (دکمهٔ دستی در صفحهٔ حسابداری).
+     * برخلاف نسخهٔ سراسری، فقط قالب‌های همان ساختمان پردازش می‌شوند تا
+     * اجرای دستی سریع و قابل‌اتکا بماند.
+     *
+     * @return array{generated:int, ended:int, details:array<int,array<string,mixed>>}
+     */
+    public function generateDueRecurringCostsForBuilding(int $buildingId, ?string $today = null): array
+    {
+        $today = date('Y-m-d', strtotime($today ?: date('Y-m-d')));
+        $templates = $this->costRepo->findDueRecurringTemplates($today, $buildingId);
+        return $this->processDueRecurringTemplates($templates, $today);
+    }
+
+    /** حلقهٔ مشترک صدور نوبت‌های سررسیدشده برای فهرستی از قالب‌های دوره‌ای */
+    private function processDueRecurringTemplates(array $templates, string $today): array
+    {
         $generated = 0;
         $ended = 0;
         $details = [];
@@ -341,10 +361,7 @@ final class CostService
     {
         $db = Database::getConnection();
         $rows = $db->query(
-            "SELECT b.id AS building_id,
-                    (SELECT bm.user_id FROM building_members bm
-                      WHERE bm.building_id = b.id AND bm.role = 'manager' AND bm.status = 'active'
-                      ORDER BY bm.id LIMIT 1) AS manager_id
+            "SELECT b.id AS building_id
              FROM buildings b
              WHERE b.monthly_charge_enabled = 1 AND b.deleted_at IS NULL"
         )->fetchAll(\PDO::FETCH_ASSOC);
@@ -352,28 +369,43 @@ final class CostService
         $created = 0;
         $skipped = 0;
         foreach ($rows as $r) {
-            $buildingId = (int) $r['building_id'];
-            $managerId = (int) ($r['manager_id'] ?? 0);
-            if ($managerId <= 0) {
-                $skipped++;
-                continue;
-            }
-            try {
-                $cost = $this->createMonthlyCharge($buildingId, $managerId);
-                if ($cost->status === 'pending' && empty($cost->issued_at)) {
-                    $this->issueCost((int) $cost->id, $managerId);
-                    $created++;
-                } else {
-                    $skipped++;
-                }
-            } catch (\Throwable $e) {
-                $skipped++;
-                Logger::warning('CostService', 'کران شارژ ماهیانه برای ساختمان ناموفق بود', [
-                    'building_id' => $buildingId, 'reason' => $e->getMessage(),
-                ]);
-            }
+            $res = $this->generateMonthlyChargeForBuilding((int) $r['building_id']);
+            $created += $res['created'];
+            $skipped += $res['skipped'];
         }
         return ['created' => $created, 'skipped' => $skipped];
+    }
+
+    /**
+     * صدور شارژ ماه جاری برای یک ساختمان مشخص (نسخهٔ تک‌ساختمانِ موتور دوره‌ای).
+     *
+     * @return array{created:int, skipped:int}
+     */
+    public function generateMonthlyChargeForBuilding(int $buildingId): array
+    {
+        $stmt = Database::getConnection()->prepare(
+            "SELECT bm.user_id FROM building_members bm
+             WHERE bm.building_id = ? AND bm.role = 'manager' AND bm.status = 'active'
+             ORDER BY bm.id LIMIT 1"
+        );
+        $stmt->execute([$buildingId]);
+        $managerId = (int) ($stmt->fetchColumn() ?: 0);
+        if ($managerId <= 0) {
+            return ['created' => 0, 'skipped' => 1];
+        }
+        try {
+            $cost = $this->createMonthlyCharge($buildingId, $managerId);
+            if ($cost->status === 'pending' && empty($cost->issued_at)) {
+                $this->issueCost((int) $cost->id, $managerId);
+                return ['created' => 1, 'skipped' => 0];
+            }
+            return ['created' => 0, 'skipped' => 1];
+        } catch (\Throwable $e) {
+            Logger::warning('CostService', 'کران شارژ ماهیانه برای ساختمان ناموفق بود', [
+                'building_id' => $buildingId, 'reason' => $e->getMessage(),
+            ]);
+            return ['created' => 0, 'skipped' => 1];
+        }
     }
 
     /** آیا هزینه‌ای با این نشانگر در ساختمان هست؟ */

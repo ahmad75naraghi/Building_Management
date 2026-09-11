@@ -1013,8 +1013,11 @@
             transition: opacity 0.4s;
         }
         .app-alert svg { flex-shrink: 0; margin-top: 2px; }
+        .app-alert span { overflow-wrap: anywhere; word-break: break-word; }
         .app-alert-success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
         .app-alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+        html[data-theme="dark"] .app-alert-success { background: #0c2f22; color: #a7f3d0; border-color: #14532d; }
+        html[data-theme="dark"] .app-alert-error { background: #3b1216; color: #fecaca; border-color: #7f1d1d; }
 
         /* دکمه بازگشت و عنوان صفحات داخلی */
         .subpage-back-btn {
@@ -1992,6 +1995,7 @@
             cursor: pointer;
             animation: toast-in 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2);
         }
+        .app-toast span { overflow-wrap: anywhere; word-break: break-word; }
         .app-toast-success { background: #0f9d6e; color: #fff; }
         .app-toast-error { background: #dc4c4c; color: #fff; }
         .app-toast-icon { display: inline-flex; flex-shrink: 0; }

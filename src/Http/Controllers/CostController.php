@@ -812,8 +812,9 @@ final class CostController
             ]);
         }
         try {
-            $monthly = $this->service->generateAllMonthlyCharges();
-            $recurring = $this->service->generateDueRecurringCosts();
+            // اجرای دستی فقط همان ساختمان را پردازش می‌کند (سریع و بدون اثر روی بقیه)
+            $monthly = $this->service->generateMonthlyChargeForBuilding($buildingId);
+            $recurring = $this->service->generateDueRecurringCostsForBuilding($buildingId);
             return (new Response())->setJson([
                 'success' => true,
                 'message' => 'موتور دوره‌ای اجرا شد.',

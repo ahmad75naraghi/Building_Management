@@ -56,6 +56,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action'])) {
             }
         }
     } elseif ($action === 'run_engine') {
+        // اجرای موتور ممکن است چند ثانیه طول بکشد؛ مهلت اجرای صفحه بالا برده می‌شود
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(120);
+        }
         $response = callAPI('POST', '/buildings/' . $building_id . '/recurring-generate');
         if (!empty($response['success'])) {
             $d = $response['data'] ?? [];

@@ -289,3 +289,50 @@ TestLog::run('هزینه حذف‌شده از مانده همه صفحه‌ها 
     $ledger = $svc->getBuildingLedger($b, $manager);
     TestLog::assertSame('لجر واحد خالی یا صفر', 0.0, (float) ($ledger['units'][$u1]['balance'] ?? 0.0));
 });
+
+// ------------------------------------------------------------ موتور دوره‌ای تک‌ساختمان
+
+TestLog::run('موتور دوره‌ای تک‌ساختمان: فقط ساختمانِ صفحه پردازش می‌شود', function () use ($svc, $manager) {
+    [$bA] = acc_building($svc, $manager, '0913900200');
+    [$bB] = acc_building($svc, $manager, '0913900210');
+
+    // یک قالب دوره‌ای سررسیدگذشته در هر دو ساختمان
+    $tplA = $svc->createCost([
+        'building_id' => $bA, 'title' => 'نظافت الف', 'amount' => 50000,
+        'is_recurring' => true, 'recurring_interval' => 'monthly',
+        'recurring_start_date' => '2026-08-01',
+    ], $manager);
+    $tplB = $svc->createCost([
+        'building_id' => $bB, 'title' => 'نظافت ب', 'amount' => 60000,
+        'is_recurring' => true, 'recurring_interval' => 'monthly',
+        'recurring_start_date' => '2026-08-01',
+    ], $manager);
+
+    $r = $svc->generateDueRecurringCostsForBuilding($bA, '2026-09-01');
+    TestLog::assertTrue('نوبت‌های ساختمان الف صادر شد', $r['generated'] >= 1);
+
+    $db = test_db();
+    $kidsA = (int) $db->query("SELECT COUNT(*) FROM costs WHERE building_id = {$bA} AND parent_cost_id = {$tplA->id}")->fetchColumn();
+    TestLog::assertTrue('هزینه فرزند برای ساختمان الف ساخته شد', $kidsA >= 1);
+
+    // ساختمان ب نباید هیچ تغییری کرده باشد
+    $kidsB = (int) $db->query("SELECT COUNT(*) FROM costs WHERE building_id = {$bB} AND parent_cost_id = {$tplB->id}")->fetchColumn();
+    TestLog::assertSame('ساختمان ب دست‌نخورده ماند', 0, $kidsB);
+    $nextB = (string) $db->query("SELECT recurring_next_date FROM costs WHERE id = {$tplB->id}")->fetchColumn();
+    TestLog::assertSame('نوبت بعد قالب ب ثابت', '2026-08-01', $nextB);
+
+    // قالب الف جلو رفته است
+    $nextA = (string) $db->query("SELECT recurring_next_date FROM costs WHERE id = {$tplA->id}")->fetchColumn();
+    TestLog::assertTrue('نوبت بعد قالب الف جلو رفت', $nextA > '2026-08-01');
+});
+
+TestLog::run('شارژ ماهیانهٔ تک‌ساختمان: صدور یک‌بار و توان‌تکرار', function () use ($svc, $manager) {
+    [$b] = acc_building($svc, $manager, '0913900220', 30000);
+    $r = $svc->generateMonthlyChargeForBuilding($b);
+    TestLog::assertSame('یک شارژ صادر شد', 1, $r['created']);
+    $r2 = $svc->generateMonthlyChargeForBuilding($b);
+    TestLog::assertSame('اجرای دوم همان ماه: رد شد', 0, $r2['created']);
+    $monthKey = date('Y-m');
+    $cnt = (int) test_db()->query("SELECT COUNT(*) FROM costs WHERE building_id = {$b} AND description = 'auto:monthly:{$monthKey}'")->fetchColumn();
+    TestLog::assertSame('فقط یک ردیف شارژ برای ماه جاری', 1, $cnt);
+});

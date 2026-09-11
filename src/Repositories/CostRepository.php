@@ -98,16 +98,20 @@ final class CostRepository
     }
 
     /** قالب‌های دوره‌ای فعال برای تولید نمونه‌های سررسیدشده */
-    public function findDueRecurringTemplates(string $today): array
+    public function findDueRecurringTemplates(string $today, ?int $buildingId = null): array
     {
         $db = Database::getConnection();
-        $stmt = $db->prepare(
-            "SELECT * FROM costs
+        $sql = "SELECT * FROM costs
              WHERE cost_type = 'recurring' AND status = 'active' AND deleted_at IS NULL
-               AND recurring_next_date IS NOT NULL AND recurring_next_date <= ?
-             ORDER BY id"
-        );
-        $stmt->execute([$today]);
+               AND recurring_next_date IS NOT NULL AND recurring_next_date <= ?";
+        $params = [$today];
+        if ($buildingId !== null) {
+            $sql .= " AND building_id = ?";
+            $params[] = $buildingId;
+        }
+        $sql .= " ORDER BY id";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
         return array_map(fn($r) => $this->mapRow($r), $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 

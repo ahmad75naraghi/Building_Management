@@ -129,6 +129,31 @@ function api_apply_ssl_options($curl)
     curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, $insecure ? 0 : true);
 }
 
+/**
+ * پیام کاربری دقیق برای خطاهای ارتباط با API.
+ *
+ * @param int $curlErrno خطای cURL (صفر = بدون خطای ترنسپورت؛ پاسخ غیر-JSON)
+ * @param int $httpStatus کد HTTP دریافتی (۰ = اصلاً پاسخی نیامد)
+ */
+function api_transport_error_message(int $curlErrno, int $httpStatus): string
+{
+    // 28 = CURLE_OPERATION_TIMEDOUT
+    if ($curlErrno === 28) {
+        return 'پاسخ سرور بیش از حد مجاز طول کشید. لطفاً لحظاتی دیگر دوباره تلاش کنید.';
+    }
+    if ($curlErrno !== 0) {
+        return 'ارتباط با سرور برقرار نشد. لطفاً اتصال اینترنت و در دسترس بودن سرویس را بررسی کنید.';
+    }
+    // پاسخی آمده ولی JSON نبوده (مثلاً صفحهٔ خطای ۵۰۰ یا درگاه معکوس)
+    if ($httpStatus >= 500) {
+        return 'سرور در حال حاضر قادر به پاسخ‌گویی نیست (خطای ' . $httpStatus . '). لطفاً دوباره تلاش کنید.';
+    }
+    if ($httpStatus === 0) {
+        return 'ارتباط با سرور برقرار نشد. لطفاً دوباره تلاش کنید.';
+    }
+    return 'پاسخ سرور نامعتبر بود (کد ' . $httpStatus . '). لطفاً دوباره تلاش کنید.';
+}
+
 function callAPI($method, $endpoint, $data = false) {
     // کش scoped به درخواست: GETهای صرفاً خواندنی که در یک صفحه چندبار
     // تکرار می‌شوند، فقط یک‌بار دیسپچ می‌شوند (کاهش رفت‌وآمد کرنل/شبکه).
@@ -196,11 +221,14 @@ function callAPI_dispatch($method, $endpoint, $data = false) {
     curl_setopt($curl, CURLOPT_URL, $url);
     curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-    
+    // مهلت مشخص: اتصال ۱۰ ثانیه و پاسخ حداکثر ۹۰ ثانیه (موتور دوره‌ای ممکن است طول بکشد)
+    curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 10);
+    curl_setopt($curl, CURLOPT_TIMEOUT, 90);
+
     // بررسی گواهی SSL به‌صورت پیش‌فرض فعال است.
     // فقط برای توسعه محلی با گواهی خودامضا می‌توان API_INSECURE_SSL=1 گذاشت.
     api_apply_ssl_options($curl);
-    
+
     $started = microtime(true);
     $result = curl_exec($curl);
     $http_status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
@@ -216,7 +244,7 @@ function callAPI_dispatch($method, $endpoint, $data = false) {
         'duration_ms' => $took,
     ];
 
-    // خطای شبکه/ترنسپورت: اصلاً به سرور نرسیدیم
+    // خطای شبکه/ترنسپورت: اصلاً به سرور نرسیدیم یا مهلت تمام شد
     if ($curl_errno !== 0) {
         Logger::error('callAPI', 'ارتباط شبکه‌ای با API برقرار نشد', $log_ctx + [
             'curl_errno' => $curl_errno,
@@ -224,7 +252,7 @@ function callAPI_dispatch($method, $endpoint, $data = false) {
         ]);
         return [
             'success' => false,
-            'message' => 'ارتباط با API برقرار نشد.',
+            'message' => api_transport_error_message($curl_errno, $http_status),
             'raw_error' => htmlspecialchars(substr($curl_error, 0, 250)),
             'http_code' => $http_status,
         ];
@@ -240,7 +268,7 @@ function callAPI_dispatch($method, $endpoint, $data = false) {
         ]);
         return [
             'success' => false,
-            'message' => 'ارتباط با API برقرار نشد.',
+            'message' => api_transport_error_message(0, $http_status),
             'raw_error' => htmlspecialchars(substr($result_string, 0, 250)),
             'http_code' => $http_status
         ];
@@ -410,6 +438,8 @@ function callAPIUpload($endpoint, $fields = [], $files = [])
     curl_setopt($curl, CURLOPT_POSTFIELDS, $postFields);
     curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 10);
+    curl_setopt($curl, CURLOPT_TIMEOUT, 90);
 
     // بررسی گواهی SSL به‌صورت پیش‌فرض فعال است.
     // فقط برای توسعه محلی با گواهی خودامضا می‌توان API_INSECURE_SSL=1 گذاشت.
@@ -417,13 +447,14 @@ function callAPIUpload($endpoint, $fields = [], $files = [])
 
     $result = curl_exec($curl);
     $http_status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    $curl_errno = curl_errno($curl);
     curl_close($curl);
 
     $response = json_decode(is_string($result) ? $result : '', true);
     if (!is_array($response)) {
         return [
             'success' => false,
-            'message' => 'ارتباط با API برقرار نشد.',
+            'message' => api_transport_error_message($curl_errno, $http_status),
             'http_code' => $http_status,
         ];
     }
