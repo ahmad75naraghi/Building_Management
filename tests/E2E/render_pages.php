@@ -108,7 +108,7 @@ $svc->recordDirectPayment($b, $u1, 120000.0, 'E2E', $manager);
 $now = date('Y-m-d H:i:s');
 $today = date('Y-m-d');
 $db->exec("INSERT INTO tickets (building_id, user_id, title, description, category, priority, status) VALUES ({$b}, {$tenant}, 'تیکت تست', 'شرح', 'فنی', 'medium', 'open')");
-$db->exec("INSERT INTO ticket_comments (ticket_id, user_id, body) VALUES (1, {$manager}, 'پاسخ تست')");
+$db->exec("INSERT INTO ticket_comments (ticket_id, user_id, comment) VALUES (1, {$manager}, 'پاسخ تست')");
 $db->exec("INSERT INTO announcements (building_id, title, content, is_pinned, created_by) VALUES ({$b}, 'اطلاعیه تست', 'متن', 1, {$manager})");
 $db->exec("INSERT INTO meetings (building_id, title, description, meeting_date, location, status, created_by) VALUES ({$b}, 'جلسه تست', 'شرح', '{$today}', 'لابی', 'scheduled', {$manager})");
 $db->exec("INSERT INTO meeting_minutes (meeting_id, content, created_by) VALUES (1, 'صورت‌جلسه', {$manager})");

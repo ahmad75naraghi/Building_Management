@@ -47,4 +47,53 @@ final class NotificationService
     {
         return $this->repo->markAsRead($notificationId);
     }
+
+    /**
+     * ارسال اعلان به همهٔ اعضای فعال یک ساختمان (پخش سراسری).
+     *
+     * برای اطلاعیه‌ها، رأی‌گیری‌ها و رویدادهای عمومی ساختمان. خطا در ارسال به
+     * یک کاربر نباید کل پخش را متوقف کند؛ هر کاربر جداگانه تلاش می‌شود.
+     *
+     * @param int      $buildingId      شناسهٔ ساختمان
+     * @param string   $notificationType نوع اعلان (مثلاً announcement / vote)
+     * @param string   $title           عنوان اعلان
+     * @param string   $message         متن اعلان
+     * @param array    $data            دادهٔ اضافی (JSON) برای لینک عمیق
+     * @param int[]    $excludeUserIds  کاربرانی که اعلان نمی‌گیرند (مثلاً ایجادکننده یا مدیران)
+     * @return int تعداد اعلان‌های ارسال‌شده
+     */
+    public function broadcastToBuilding(
+        int $buildingId,
+        string $notificationType,
+        string $title,
+        string $message = '',
+        array $data = [],
+        array $excludeUserIds = []
+    ): int {
+        $memberIds = $this->repo->activeMemberIds($buildingId);
+        $exclude = array_map('intval', $excludeUserIds);
+        $sent = 0;
+        foreach ($memberIds as $userId) {
+            if (in_array((int) $userId, $exclude, true)) {
+                continue;
+            }
+            try {
+                $this->createNotification([
+                    'user_id' => (int) $userId,
+                    'building_id' => $buildingId,
+                    'notification_type' => $notificationType,
+                    'title' => $title,
+                    'message' => $message,
+                    'data' => $data ?: null,
+                ]);
+                $sent++;
+            } catch (\Throwable $e) {
+                \App\Core\Logger::error('NotificationService', 'پخش اعلان برای یک کاربر ناموفق بود', [
+                    'building_id' => $buildingId,
+                    'user_id' => $userId,
+                ], $e);
+            }
+        }
+        return $sent;
+    }
 }

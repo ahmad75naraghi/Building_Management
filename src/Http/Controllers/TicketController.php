@@ -159,7 +159,12 @@ final class TicketController
         }
         $id = (int) ($request->getAttribute('id') ?? 0);
         $data = $request->getJsonBody() ?? [];
-        $updated = $this->service->updateStatus($id, $data['status'] ?? 'open', isset($data['assigned_to']) ? (int) $data['assigned_to'] : null);
+        $updated = $this->service->updateStatus(
+            $id,
+            $data['status'] ?? 'open',
+            isset($data['assigned_to']) ? (int) $data['assigned_to'] : null,
+            (int) $userId
+        );
         return (new Response())->setJson([
             'success' => $updated,
             'message' => $updated ? 'Status updated' : 'Failed to update status',

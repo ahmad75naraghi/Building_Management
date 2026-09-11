@@ -352,6 +352,47 @@ function test_db(): PDO
         read_at TEXT DEFAULT NULL
     )");
 
+    $pdo->exec("CREATE TABLE announcements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        content TEXT DEFAULT NULL,
+        is_pinned INTEGER DEFAULT 0,
+        created_by INTEGER NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TEXT DEFAULT NULL
+    )");
+
+    $pdo->exec("CREATE TABLE tickets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT DEFAULT NULL,
+        category TEXT DEFAULT 'technical',
+        priority TEXT DEFAULT 'normal',
+        status TEXT DEFAULT 'open',
+        assigned_to INTEGER DEFAULT NULL,
+        unit_id INTEGER DEFAULT NULL,
+        is_anonymous INTEGER DEFAULT 0,
+        resolved_at TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TEXT DEFAULT NULL
+    )");
+
+    $pdo->exec("CREATE TABLE ticket_comments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ticket_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        comment TEXT DEFAULT NULL,
+        is_internal INTEGER DEFAULT 0,
+        attachment_path TEXT DEFAULT NULL,
+        unit_id INTEGER DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )");
+
     $pdo->exec("CREATE TABLE penalty_settings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         building_id INTEGER NOT NULL,
@@ -454,7 +495,7 @@ function test_db(): PDO
 function test_db_reset(): void
 {
     $db = test_db();
-    foreach (['debtor_sms_log','messages','invitations','receipts','reviews','vote_results','vote_options','votes','audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
+    foreach (['debtor_sms_log','messages','invitations','receipts','ticket_comments','tickets','announcements','notifications','reviews','vote_results','vote_options','votes','audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
               'building_members','building_hierarchy_settings','buildings','otp_codes','users'] as $t) {
         $db->exec("DELETE FROM {$t}");
         $db->exec("DELETE FROM sqlite_sequence WHERE name = '{$t}'");

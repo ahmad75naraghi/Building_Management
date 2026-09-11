@@ -112,6 +112,22 @@ final class ExtraModulesService
 
         $id = $this->repo->createAnnouncement($announcement);
         $announcement->id = $id;
+
+        // اعلان سراسری: همهٔ اعضای فعال ساختمان از اطلاعیهٔ جدید باخبر شوند
+        // (ایجادکننده خودش مطلع است و اعلان نمی‌گیرد)
+        try {
+            (new NotificationService())->broadcastToBuilding(
+                $buildingId,
+                'announcement',
+                '📢 اطلاعیه جدید: ' . $announcement->title,
+                mb_substr((string) $announcement->content, 0, 160),
+                ['announcement_id' => $id],
+                [$userId]
+            );
+        } catch (\Throwable $e) {
+            Logger::error('ExtraModules', 'اعلان اطلاعیهٔ جدید ارسال نشد', ['announcement_id' => $id], $e);
+        }
+
         return $announcement;
     }
 
@@ -187,6 +203,20 @@ final class ExtraModulesService
         \App\Core\Audit::log($userId, 'vote.create', 'vote', $id, $buildingId, [
             'title' => $vote->title,
         ]);
+
+        // اعلان سراسری شروع رأی‌گیری برای همهٔ اعضای فعال
+        try {
+            (new NotificationService())->broadcastToBuilding(
+                $buildingId,
+                'vote',
+                '🗳️ رأی‌گیری جدید: ' . $vote->title,
+                'رأی‌گیری جدیدی در ساختمان شروع شده است. لطفاً نظر خود را ثبت کنید.',
+                ['vote_id' => $id],
+                [$userId]
+            );
+        } catch (\Throwable $e) {
+            Logger::error('ExtraModules', 'اعلان رأی‌گیری جدید ارسال نشد', ['vote_id' => $id], $e);
+        }
 
         return $this->enrichVote($vote, $userId);
     }

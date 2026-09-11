@@ -64,6 +64,45 @@ if ($building_id > 0) {
     }
 }
 
+// مهلت‌های پرداخت: برای مدیر همهٔ هزینه‌های صادرشدهٔ مهلت‌دار،
+// برای ساکن فقط هزینه‌هایی که پرداخت تأییدنشده دارد
+$due_events = [];
+if ($building_id > 0) {
+    $cal_ctx = building_role_context($building_id);
+    $cal_is_manager = $cal_ctx['is_manager'];
+    $cal_user_id = (int) ($_SESSION['user_id'] ?? 0);
+
+    $my_pending_cost_ids = null; // null = مدیر (نمایش همه)
+    if (!$cal_is_manager) {
+        $my_pending_cost_ids = [];
+        $cal_payments = callAPI('GET', '/payments', ['building_id' => $building_id]);
+        if (!empty($cal_payments['success'])) {
+            foreach ($cal_payments['data'] ?? [] as $p) {
+                if ((int) ($p['user_id'] ?? 0) === $cal_user_id && ($p['status'] ?? '') !== 'confirmed') {
+                    $my_pending_cost_ids[] = (int) ($p['cost_id'] ?? 0);
+                }
+            }
+        }
+    }
+
+    $cal_costs = callAPI('GET', '/costs', ['building_id' => $building_id]);
+    if (!empty($cal_costs['success'])) {
+        foreach ($cal_costs['data'] ?? [] as $c) {
+            $due = (string) ($c['due_date'] ?? '');
+            if ($due === '' || empty($c['issued_at'])) {
+                continue;
+            }
+            if ($my_pending_cost_ids !== null && !in_array((int) ($c['id'] ?? 0), $my_pending_cost_ids, true)) {
+                continue;
+            }
+            $due_events[] = [
+                'title' => (string) ($c['title'] ?? 'هزینه'),
+                'due_date' => substr($due, 0, 10),
+            ];
+        }
+    }
+}
+
 // چیدمان رویدادها بر اساس روز شمسی (کلید: "jy-jm-jd")
 // یک آرایه برای شبکه تقویم و یک آرایه کامل برای پنل جزئیات هر روز
 $eventsByDay = [];   // jy-jm-jd => [['title', 'time', 'type', 'status_label', 'color'] ...]
@@ -130,6 +169,28 @@ foreach ($bookings as $booking) {
     $eventsByDay[$key][] = $item;
     if ($event_ts >= strtotime($today_g) && $event_ts < $horizon_ts) {
         $upcoming[] = $item + ['date_ts' => strtotime($date)];
+    }
+}
+
+// مهلت‌های پرداخت — رویداد تمام‌روز با نوع «due»
+foreach ($due_events as $due_ev) {
+    $due_ts = strtotime($due_ev['due_date'] . ' 12:00:00');
+    if ($due_ts === false) {
+        continue;
+    }
+    [$jy, $jm, $jd] = gregorian_to_jalali((int) date('Y', $due_ts), (int) date('m', $due_ts), (int) date('d', $due_ts));
+    $key = "{$jy}-{$jm}-{$jd}";
+    $item = [
+        'type' => 'due',
+        'title' => '⏰ مهلت: ' . $due_ev['title'],
+        'time' => '',
+        'location' => '',
+        'status_label' => 'مهلت پرداخت',
+        'ts' => $due_ts,
+    ];
+    $eventsByDay[$key][] = $item;
+    if ($due_ts >= strtotime($today_g) && $due_ts < $horizon_ts) {
+        $upcoming[] = $item + ['date_ts' => strtotime($due_ev['due_date'])];
     }
 }
 
@@ -229,7 +290,7 @@ require_once 'includes/page_head.php';
                             </span>
                             <span class="flex-1 flex flex-col gap-0.5 mt-0.5 overflow-hidden">
                                 <?php foreach ($cell['events'] as $ev): ?>
-                                    <span class="text-[8px] leading-tight px-1 py-0.5 rounded <?= $ev['type'] === 'meeting' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700' ?> <?= $cell['is_today'] ? 'bg-white/25 text-white' : '' ?> truncate">
+                                    <span class="text-[8px] leading-tight px-1 py-0.5 rounded <?= $ev['type'] === 'meeting' ? 'bg-purple-100 text-purple-700' : ($ev['type'] === 'due' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700') ?> <?= $cell['is_today'] ? 'bg-white/25 text-white' : '' ?> truncate">
                                         <?= htmlspecialchars($ev['title']) ?>
                                     </span>
                                 <?php endforeach; ?>
@@ -259,9 +320,9 @@ require_once 'includes/page_head.php';
                 <div class="space-y-2">
                     <?php foreach (array_slice($upcoming, 0, 10) as $ev): ?>
                         <?php [$ev_jy, $ev_jm, $ev_jd] = gregorian_to_jalali((int) date('Y', $ev['ts']), (int) date('m', $ev['ts']), (int) date('d', $ev['ts'])); ?>
-                        <a href="<?= $ev['type'] === 'meeting' ? 'meetings.php' : 'bookings.php' ?>?building_id=<?= $building_id ?>"
+                        <a href="<?= $ev['type'] === 'meeting' ? 'meetings.php' : ($ev['type'] === 'due' ? 'costs.php' : 'bookings.php') ?>?building_id=<?= $building_id ?>"
                            class="flex items-center gap-3 p-2 rounded-xl bg-gray-50 hover:bg-blue-50 transition-colors">
-                            <span class="w-2.5 h-2.5 rounded-full shrink-0 <?= $ev['type'] === 'meeting' ? 'bg-purple-400' : 'bg-green-400' ?>"></span>
+                            <span class="w-2.5 h-2.5 rounded-full shrink-0 <?= $ev['type'] === 'meeting' ? 'bg-purple-400' : ($ev['type'] === 'due' ? 'bg-amber-400' : 'bg-green-400') ?>"></span>
                             <span class="flex-1 min-w-0">
                                 <span class="block text-sm font-bold text-gray-700 truncate"><?= htmlspecialchars($ev['title']) ?></span>
                                 <span class="block text-[11px] text-gray-400">
@@ -281,6 +342,7 @@ require_once 'includes/page_head.php';
         <div class="flex items-center gap-4 mt-4 text-xs text-gray-500">
             <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-purple-400 inline-block"></span> جلسه</span>
             <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-green-400 inline-block"></span> رزرو مشاع</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span> مهلت پرداخت</span>
             <span class="text-gray-300">|</span>
             <span>برای جزئیات، روی روز بزنید</span>
             <a href="meetings.php?building_id=<?= $building_id ?>" class="mr-auto text-blue-600 font-bold">جلسات</a>
@@ -322,9 +384,10 @@ require_once 'includes/page_head.php';
                         panelBody.innerHTML = '<p class="text-sm text-gray-400">در این روز رویدادی ثبت نشده است.</p>';
                     } else {
                         panelBody.innerHTML = items.map(function (ev) {
-                            var color = ev.type === 'meeting' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700';
+                            var color = ev.type === 'meeting' ? 'bg-purple-100 text-purple-700'
+                                : (ev.type === 'due' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700');
                             return '<div class="flex items-center gap-3 p-2 rounded-xl bg-gray-50">'
-                                + '<span class="text-[11px] font-bold px-2 py-1 rounded ' + color + '">' + esc(ev.type === 'meeting' ? 'جلسه' : 'رزرو') + '</span>'
+                                + '<span class="text-[11px] font-bold px-2 py-1 rounded ' + color + '">' + esc(ev.type === 'meeting' ? 'جلسه' : (ev.type === 'due' ? 'مهلت پرداخت' : 'رزرو')) + '</span>'
                                 + '<span class="flex-1 min-w-0">'
                                 + '<span class="block text-sm font-bold text-gray-700">' + esc(ev.t) + '</span>'
                                 + '<span class="block text-[11px] text-gray-400">'

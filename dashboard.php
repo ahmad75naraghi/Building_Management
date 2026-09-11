@@ -118,6 +118,61 @@ if ($building_id > 0) {
     }
 }
 
+// ---------- «واحد من»: واحدِ کاربر جاری، مانده و پرداخت‌نشده‌ها ----------
+$my_user_id = (int) ($_SESSION['user_id'] ?? 0);
+$my_unit = null;
+foreach ($units as $u) {
+    if ((int) ($u['owner_user_id'] ?? 0) === $my_user_id || (int) ($u['tenant_user_id'] ?? 0) === $my_user_id) {
+        $my_unit = $u;
+        break;
+    }
+}
+
+// ماندهٔ واحدها (هم برای کارت «واحد من» و هم بخش‌های پروفایل ساختمان)
+$unit_balances_by_unit = [];
+if ($building_id > 0) {
+    $balances_response = callAPI('GET', '/buildings/' . $building_id . '/unit-balances');
+    if (!empty($balances_response['success'])) {
+        foreach ($balances_response['data'] ?? [] as $bal) {
+            $unit_balances_by_unit[(int) ($bal['unit_id'] ?? 0)] = $bal;
+        }
+    }
+}
+$my_balance = $my_unit ? ($unit_balances_by_unit[(int) ($my_unit['id'] ?? 0)] ?? null) : null;
+
+// جمع پرداخت‌نشده‌های من + نزدیک‌ترین مهلت پرداخت
+$my_unpaid_total = 0.0;
+$my_unpaid_count = 0;
+$my_next_due = null;
+if ($my_user_id > 0 && $building_id > 0) {
+    $my_pending_cost_ids = [];
+    $payments_response = callAPI('GET', '/payments', ['building_id' => $building_id]);
+    if (!empty($payments_response['success'])) {
+        foreach ($payments_response['data'] ?? [] as $p) {
+            if ((int) ($p['user_id'] ?? 0) !== $my_user_id || ($p['status'] ?? '') === 'confirmed') {
+                continue;
+            }
+            $my_unpaid_total += (float) ($p['share_amount'] ?? 0);
+            $my_unpaid_count++;
+            $my_pending_cost_ids[] = (int) ($p['cost_id'] ?? 0);
+        }
+    }
+    if ($my_pending_cost_ids) {
+        $costs_response = callAPI('GET', '/costs', ['building_id' => $building_id]);
+        if (!empty($costs_response['success'])) {
+            foreach ($costs_response['data'] ?? [] as $c) {
+                if (!in_array((int) ($c['id'] ?? 0), $my_pending_cost_ids, true)) {
+                    continue;
+                }
+                $due = (string) ($c['due_date'] ?? '');
+                if ($due !== '' && ($my_next_due === null || $due < $my_next_due)) {
+                    $my_next_due = $due;
+                }
+            }
+        }
+    }
+}
+
 // اعلان‌های اخیر (ماژول اطلاعیه‌ها)
 $announcements = [];
 if ($building_id > 0) {
@@ -242,6 +297,65 @@ require_once 'includes/header.php';
         <div class="app-alert" style="background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;border-radius:14px;padding:10px 14px;font-size:12px;margin:12px 0 0;">
             شما با نقش «<?= htmlspecialchars(member_role_label($my_role)) ?>» وارد شده‌اید؛ دسترسی‌های مدیریتی برای شما نمایش داده نمی‌شود.
         </div>
+        <?php endif; ?>
+
+        <?php if ($my_unit): ?>
+        <!-- کارت «واحد من»: وضعیت مالی و مشخصات واحد کاربر جاری -->
+        <section class="my-unit-card card" style="margin-top:12px; padding:16px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:20px;">🏠</span>
+                    <div>
+                        <strong style="font-size:13px;">واحد من — <?= fa_digits(htmlspecialchars((string) ($my_unit['unit_number'] ?? ''))) ?></strong>
+                        <div style="font-size:10px; color:var(--text-gray);">
+                            <?= htmlspecialchars($my_unit['type'] === 'commercial' ? 'تجاری' : ($my_unit['type'] === 'office' ? 'اداری' : 'مسکونی')) ?>
+                            <?php if (!empty($my_unit['residents_count'])): ?> · <?= fa_digits($my_unit['residents_count']) ?> ساکن<?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                <?php if ($my_balance): ?>
+                    <?php $bal = (float) ($my_balance['balance'] ?? 0); ?>
+                    <span style="font-size:11px; font-weight:800; padding:5px 10px; border-radius:999px;
+                        background: <?= $bal < 0 ? '#fee2e2' : ($bal > 0 ? '#d1fae5' : '#e2e8f0') ?>;
+                        color: <?= $bal < 0 ? '#991b1b' : ($bal > 0 ? '#065f46' : '#475569') ?>;">
+                        <?= $bal < 0 ? fa_number(abs($bal)) . ' تومان بدهکار' : ($bal > 0 ? fa_number($bal) . ' تومان طلبکار' : 'تسویه شده') ?>
+                    </span>
+                <?php endif; ?>
+            </div>
+
+            <?php if ($my_unpaid_count > 0): ?>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:#fff7ed; border:1px solid #fed7aa; border-radius:12px; padding:10px 12px;">
+                <div style="font-size:12px; color:#9a3412;">
+                    💳 <strong><?= fa_number($my_unpaid_total) ?> تومان</strong>
+                    پرداخت‌نشده (<?= fa_digits($my_unpaid_count) ?> مورد)
+                    <?php if ($my_next_due): ?>
+                        <div style="font-size:10px; margin-top:3px;">⏰ مهلت پرداخت: <?= fa_date($my_next_due) ?></div>
+                    <?php endif; ?>
+                </div>
+                <button class="btn-view-profile" style="white-space:nowrap;" onclick="window.location.href='costs.php?building_id=<?= (int) $building_id ?>'">
+                    <span>پرداخت</span>
+                </button>
+            </div>
+            <?php else: ?>
+            <div style="font-size:12px; color:#047857; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:12px; padding:10px 12px;">
+                ✅ پرداخت باز یا معوقی ندارید.
+                <?php if ($my_next_due): ?>
+                    <div style="font-size:10px; margin-top:3px; color:var(--text-gray);">⏰ مهلت بعدی: <?= fa_date($my_next_due) ?></div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
+            <?php if (!empty($my_unit['parking_no']) || !empty($my_unit['storage_no'])): ?>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;">
+                <?php if (!empty($my_unit['parking_no'])): ?>
+                    <span class="chip chip-gray">🅿️ پارکینگ: <?= fa_digits(htmlspecialchars((string) $my_unit['parking_no'])) ?></span>
+                <?php endif; ?>
+                <?php if (!empty($my_unit['storage_no'])): ?>
+                    <span class="chip chip-gray">📦 انباری: <?= fa_digits(htmlspecialchars((string) $my_unit['storage_no'])) ?></span>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+        </section>
         <?php endif; ?>
 
         <!-- کارت سفید آمار ۴ ستونه -->
@@ -605,6 +719,7 @@ require_once 'includes/header.php';
         $bv_blocks = $blocks;
         $bv_floors = $floors;
         $bv_financial = $financial;
+        $bv_balances = $unit_balances_by_unit;
         require 'includes/_building_profile_sections.php';
         ?>
 

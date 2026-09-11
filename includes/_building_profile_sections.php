@@ -11,7 +11,7 @@
  *   $building     آرایهٔ اطلاعات ساختمان
  *   $is_manager   آیا کاربر مدیر ساختمان است
  * ورودی‌های اختیاری (برای جلوگیری از واکشی مجدد):
- *   $bv_members, $bv_units, $bv_blocks, $bv_floors, $bv_financial
+ *   $bv_members, $bv_units, $bv_blocks, $bv_floors, $bv_financial, $bv_balances
  */
 
 // ---------- داده‌ها ----------
@@ -210,11 +210,13 @@ $occ_label_map = [
 ];
 
 // ماندهٔ مالی هر واحد (بدهکار/طلبکار)
-$unit_balances = [];
-$balances_response = callAPI('GET', '/buildings/' . $building_id . '/unit-balances');
-if (!empty($balances_response['success'])) {
-    foreach ($balances_response['data'] ?? [] as $bal) {
-        $unit_balances[(int) $bal['unit_id']] = $bal;
+$unit_balances = $bv_balances ?? [];
+if (!isset($bv_balances)) {
+    $balances_response = callAPI('GET', '/buildings/' . $building_id . '/unit-balances');
+    if (!empty($balances_response['success'])) {
+        foreach ($balances_response['data'] ?? [] as $bal) {
+            $unit_balances[(int) $bal['unit_id']] = $bal;
+        }
     }
 }
 

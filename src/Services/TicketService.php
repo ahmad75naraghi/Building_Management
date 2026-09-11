@@ -68,9 +68,34 @@ final class TicketService
         return $this->repo->findCommentsByTicketId($ticketId);
     }
 
-    public function updateStatus(int $id, string $status, ?int $assignedTo = null): bool
+    public function updateStatus(int $id, string $status, ?int $assignedTo = null, int $actorUserId = 0): bool
     {
-        return $this->repo->updateStatus($id, $status, $assignedTo);
+        $ticket = $this->repo->findById($id);
+        $updated = $this->repo->updateStatus($id, $status, $assignedTo);
+
+        // اعلان تغییر وضعیت به ایجادکنندهٔ تیکت (اگر خودش تغییر نداد)
+        if ($updated && $ticket && (int) $ticket->user_id !== $actorUserId) {
+            $labels = [
+                'open' => 'باز شد',
+                'in_progress' => 'در حال بررسی است',
+                'resolved' => 'حل شد ✅',
+                'closed' => 'بسته شد',
+                'rejected' => 'رد شد',
+            ];
+            try {
+                (new NotificationService())->createNotification([
+                    'user_id' => (int) $ticket->user_id,
+                    'building_id' => (int) $ticket->building_id,
+                    'notification_type' => 'ticket',
+                    'title' => 'وضعیت تیکت «' . $ticket->title . '»',
+                    'message' => 'تیکت شما ' . ($labels[$status] ?? 'به‌روزرسانی شد') . '.',
+                    'data' => ['ticket_id' => $id],
+                ]);
+            } catch (\Throwable $e) {
+                \App\Core\Logger::error('TicketService', 'اعلان تغییر وضعیت تیکت ارسال نشد', ['ticket_id' => $id], $e);
+            }
+        }
+        return $updated;
     }
 
     /**
@@ -172,6 +197,66 @@ final class TicketService
         ]);
         $commentId = (int) $db->lastInsertId();
         \App\Core\Audit::log($userId, 'ticket.comment', 'ticket', $ticketId, null, []);
+
+        // اعلان دوطرفه: پاسخ‌ها برای طرف مقابل تیکت ارسال می‌شود
+        // (یادداشت‌های داخلی هرگز اعلان نمی‌شوند)
+        if (empty($data['is_internal'])) {
+            $this->notifyTicketReply($ticketId, $userId);
+        }
+
         return ['id' => $commentId, 'ticket_id' => $ticketId];
+    }
+
+    /**
+     * اعلان پاسخ جدید در تیکت — دوطرفه:
+     *  - اگر مدیر/غیر از ایجادکننده پاسخ دهد → به ایجادکنندهٔ تیکت خبر داده می‌شود
+     *  - اگر خودِ ایجادکننده پاسخ دهد → به مدیر ساختمان خبر داده می‌شود
+     */
+    private function notifyTicketReply(int $ticketId, int $commenterId): void
+    {
+        $ticket = $this->repo->findById($ticketId);
+        if (!$ticket) {
+            return;
+        }
+        $creatorId = (int) $ticket->user_id;
+
+        if ($commenterId !== $creatorId) {
+            $targetUserId = $creatorId;
+            $title = 'پاسخ جدید به تیکت «' . $ticket->title . '»';
+            $message = 'به تیکت شما پاسخ داده شد. برای مشاهده گفت‌وگو، تیکت را باز کنید.';
+        } else {
+            // پاسخ خود ساکن → اطلاع به مدیر ساختمان
+            $targetUserId = $this->buildingManagerId((int) $ticket->building_id);
+            if ($targetUserId <= 0 || $targetUserId === $commenterId) {
+                return;
+            }
+            $title = 'پیام جدید در تیکت «' . $ticket->title . '»';
+            $message = 'ساکن در تیکت پیام جدیدی گذاشته است.';
+        }
+
+        try {
+            (new NotificationService())->createNotification([
+                'user_id' => $targetUserId,
+                'building_id' => (int) $ticket->building_id,
+                'notification_type' => 'ticket',
+                'title' => $title,
+                'message' => $message,
+                'data' => ['ticket_id' => $ticketId],
+            ]);
+        } catch (\Throwable $e) {
+            \App\Core\Logger::error('TicketService', 'اعلان پاسخ تیکت ارسال نشد', ['ticket_id' => $ticketId], $e);
+        }
+    }
+
+    /** شناسهٔ مدیر فعال ساختمان (۰ اگر نبود) */
+    private function buildingManagerId(int $buildingId): int
+    {
+        $stmt = \App\Core\Database::getConnection()->prepare(
+            "SELECT user_id FROM building_members
+             WHERE building_id = ? AND role = 'manager' AND status = 'active'
+             ORDER BY id LIMIT 1"
+        );
+        $stmt->execute([$buildingId]);
+        return (int) ($stmt->fetchColumn() ?: 0);
     }
 }
