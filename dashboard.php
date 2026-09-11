@@ -51,6 +51,30 @@ $building_id = (int) ($active_building['id'] ?? 0);
 $my_role = $active_building['my_role'] ?? 'resident';
 $is_manager = ($my_role === 'manager');
 
+// ---- حذف واحد از پاپ‌آپ نمای گرافیکی (فقط مدیر) — سپس ریدایرکت برای جلوگیری از ثبت مجدد ----
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form_action'] ?? '') === 'delete_unit') {
+    $unit_id = (int) ($_POST['unit_id'] ?? 0);
+    if (!$is_manager) {
+        header("Location: dashboard.php?building_id={$building_id}&flash=forbidden");
+        exit;
+    }
+    $del_response = callAPI('DELETE', '/units/' . $unit_id);
+    header("Location: dashboard.php?building_id={$building_id}&flash=" . (!empty($del_response['success']) ? 'unit_deleted' : 'unit_delete_failed'));
+    exit;
+}
+
+// پیام‌های ریدایرکت (PRG)
+$flash_messages = [
+    'unit_deleted' => ['واحد با موفقیت حذف شد.', 'success'],
+    'unit_delete_failed' => ['خطا در حذف واحد.', 'error'],
+    'forbidden' => ['این عملیات فقط برای مدیر ساختمان مجاز است.', 'error'],
+];
+$alert_message = '';
+$alert_type = 'error';
+if (isset($_GET['flash'], $flash_messages[$_GET['flash']])) {
+    [$alert_message, $alert_type] = $flash_messages[$_GET['flash']];
+}
+
 // دریافت اعلانات برای عدد زنگوله
 $notif_response = callAPI('GET', '/notifications');
 $unread_notifs = 0;
@@ -64,12 +88,33 @@ if (isset($notif_response['success']) && $notif_response['success'] === true) {
 
 // ---------- داده‌های واقعی داشبورد (بر اساس ساختمان فعال) ----------
 
-// اعضای ساختمان
+// اعضای ساختمان (فهرست کامل — هم برای آمار و هم برای بخش‌های پروفایل ساختمان)
+$members = [];
 $members_count = 0;
 if ($building_id > 0) {
     $members_response = callAPI('GET', '/buildings/' . $building_id . '/members');
     if (isset($members_response['success']) && $members_response['success'] === true) {
-        $members_count = is_array($members_response['data']) ? count($members_response['data']) : 0;
+        $members = is_array($members_response['data']) ? $members_response['data'] : [];
+        $members_count = count($members);
+    }
+}
+
+// واحدها، بلوک‌ها و طبقات — برای بخش‌های «پروفایل ساختمان» در همین صفحه
+$units = [];
+$blocks = [];
+$floors = [];
+if ($building_id > 0) {
+    $units_response = callAPI('GET', '/buildings/' . $building_id . '/units');
+    if (isset($units_response['success']) && $units_response['success'] === true) {
+        $units = $units_response['data']['units'] ?? [];
+    }
+    $blocks_response = callAPI('GET', '/buildings/' . $building_id . '/blocks');
+    if (isset($blocks_response['success']) && $blocks_response['success'] === true) {
+        $blocks = $blocks_response['data']['blocks'] ?? [];
+    }
+    $floors_response = callAPI('GET', '/buildings/' . $building_id . '/floors');
+    if (isset($floors_response['success']) && $floors_response['success'] === true) {
+        $floors = $floors_response['data']['floors'] ?? [];
     }
 }
 
@@ -160,12 +205,17 @@ require_once 'includes/header.php';
 
                 <?php if ($active_building): ?>
                     <?php if ($is_manager): ?>
-                    <button class="btn-view-profile" onclick="window.location.href='building_view.php?id=<?= $active_building['id'] ?>'">
-                        <span>مشاهده پروفایل ساختمان</span>
+                    <button class="btn-view-profile" onclick="window.location.href='costs.php?building_id=<?= (int) $active_building['id'] ?>'">
+                        <span>مدیریت مالی و شارژ</span>
                         <svg width="6" height="10" viewBox="0 0 6 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M5 9 1 5l4-4" />
                         </svg>
                     </button>
+                    <div style="display:flex; gap:8px; margin-top:8px;">
+                        <button class="btn-view-profile" style="flex:1;" onclick="window.location.href='building_edit.php?id=<?= (int) $active_building['id'] ?>'">
+                            <span>ویرایش اطلاعات ساختمان</span>
+                        </button>
+                    </div>
                     <?php else: ?>
                     <button class="btn-view-profile" onclick="window.location.href='costs.php?building_id=<?= $active_building['id'] ?>'">
                         <span>مشاهده و پرداخت شارژ</span>
@@ -546,5 +596,16 @@ require_once 'includes/header.php';
         </section>
 
         <?php endif; ?>
+
+        <?php
+        // بخش‌های ساختمان (ساختار مجتمع، نمای واحدها، ماژول‌ها و اطلاعات اجمالی)
+        // — صفحهٔ جداگانهٔ «پروفایل ساختمان» حذف و در همین داشبورد یکپارچه شده است.
+        $bv_members = $members;
+        $bv_units = $units;
+        $bv_blocks = $blocks;
+        $bv_floors = $floors;
+        $bv_financial = $financial;
+        require 'includes/_building_profile_sections.php';
+        ?>
 
 <?php require_once 'includes/footer.php'; ?>

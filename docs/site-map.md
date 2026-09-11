@@ -39,24 +39,24 @@ auth.php (ورود / ثبت‌نام یکپارچه)
    │
    ▼
 dashboard.php ◄══════════════ منوی پایین: «داشبورد»
-   │  (هاب اصلی: ساختمان فعال + ویجت‌های خلاصه)
+   │  (هاب یگانهٔ ساختمان: ویجت‌های خلاصه + پروفایل ساختمان یکپارچه)
+   │  ── نمای ساختمان، ساختار مجتمع، ماژول‌ها و اطلاعات اجمالی همه همین‌جاست؛
+   │     صفحهٔ جداگانهٔ «پروفایل ساختمان» حذف شده (ریدایرکت به داشبورد)
    │
    ├─► index.php «ساختمان‌های من» ──► building_add.php
-   │        │
-   │        ▼
-   │   building_view.php ◄══════════ هاب دوم (پروفایل ساختمان)
-   │        │  دسترسی سریع: مالی، حسابداری، تیکت، اطلاعیه، تعمیرات، اعضا
-   │        │
-   │        ├── ساختار فیزیکی ─► floors / blocks / units / common_areas
-   │        │
-   │        ├── مالی ─► costs.php ⇄ accounting.php
-   │        │           consumption.php
-   │        │
-   │        ├── اعضا ─► members.php ──► bulk_users.php
-   │        │
-   │        └── ماژول‌ها ─► tickets / announcements / meetings / bookings /
-   │                        visitors / maintenance / documents / votes /
-   │                        reviews / emergency_contacts
+   │
+   ├── دسترسی سریع: مالی، حسابداری، تیکت، اطلاعیه، تعمیرات، اعضا
+   │
+   ├── ساختار فیزیکی ─► floors / blocks / units / common_areas
+   │
+   ├── مالی ─► costs.php ⇄ accounting.php
+   │           consumption.php
+   │
+   ├── اعضا ─► members.php ──► bulk_users.php
+   │
+   ├── ماژول‌ها ─► tickets / announcements / meetings / bookings /
+   │               visitors / maintenance / documents / votes /
+   │               reviews / emergency_contacts
    │
    ├─► reports.php (گزارش‌ها + ریز مانده‌ها به تفکیک ماه + خروجی CSV/اکسل — با لینک به ریز هر بخش)
    ├─► audit_logs.php (لاگ اقدامات — مدیر)
@@ -73,9 +73,9 @@ dashboard.php ◄══════════════ منوی پایین:
 ### 🔐 ورود و حساب کاربری (۷)
 `auth` · `profile` · `profile_edit` · `change_password` · `notifications` · `invite` · `logout`
 
-### 🏢 ساختمان‌ها — قطب‌ها (۶)
-`dashboard` (هاب اصلی) · `index` (لیست ساختمان‌ها) · `building_view` (هاب ساختمان) ·
-`building_add` · `building_edit` · `building_delete`
+### 🏢 ساختمان‌ها — قطب‌ها (۵)
+`dashboard` (هاب یگانهٔ ساختمان؛ شامل پروفایل ساختمان یکپارچه) · `index` (لیست ساختمان‌ها) ·
+`building_add` · `building_edit` · `building_delete` · (`building_view` فقط ریدایرکت به داشبورد)
 
 ### 🏗️ ساختار فیزیکی (۴)
 `floors` · `blocks` · `units` · `common_areas`

@@ -168,7 +168,7 @@ $pages = [
     'dashboard.php' => [],
     'index.php' => [],
     'building_add.php' => [],
-    'building_view.php' => ['id' => $bid],
+    // building_view.php دیگر صفحهٔ مستقل نیست؛ صرفاً به داشبورد ریدایرکت می‌کند
     'building_edit.php' => ['id' => $bid],
     'floors.php' => ['building_id' => $bid],
     'blocks.php' => ['building_id' => $bid],

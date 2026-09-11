@@ -228,7 +228,7 @@ require_once 'includes/header.php';
                         <?php if ($charge_mode === 'custom' && isset($unit['custom_charge']) && $unit['custom_charge'] !== null): ?>
                             <span class="chip chip-green">شارژ: <?= fa_number($unit['custom_charge']) ?></span>
                         <?php endif; ?>
-                        <a href="building_view.php?id=<?= $building_id ?>&unit=<?= $u_id ?>" class="chip chip-gray" style="text-decoration:none;">🏢 نمایش در نما</a>
+                        <a href="dashboard.php?building_id=<?= $building_id ?>&unit=<?= $u_id ?>" class="chip chip-gray" style="text-decoration:none;">🏢 نمایش در نما</a>
                     </div>
 
                     <?php if ($is_manager): ?>
