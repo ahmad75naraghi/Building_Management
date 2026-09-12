@@ -1302,6 +1302,12 @@
         .btn-chip-neutral:hover { background: #e2e8f0; }
         .btn-chip-success { background: #ecfdf5; color: #047857; }
         .btn-chip-success:hover { background: #d1fae5; }
+        .btn-chip-gold {
+            background: linear-gradient(135deg, var(--gold-primary), #b08654);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(212, 163, 115, 0.35);
+        }
+        .btn-chip-gold:hover { filter: brightness(1.05); color: #fff; }
 
         /* ==================== کارت خلاصه مالی ==================== */
         .finance-summary-card {
@@ -1954,6 +1960,17 @@
             color: var(--text-dark);
             border-color: var(--line);
         }
+        html[data-theme="dark"] .btn-chip-gold {
+            background: linear-gradient(135deg, var(--gold-primary), #b08654);
+            color: #fff;
+            box-shadow: 0 2px 10px rgba(212, 163, 115, 0.25);
+        }
+        html[data-theme="dark"] .btn-chip-edit { background: rgba(59, 130, 246, 0.16); color: #93c5fd; }
+        html[data-theme="dark"] .btn-chip-edit:hover { background: rgba(59, 130, 246, 0.28); }
+        html[data-theme="dark"] .btn-chip-danger { background: rgba(239, 68, 68, 0.14); color: #fca5a5; }
+        html[data-theme="dark"] .btn-chip-danger:hover { background: rgba(239, 68, 68, 0.26); }
+        html[data-theme="dark"] .btn-chip-success { background: rgba(16, 185, 129, 0.14); color: #6ee7b7; }
+        html[data-theme="dark"] .btn-chip-success:hover { background: rgba(16, 185, 129, 0.26); }
 
         /* حباب‌های گفتگو */
         html[data-theme="dark"] .chat-thread-area { background: #0a1120 !important; }

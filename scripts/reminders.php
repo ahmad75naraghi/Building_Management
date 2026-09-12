@@ -11,7 +11,9 @@ declare(strict_types=1);
  *   ۲. در صورت داشتن شماره موبایل معتبر، پیامک یادآوری ارسال می‌کند
  *
  * همچنین هزینه‌های صادرشده‌ای که مهلتشان نزدیک است (پیش‌فرض ۳ روز آینده،
- * `REMINDER_DUE_DAYS`) به پرداخت‌کننده‌های پرداخت‌نکرده اعلان + پیامک می‌دهد.
+ * `REMINDER_DUE_DAYS`) به پرداخت‌کننده‌های پرداخت‌نکرده اعلان + پیامک می‌دهد
+ * و دعوت‌نامه‌های در آستانهٔ انقضا (پیش‌فرض ۱ روز آینده،
+ * `INVITE_EXPIRY_REMIND_DAYS`) را به دعوت‌کننده یادآوری می‌کند.
  *
  * ارسال هر یادآوری در جدول `event_reminders` ثبت می‌شود (کلید یکتا بر اساس
  * رویداد + کاربر + کانال) تا اجرای مکرر کران باعث ارسال تکراری نشود.
@@ -31,6 +33,7 @@ require __DIR__ . '/../vendor/autoload.php';
 
 use App\Core\Database;
 use App\Core\Logger;
+use App\Services\InviteExpiryReminderService;
 use App\Services\NotificationService;
 use App\Services\PaymentDueReminderService;
 use App\Services\SmsService;
@@ -129,8 +132,7 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
 }
 
 if (!$candidates) {
-    echo "No upcoming events in the next {$windowHours} hour(s). Nothing to remind." . PHP_EOL;
-    exit(0);
+    echo "No upcoming events in the next {$windowHours} hour(s)." . PHP_EOL;
 }
 
 $insertSql = 'INSERT IGNORE INTO event_reminders (event_type, event_id, user_id, building_id, remind_at, channel)
@@ -226,5 +228,18 @@ echo sprintf(
     $due['notified'],
     $due['sms_sent'],
     $due['skipped'],
+    PHP_EOL
+);
+
+// ------------------------------------------------------------------
+// یادآوری انقضای دعوت‌نامه‌ها (پنجرهٔ روزانه؛ جدا از رویدادهای ساعتی)
+// ------------------------------------------------------------------
+$invites = (new InviteExpiryReminderService())->run();
+echo sprintf(
+    "Invite expiry: %d invitation(s) in window, %d notification(s), %d SMS sent, %d skipped.%s",
+    $invites['candidates'],
+    $invites['notified'],
+    $invites['sms_sent'],
+    $invites['skipped'],
     PHP_EOL
 );

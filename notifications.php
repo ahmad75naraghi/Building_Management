@@ -37,6 +37,31 @@ if (isset($list_response['success']) && $list_response['success'] === true) {
     $notifications = $list_response['data'] ?? [];
 }
 
+// فیلتر اعلان‌ها: همه / مالی / عمومی
+$financial_types = ['payment'];
+$notif_is_financial = static fn(array $n): bool => in_array(
+    (string) ($n['notification_type'] ?? 'general'),
+    $financial_types,
+    true
+);
+$filter = (string) ($_GET['filter'] ?? 'all');
+if (!in_array($filter, ['all', 'financial', 'general'], true)) {
+    $filter = 'all';
+}
+$filter_counts = ['all' => count($notifications), 'financial' => 0, 'general' => 0];
+foreach ($notifications as $n_item) {
+    if ($notif_is_financial($n_item)) {
+        $filter_counts['financial']++;
+    } else {
+        $filter_counts['general']++;
+    }
+}
+$filtered_notifications = array_values(array_filter(
+    $notifications,
+    static fn(array $n): bool => $filter === 'all'
+        || ($filter === 'financial') === $notif_is_financial($n)
+));
+
 $page_title = 'اعلانات من';
 $header_sub = 'پیام‌ها و رویدادها';
 $back_url = 'index.php';
@@ -66,16 +91,42 @@ require_once 'includes/page_head.php';
         <?php endif; ?>
     </div>
 
-    <?php if (empty($notifications)): ?>
+    <!-- فیلتر نوع اعلان‌ها -->
+    <?php
+    $filter_tabs = [
+        'all' => 'همه',
+        'financial' => '💰 مالی',
+        'general' => '📋 عمومی',
+    ];
+    ?>
+    <div class="flex items-center gap-2 mb-3 flex-wrap">
+        <?php foreach ($filter_tabs as $f_key => $f_label): ?>
+            <?php $active = $filter === $f_key; ?>
+            <a href="notifications.php<?= $f_key === 'all' ? '' : '?filter=' . $f_key ?>"
+               class="btn-chip <?= $active ? 'btn-chip-gold' : 'btn-chip-neutral' ?>"
+               style="<?= $active ? '' : 'opacity:.75;' ?>font-size:12px;">
+                <?= $f_label ?>
+                <span style="opacity:.7;font-size:11px;">(<?= fa_digits($filter_counts[$f_key]) ?>)</span>
+            </a>
+        <?php endforeach; ?>
+    </div>
+
+    <?php if (empty($filtered_notifications)): ?>
         <div class="card empty-state">
             <div class="empty-icon">🔔</div>
-            اعلانی برای شما ثبت نشده است.
-            <a class="empty-action" href="index.php">🏠 بازگشت به داشبورد</a>
+            <?= $filter === 'all'
+                ? 'اعلانی برای شما ثبت نشده است.'
+                : 'اعلانی در این بخش وجود ندارد.' ?>
+            <?php if ($filter === 'all'): ?>
+                <a class="empty-action" href="index.php">🏠 بازگشت به داشبورد</a>
+            <?php else: ?>
+                <a class="empty-action" href="notifications.php">نمایش همهٔ اعلان‌ها</a>
+            <?php endif; ?>
         </div>
     <?php else: ?>
         <div class="space-y-3">
             <?php $current_day = null; ?>
-            <?php foreach ($notifications as $notification): ?>
+            <?php foreach ($filtered_notifications as $notification): ?>
                 <?php
                 // گروه‌بندی روزانه: هنگام تغییر روز، جداکنندهٔ «امروز/دیروز/تاریخ» بگذار
                 $n_day = date('Y-m-d', strtotime((string) ($notification['created_at'] ?? 'now')));
