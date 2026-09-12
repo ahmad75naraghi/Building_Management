@@ -59,6 +59,48 @@ final class SmsService
             Logger::warning('SmsService', 'شماره مقصد پیامک معتبر نیست', ['to' => $to]);
             return false;
         }
+
+        // حالت صف: ارسال به کار پس‌زمینه سپرده می‌شود تا درخواست کاربر
+        // منتظر سامانه پیامک نماند (فعال‌سازی با QUEUE_DRIVER=database)
+        if ($this->queueEnabled()) {
+            $jobId = JobQueue::enqueue('sms', [
+                'to' => $to,
+                'text' => $text,
+                'args' => array_values($args),
+                'body_id' => $bodyId,
+            ]);
+            if ($jobId !== null) {
+                Logger::info('SmsService', 'پیامک در صف پس‌زمینه ثبت شد', ['to' => $to, 'job_id' => $jobId]);
+                return true; // پذیرفته شد؛ ارسال واقعی توسط پردازشگر صف انجام می‌شود
+            }
+            // جدول صف موجود نبود → ارسال همگام مثل قبل
+        }
+
+        return $this->sendDirect($to, $text, $args, $bodyId);
+    }
+
+    /** آیا صف پس‌زمینه برای پیامک فعال است؟ */
+    private function queueEnabled(): bool
+    {
+        $driver = (string) \App\Config\AppConfig::env('QUEUE_DRIVER', 'sync');
+        return $driver === 'database' && JobQueue::isAvailable();
+    }
+
+    /**
+     * ارسال واقعی پیامک (همگام). توسط پردازشگر صف نیز مستقیم فراخوانی
+     * می‌شود تا حلقهٔ صف ایجاد نشود.
+     *
+     * @param string   $to     شماره مقصد (فرمت 09xxxxxxxxx)
+     * @param string   $text   متن اصلی پیامک
+     * @param array    $args   آرگومان‌های پترن (متناظر با arg1 و arg2 و ...)
+     * @param int|null $bodyId شناسه پترن (اگر نال باشد، پترن پیش‌فرض استفاده می‌شود)
+     */
+    public function sendDirect(string $to, string $text, array $args = [], ?int $bodyId = null): bool
+    {
+        if (!$this->isEnabled()) {
+            Logger::warning('SmsService', 'پیامک غیرفعال است؛ ارسال مستقیم رد شد', ['to' => $to]);
+            return false;
+        }
         if (!class_exists(\SoapClient::class)) {
             Logger::warning('SmsService', 'افزونه soap نصب نیست؛ ارسال پیامک انجام نشد', ['to' => $to]);
             return false;

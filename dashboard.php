@@ -124,6 +124,63 @@ if ($building_id > 0) {
 }
 $members_count = count($members);
 
+// ---------- نمودارهای تحلیلی داشبورد (فقط مدیر) ----------
+$chart_months = [];
+$chart_donut_pct = (float) ($financial['collection_percentage'] ?? 0);
+$chart_debtors = [];
+if ($building_id > 0) {
+    $jalali_month_names = ['', 'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+    $month_series = [];
+    $first_of_month = strtotime(date('Y-m-01'));
+    for ($mi = 5; $mi >= 0; $mi--) {
+        $ts = strtotime("-{$mi} months", $first_of_month);
+        [$jy_m, $jm_m] = \App\Utilities\JalaliHelper::fromTimestamp($ts);
+        $month_series[date('Y-m', $ts)] = [
+            'label' => $jalali_month_names[$jm_m] . ' ' . \App\Utilities\JalaliHelper::faDigits((string) $jy_m),
+            'income' => 0.0,
+            'expense' => 0.0,
+        ];
+    }
+    foreach ($all_payments as $p_row) {
+        if (($p_row['status'] ?? '') !== 'confirmed') {
+            continue;
+        }
+        $p_key = substr((string) ($p_row['payment_date'] ?: ($p_row['created_at'] ?? '')), 0, 7);
+        if (isset($month_series[$p_key])) {
+            $month_series[$p_key]['income'] += (float) ($p_row['amount_paid'] ?? $p_row['share_amount'] ?? 0);
+        }
+    }
+    foreach ($all_costs as $c_row) {
+        if (empty($c_row['issued_at'])) {
+            continue;
+        }
+        $c_key = substr((string) $c_row['issued_at'], 0, 7);
+        if (isset($month_series[$c_key])) {
+            $month_series[$c_key]['expense'] += (float) ($c_row['amount'] ?? 0);
+        }
+    }
+    $chart_months = array_values($month_series);
+
+    // بدهکارترین واحدها برای نمودار میله‌ای
+    $debtor_rows = [];
+    foreach ($unit_balances_by_unit as $bal_uid => $bal_row) {
+        if ((float) ($bal_row['balance'] ?? 0) < 0) {
+            $debtor_rows[] = ['unit_id' => (int) $bal_uid, 'value' => abs((float) $bal_row['balance'])];
+        }
+    }
+    usort($debtor_rows, static fn($a, $b) => $b['value'] <=> $a['value']);
+    $unit_number_by_id = [];
+    foreach ($units as $u_row) {
+        $unit_number_by_id[(int) ($u_row['id'] ?? 0)] = (string) ($u_row['unit_number'] ?? '');
+    }
+    foreach (array_slice($debtor_rows, 0, 5) as $d_row) {
+        $chart_debtors[] = [
+            'label' => 'واحد ' . ($unit_number_by_id[$d_row['unit_id']] ?? (string) $d_row['unit_id']),
+            'value' => (int) round($d_row['value']),
+        ];
+    }
+}
+
 // ---------- «واحد من»: واحدِ کاربر جاری، مانده و پرداخت‌نشده‌ها ----------
 $my_user_id = (int) ($_SESSION['user_id'] ?? 0);
 $my_unit = null;
@@ -389,6 +446,31 @@ require_once 'includes/header.php';
             </div>
         </section>
 
+        <?php endif; ?>
+
+        <!-- تحلیل مالی: نمودار روند، درصد وصولی و بدهکارترین واحدها (فقط مدیر) -->
+        <?php if ($is_manager && $building_id > 0): ?>
+        <section class="analytics-section">
+            <div class="section-header-row">
+                <h2 class="section-title">تحلیل مالی</h2>
+            </div>
+            <div class="analytics-grid">
+                <div class="analytics-panel">
+                    <h3 class="analytics-panel-title">📈 روند ۶ ماههٔ درآمد و هزینه</h3>
+                    <div id="chart-monthly"></div>
+                </div>
+                <div class="analytics-panel">
+                    <div class="bms-donut-wrap">
+                        <div id="chart-donut"></div>
+                        <p class="bms-donut-caption">نسبت وصولی کل</p>
+                    </div>
+                </div>
+            </div>
+            <div class="analytics-panel" style="margin-top: 12px;">
+                <h3 class="analytics-panel-title">🏠 بدهکارترین واحدها</h3>
+                <div id="chart-debtors"></div>
+            </div>
+        </section>
         <?php endif; ?>
 
         <!-- بخش دسترسی سریع -->
@@ -679,5 +761,26 @@ require_once 'includes/header.php';
         $bv_balances = $unit_balances_by_unit;
         require 'includes/_building_profile_sections.php';
         ?>
+
+<?php if ($is_manager && $building_id > 0): ?>
+<script src="assets/js/charts.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (!window.BmsCharts) { return; }
+    BmsCharts.monthlyBars({
+        el: document.getElementById('chart-monthly'),
+        months: <?= json_encode($chart_months, JSON_UNESCAPED_UNICODE) ?>
+    });
+    BmsCharts.donut({
+        el: document.getElementById('chart-donut'),
+        percent: <?= (float) $chart_donut_pct ?>
+    });
+    BmsCharts.hBars({
+        el: document.getElementById('chart-debtors'),
+        items: <?= json_encode($chart_debtors, JSON_UNESCAPED_UNICODE) ?>
+    });
+});
+</script>
+<?php endif; ?>
 
 <?php require_once 'includes/footer.php'; ?>

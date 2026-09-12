@@ -2372,6 +2372,34 @@
             font-size: 38px;
             margin-bottom: 10px;
             line-height: 1;
+            width: 92px;
+            height: 92px;
+            margin-left: auto;
+            margin-right: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 25%, rgba(212, 163, 115, .22), rgba(212, 163, 115, .07));
+            border: 1.5px dashed rgba(212, 163, 115, .45);
+            position: relative;
+            animation: bms-empty-float 3.2s ease-in-out infinite;
+        }
+        .empty-state .empty-icon::after {
+            content: '✦';
+            position: absolute;
+            top: 6px;
+            left: 12px;
+            font-size: 12px;
+            color: var(--gold-primary);
+            opacity: .8;
+        }
+        @keyframes bms-empty-float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+        }
+        html[data-theme="dark"] .empty-state .empty-icon {
+            background: radial-gradient(circle at 30% 25%, rgba(212, 163, 115, .16), transparent);
         }
         .empty-action {
             display: inline-flex;
@@ -2397,4 +2425,152 @@
         html[data-theme="dark"] .empty-action {
             background: var(--surface-3);
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        /* ==================== نمودارهای داشبورد تحلیلی ==================== */
+        .analytics-section { margin: 14px 0; }
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: 1fr 130px;
+            gap: 12px;
+            align-items: stretch;
+        }
+        @media (max-width: 380px) { .analytics-grid { grid-template-columns: 1fr; } }
+        .analytics-panel {
+            background: var(--surface-1, #fff);
+            border: 1px solid var(--line, #eef2f7);
+            border-radius: 16px;
+            padding: 14px;
+            box-shadow: 0 2px 10px rgba(3, 12, 34, 0.05);
+        }
+        .analytics-panel-title {
+            font-size: 12px;
+            font-weight: 800;
+            color: var(--text-dark);
+            margin: 0 0 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .bms-chart-legend { font-size: 10px; color: var(--text-gray); margin-bottom: 6px; display: flex; align-items: center; }
+        .bms-legend-dot { width: 8px; height: 8px; border-radius: 3px; display: inline-block; margin-left: 5px; }
+        .bms-chart-empty { font-size: 11px; color: var(--text-gray); text-align: center; padding: 14px 0; }
+        .bms-donut-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 6px; }
+        .bms-donut-caption { font-size: 10px; color: var(--text-gray); text-align: center; }
+        .bms-hbar-row { display: grid; grid-template-columns: 54px 1fr auto; align-items: center; gap: 8px; margin-bottom: 9px; }
+        .bms-hbar-label { font-size: 10.5px; font-weight: 700; color: var(--text-dark); white-space: nowrap; }
+        .bms-hbar-track { background: var(--surface-2, #f1f5f9); border-radius: 6px; height: 8px; overflow: hidden; }
+        .bms-hbar-fill { display: block; height: 100%; border-radius: 6px; transition: width .8s ease; }
+        .bms-hbar-value { font-size: 9.5px; color: var(--text-gray); white-space: nowrap; direction: ltr; }
+        html[data-theme="dark"] .analytics-panel { background: var(--surface-1); border-color: var(--line); }
+        html[data-theme="dark"] { --chart-track: #1e293b; --chart-text: #f1f5f9; --chart-axis: #64748b; --chart-expense: #e07a5f; }
+
+        /* ==================== توست (اعلان سبک) ==================== */
+        .bms-toast-stack {
+            position: fixed;
+            bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: min(92vw, 420px);
+            pointer-events: none;
+        }
+        .bms-toast {
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 11px 14px;
+            border-radius: 14px;
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #fff;
+            background: var(--bg-dark-blue, #010a21);
+            box-shadow: 0 10px 30px rgba(2, 10, 32, 0.35);
+            opacity: 0;
+            transform: translateY(12px) scale(.97);
+            transition: opacity .25s ease, transform .3s cubic-bezier(.2,.9,.3,1.2);
+        }
+        .bms-toast.show { opacity: 1; transform: translateY(0) scale(1); }
+        .bms-toast-success { background: linear-gradient(135deg, #059669, #047857); }
+        .bms-toast-error { background: linear-gradient(135deg, #dc2626, #b91c1c); }
+        .bms-toast-info { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+        html[data-theme="dark"] .bms-toast { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55); }
+
+        /* ==================== انتقال نرم صفحات و پولیش ==================== */
+        @keyframes bms-page-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        main { animation: bms-page-in .3s ease both; }
+        /* منحنی یکپارچه و فنری برای پاپ‌آپ و برگهٔ پایینی */
+        .modal-sheet, .app-sheet {
+            transition: transform .32s cubic-bezier(.22,.9,.28,1.12) !important;
+        }
+        @keyframes bms-btn-shine { from { transform: translateX(120%); } to { transform: translateX(-120%); } }
+        .btn-gold, .btn-primary, .empty-action {
+            position: relative;
+            overflow: hidden;
+            transition: transform .15s ease, box-shadow .2s ease, filter .2s ease;
+        }
+        .btn-gold:active, .btn-primary:active, .empty-action:active { transform: scale(.97); }
+        .btn-gold:hover::after, .btn-primary:hover::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.35) 50%, transparent 60%);
+            animation: bms-btn-shine .9s ease;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            main, .bms-toast, .modal-content { animation: none !important; transition: none !important; }
+        }
+
+        /* ==================== تور آنبوردینگ مدیر ==================== */
+        .bms-tour-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9998;
+            background: rgba(1, 10, 33, 0.55);
+            backdrop-filter: blur(1px);
+            transition: opacity .25s ease;
+        }
+        .bms-tour-spotlight {
+            position: absolute;
+            border-radius: 14px;
+            box-shadow: 0 0 0 9999px rgba(1, 10, 33, 0.55), 0 0 0 3px var(--gold-primary);
+            transition: all .35s cubic-bezier(.2,.9,.3,1);
+            pointer-events: none;
+        }
+        .bms-tour-card {
+            position: absolute;
+            z-index: 9999;
+            width: min(86vw, 320px);
+            background: #fff;
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 18px 50px rgba(2, 10, 32, 0.35);
+            animation: bms-modal-in .3s ease both;
+        }
+        html[data-theme="dark"] .bms-tour-card { background: var(--surface-2); }
+        .bms-tour-step-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 22px; height: 22px;
+            border-radius: 8px;
+            background: var(--gold-primary);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+        .bms-tour-title { font-size: 13.5px; font-weight: 900; color: var(--text-dark); margin: 0 0 6px; }
+        .bms-tour-text { font-size: 11.5px; line-height: 1.9; color: var(--text-gray); margin: 0 0 12px; }
+        .bms-tour-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .bms-tour-skip { background: none; border: none; font-family: inherit; font-size: 11px; color: var(--text-gray); cursor: pointer; }
+        .bms-tour-next {
+            border: none; font-family: inherit; cursor: pointer;
+            background: var(--gold-primary); color: #fff;
+            font-size: 12px; font-weight: 800;
+            padding: 8px 18px; border-radius: 10px;
         }

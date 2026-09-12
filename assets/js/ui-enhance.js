@@ -510,7 +510,103 @@
             ids[nodes[i].getAttribute('data-list-items')] = true;
         }
         Object.keys(ids).forEach(setupListWidget);
+
+        // تور آنبوردینگ: فقط در داشبورد و فقط بار اول برای مدیر
+        if (window.location.pathname.indexOf('dashboard.php') !== -1) {
+            window.setTimeout(function () { startManagerTour(false); }, 600);
+        }
     });
+
+    /* ----------------------------------------------------------
+     * ۷) تور آنبوردینگ مدیر (فقط بار اول ورود به داشبورد)
+     * ---------------------------------------------------------- */
+    var TOUR_KEY = 'bms_onboarded_v1';
+
+    function startManagerTour(force) {
+        if (!force) {
+            try {
+                if (localStorage.getItem(TOUR_KEY)) { return; }
+            } catch (e) { /* دسترسی نداشت → تور را رد کن */ }
+        }
+        var stepDefs = [
+            { sel: '.statistics-grid-card', title: 'نمای کلی ساختمان', text: 'مانده حساب، اعلان‌های جدید، درخواست‌های فعال و تعداد اعضا را اینجا یک‌جا می‌بینید.' },
+            { sel: '.analytics-section', title: 'تحلیل مالی', text: 'روند ۶ ماههٔ درآمد و هزینه، درصد وصولی و بدهکارترین واحدها با نمودار نمایش داده می‌شوند.' },
+            { sel: '.quick-access-section', title: 'دسترسی سریع', text: 'میان‌برِ گزارش‌ها، هزینه‌ها، تیکت‌ها و سایر بخش‌های ساختمان.' },
+            { sel: '.bottom-nav-bar', title: 'ناوبری اصلی', text: 'با منوی پایین بین داشبورد، پیام‌ها، ساختمان‌ها و پروفایل جابه‌جا شوید.' }
+        ];
+        var steps = stepDefs.filter(function (s) { return !!document.querySelector(s.sel); });
+        if (!steps.length) { return; }
+
+        var overlay = document.createElement('div');
+        overlay.className = 'bms-tour-overlay';
+        var spot = document.createElement('div');
+        spot.className = 'bms-tour-spotlight';
+        var card = document.createElement('div');
+        card.className = 'bms-tour-card';
+        overlay.appendChild(spot);
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+        document.body.classList.add('modal-open'); // قفل اسکرول صفحه
+        var idx = 0;
+
+        function finish() {
+            try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) { /* مهم نیست */ }
+            overlay.remove();
+            document.body.classList.remove('modal-open');
+            window.removeEventListener('resize', place);
+        }
+
+        function place() {
+            var s = steps[idx];
+            var t = document.querySelector(s.sel);
+            if (!t) { finish(); return; }
+            var r = t.getBoundingClientRect();
+            var pad = 6;
+            spot.style.top = Math.max(2, r.top - pad) + 'px';
+            spot.style.right = 'auto';
+            spot.style.left = Math.max(2, r.left - pad) + 'px';
+            spot.style.width = (r.width + pad * 2) + 'px';
+            spot.style.height = (r.height + pad * 2) + 'px';
+
+            var last = idx === steps.length - 1;
+            card.innerHTML =
+                '<span class="bms-tour-step-badge">' + (idx + 1) + ' / ' + steps.length + '</span>' +
+                '<h4 class="bms-tour-title">' + s.title + '</h4>' +
+                '<p class="bms-tour-text">' + s.text + '</p>' +
+                '<div class="bms-tour-actions">' +
+                '<button type="button" class="bms-tour-skip">' + (last ? '' : 'رد کردن تور') + '</button>' +
+                '<button type="button" class="bms-tour-next">' + (last ? 'متوجه شدم 👍' : 'بعدی') + '</button>' +
+                '</div>';
+            // اندازه‌گیری بعد از پر شدن محتوا
+            var ch = card.offsetHeight || 160;
+            var top = r.bottom + pad + 12;
+            if (top + ch > window.innerHeight - 12) {
+                top = Math.max(12, r.top - pad - ch - 12);
+            }
+            card.style.top = top + 'px';
+            card.style.left = Math.max(12, Math.min(window.innerWidth - card.offsetWidth - 12, r.left)) + 'px';
+
+            var next = card.querySelector('.bms-tour-next');
+            var skip = card.querySelector('.bms-tour-skip');
+            next.addEventListener('click', function () {
+                if (last) { finish(); return; }
+                idx++;
+                go();
+            });
+            skip.addEventListener('click', finish);
+        }
+
+        function go() {
+            var t = document.querySelector(steps[idx].sel);
+            if (t && t.scrollIntoView) { t.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+            window.setTimeout(place, 320);
+        }
+
+        window.addEventListener('resize', place);
+        go();
+    }
+
+    window.bmsStartTour = startManagerTour;
 
     // API برنامه‌ای برای سایر اسکریپت‌ها
     window.showToast = showToast;

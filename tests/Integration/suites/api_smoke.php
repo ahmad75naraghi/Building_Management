@@ -348,6 +348,28 @@ TestLog::run('همهٔ مسیرهای حذفی روی موجودیت اختصا�
     TestLog::assertSame('حذف‌ها موفق', [], $failures);
 });
 
+TestLog::run('نسخهٔ /api/v1 معادل /api پاسخ می‌دهد و صفحه‌بندی یکپارچه کار می‌کند', function () use ($manager, $db, $B, $resident) {
+    smoke_login($manager);
+
+    // نسخهٔ یک: همان مسیر با پیشوند v1
+    $v1 = callAPI_dispatch('GET', 'v1/auth/me', false);
+    TestLog::assertSame('auth/me با نسخهٔ ۱ → ۲۰۰', 200, (int) ($v1['http_code'] ?? 0));
+    $v1b = callAPI_dispatch('GET', "v1/buildings/{$B}/dashboard", ['building_id' => $B]);
+    TestLog::assertSame('داشبورد با نسخهٔ ۱ → ۲۰۰', 200, (int) ($v1b['http_code'] ?? 0));
+
+    // قرارداد صفحه‌بندی: فقط با درخواست صریح فعال می‌شود
+    $plain = callAPI_dispatch('GET', 'notifications', ['building_id' => $B]);
+    TestLog::assertTrue('بدون پارامتر، پاکت قدیمی حفظ می‌شود', !isset($plain['pagination']));
+
+    for ($i = 0; $i < 3; $i++) {
+        $db->exec("INSERT INTO notifications (user_id, title, message, is_read) VALUES ({$manager}, 'اعلان صفحه‌بندی {$i}', 'م', 0)");
+    }
+    $paged = callAPI_dispatch('GET', 'notifications', ['building_id' => $B, 'paginate' => '1', 'per_page' => '2', 'page' => '1']);
+    TestLog::assertTrue('بلوک صفحه‌بندی دارد', isset($paged['pagination']['total_pages']));
+    TestLog::assertSame('دو ردیف در صفحه', 2, count($paged['data']));
+    TestLog::assertTrue('مجموع دست‌کم ۳', ($paged['pagination']['total'] ?? 0) >= 3);
+});
+
 // ------------------------------------------------------------------
 // فاز ۳: پیمایش بدون توکن → ۴۰۱ برای مسیرهای محافظت‌شده
 // ------------------------------------------------------------------

@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Core\Request;
 use App\Core\Response;
+use App\Utilities\PaginationHelper;
 use App\Services\CostService;
 
 final class CostController
@@ -106,10 +107,16 @@ final class CostController
         }
         try {
             $this->service->ensureMonthlyCharge($buildingId, (int) $userId);
-            $costs = $this->service->listCostsByBuilding($buildingId);
+            $costs = array_map(fn($c) => $c->toArray(), $this->service->listCostsByBuilding($buildingId));
+            if (PaginationHelper::requested($request)) {
+                $paged = PaginationHelper::paginate($costs, PaginationHelper::fromQuery($request));
+                return (new Response())->setJson([
+                    'success' => true, 'data' => $paged['items'], 'pagination' => $paged['pagination'],
+                ]);
+            }
             return (new Response())->setJson([
                 'success' => true,
-                'data' => array_map(fn($c) => $c->toArray(), $costs),
+                'data' => $costs,
             ]);
         } catch (\Exception $e) {
             return (new Response())->setStatusCode(400)->setJson([
@@ -137,6 +144,12 @@ final class CostController
         }
         try {
             $payments = $this->service->listPaymentsByBuilding($buildingId);
+            if (PaginationHelper::requested($request)) {
+                $paged = PaginationHelper::paginate($payments, PaginationHelper::fromQuery($request));
+                return (new Response())->setJson([
+                    'success' => true, 'data' => $paged['items'], 'pagination' => $paged['pagination'],
+                ]);
+            }
             return (new Response())->setJson([
                 'success' => true,
                 'data' => $payments,

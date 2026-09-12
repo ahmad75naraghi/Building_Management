@@ -43,6 +43,11 @@ final class Request
 
     public function getPathInfo(): string
     {
+        // نسخه‌بندی API: مسیرهای /api/v1/… معادل /api/… پردازش می‌شوند
+        // تا کلاینت‌های آینده (اپ موبایل بومی) بتوانند نسخهٔ خود را ثابت کنند
+        if (str_starts_with($this->uri, '/api/v1/')) {
+            return '/api/' . substr($this->uri, strlen('/api/v1/'));
+        }
         return $this->uri;
     }
 

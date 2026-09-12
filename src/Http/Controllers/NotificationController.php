@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Core\Request;
 use App\Core\Response;
+use App\Utilities\PaginationHelper;
 use App\Services\NotificationService;
 
 final class NotificationController
@@ -25,10 +26,16 @@ final class NotificationController
                 'success' => false, 'message' => 'Authentication required',
             ]);
         }
-        $notifications = $this->service->getUserNotifications((int) $userId, 20);
+        $notifications = array_map(fn($n) => $n->toArray(), $this->service->getUserNotifications((int) $userId, 20));
+        if (PaginationHelper::requested($request)) {
+            $paged = PaginationHelper::paginate($notifications, PaginationHelper::fromQuery($request));
+            return (new Response())->setJson([
+                'success' => true, 'data' => $paged['items'], 'pagination' => $paged['pagination'],
+            ]);
+        }
         return (new Response())->setJson([
             'success' => true,
-            'data' => array_map(fn($n) => $n->toArray(), $notifications),
+            'data' => $notifications,
         ]);
     }
 
