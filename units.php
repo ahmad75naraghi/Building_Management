@@ -71,6 +71,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $building_id > 0) {
                 'owner_resident' => !empty($_POST['owner_resident']) ? 1 : 0,
                 'residents_count' => max(0, (int) en_digits($_POST['residents_count'] ?? '0')),
                 'custom_charge' => $custom_charge_raw !== '' ? (float) $custom_charge_raw : null,
+                'parking_no' => trim($_POST['parking_no'] ?? '') !== '' ? trim($_POST['parking_no']) : null,
+                'storage_no' => trim($_POST['storage_no'] ?? '') !== '' ? trim($_POST['storage_no']) : null,
             ];
 
             if ($action === 'update') {
@@ -154,7 +156,11 @@ require_once 'includes/header.php';
     <?php if ($is_manager): ?>
         <?php modal_open_button('add-unit', 'افزودن واحد جدید'); ?>
 
-        <?php if ($charge_mode === 'per_person'): ?>
+        <?php if ($charge_mode === 'combined'): ?>
+            <div class="hint-card" style="margin-top:12px;">
+                💰 شارژ این ساختمان <strong>ترکیبی (ثابت + نفری)</strong> است؛ برای هر واحد تعداد ساکنین را وارد کنید تا سهم نفری محاسبه شود.
+            </div>
+        <?php elseif ($charge_mode === 'per_person'): ?>
             <div class="hint-card" style="margin-top:12px;">
                 👥 شارژ این ساختمان <strong>بر اساس تعداد نفرات</strong> محاسبه می‌شود؛ برای هر واحد تعداد ساکنین را وارد کنید.
             </div>
@@ -175,11 +181,16 @@ require_once 'includes/header.php';
 
     <?php if (empty($units)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">🏠</div>
+            <div class="empty-icon">🏠</div>
             هنوز واحدی ثبت نشده است.
+            <button type="button" class="empty-action" data-modal-open="add-unit">➕ افزودن اولین واحد</button>
         </div>
     <?php else: ?>
-        <div class="space-y-3">
+                <div class="list-filter-bar">
+            <input type="search" class="form-input" data-list-search="units-list" placeholder="🔍 جستجوی شماره واحد، مالک یا ساکن…" style="flex:1;">
+            <span class="list-count-chip" data-list-count="units-list"></span>
+        </div>
+        <div class="space-y-3" data-list-items="units-list">
             <?php foreach ($units as $unit): ?>
                 <?php
                 $u_id = (int) ($unit['id'] ?? 0);
@@ -212,9 +223,16 @@ require_once 'includes/header.php';
                         <?php if ($residents > 0): ?>
                             <span class="chip chip-green"><?= fa_digits($residents) ?> نفر ساکن</span>
                         <?php endif; ?>
+                        <?php if (!empty($unit['parking_no'])): ?>
+                            <span class="chip chip-gray">🚗 پارکینگ: <?= fa_digits(htmlspecialchars($unit['parking_no'])) ?></span>
+                        <?php endif; ?>
+                        <?php if (!empty($unit['storage_no'])): ?>
+                            <span class="chip chip-gray">📦 انباری: <?= fa_digits(htmlspecialchars($unit['storage_no'])) ?></span>
+                        <?php endif; ?>
                         <?php if ($charge_mode === 'custom' && isset($unit['custom_charge']) && $unit['custom_charge'] !== null): ?>
                             <span class="chip chip-green">شارژ: <?= fa_number($unit['custom_charge']) ?></span>
                         <?php endif; ?>
+                        <a href="dashboard.php?building_id=<?= $building_id ?>&unit=<?= $u_id ?>" class="chip chip-gray" style="text-decoration:none;">🏢 نمایش در نما</a>
                     </div>
 
                     <?php if ($is_manager): ?>
@@ -231,7 +249,9 @@ require_once 'includes/header.php';
                                     data-set-tenant_user_id="<?= (int) ($unit['tenant_user_id'] ?? 0) ?>"
                                     data-set-owner_resident="<?= !empty($unit['owner_resident']) ? '1' : '0' ?>"
                                     data-set-residents_count="<?= $residents ?>"
-                                    data-set-custom_charge="<?= htmlspecialchars((string) ($unit['custom_charge'] ?? '')) ?>">
+                                    data-set-custom_charge="<?= htmlspecialchars((string) ($unit['custom_charge'] ?? '')) ?>"
+                                    data-set-parking_no="<?= htmlspecialchars($unit['parking_no'] ?? '') ?>"
+                                    data-set-storage_no="<?= htmlspecialchars($unit['storage_no'] ?? '') ?>">
                                 ویرایش
                             </button>
                             <form method="POST" action="?building_id=<?= $building_id ?>" data-confirm="واحد حذف شود؟ این عمل قابل بازگشت نیست." style="display:inline;">
@@ -245,6 +265,7 @@ require_once 'includes/header.php';
                 </div>
             <?php endforeach; ?>
         </div>
+        <div data-list-pager="units-list"></div>
     <?php endif; ?>
 
 </main>
@@ -294,6 +315,19 @@ require_once 'includes/header.php';
             sync();
         });
     </script>
+
+    <?php $focus_unit_id = (int) ($_GET['focus'] ?? 0); ?>
+    <?php if ($focus_unit_id > 0): ?>
+        <script>
+            /* باز شدن خودکار پاپ‌آپ ویرایش برای واحد مشخص‌شده از طریق لینک (?focus=ID) */
+            window.addEventListener('load', function () {
+                var btn = document.querySelector('[data-modal-open="edit-unit"][data-set-unit_id="<?= $focus_unit_id ?>"]');
+                if (btn) {
+                    btn.click();
+                }
+            });
+        </script>
+    <?php endif; ?>
 
 <?php endif; ?>
 

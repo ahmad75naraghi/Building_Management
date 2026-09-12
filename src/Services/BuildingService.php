@@ -62,7 +62,8 @@ final class BuildingService
 
         // سازنده ساختمان به‌صورت خودکار مدیر (member) ساختمان می‌شود.
         $db = \App\Core\Database::getConnection();
-        $stmt = $db->prepare(
+        $stmt = \App\Core\Database::prepareInsertIgnore(
+            $db,
             "INSERT IGNORE INTO building_members (user_id, building_id, role, status, invited_by)
              VALUES (?, ?, 'manager', 'active', ?)"
         );
@@ -116,6 +117,9 @@ final class BuildingService
             $pstmt->execute([$id, 'پارکینگ', 'ظرفیت: ' . $building->parking_spots . ' خودرو']);
         }
 
+        \App\Core\Audit::log($userId, 'building.create', 'building', $id, $id, [
+            'name' => $building->name,
+        ]);
         return $building;
     }
 
@@ -209,7 +213,7 @@ final class BuildingService
      * ویرایش ساختمان (نام، آدرس، نام سفارشی، رنگ تم، مشخصات ساختمانی، شارژ ثابت و ...).
      * فیلدهای ارسال‌نشده روی مقادیر قبلی باقی می‌مانند.
      */
-    public function updateBuilding(int $id, array $data): ?Building
+    public function updateBuilding(int $id, array $data, int $actorUserId = 0): ?Building
     {
         $building = $this->repo->findById($id);
         if (!$building) {
@@ -234,6 +238,12 @@ final class BuildingService
         if (array_key_exists('default_image', $data)) {
             $building->default_image = (string) $data['default_image'];
         }
+        if (array_key_exists('custom_logo_path', $data)) {
+            // رشتهٔ خالی = حذف تصویر سفارشی و بازگشت به عکس پیش‌فرض
+            $building->custom_logo_path = trim((string) $data['custom_logo_path']) !== ''
+                ? (string) $data['custom_logo_path']
+                : null;
+        }
         if (array_key_exists('parking_spots', $data)) {
             $building->parking_spots = max(0, (int) $data['parking_spots']);
         }
@@ -256,20 +266,27 @@ final class BuildingService
         }
 
         $this->repo->update($building);
+        \App\Core\Audit::log($actorUserId, 'building.update', 'building', $id, $id, [
+            'name' => $building->name,
+        ]);
         return $this->repo->findById($id);
     }
 
     /**
-     * اعتبارسنجی حالت شارژ. مقادیر مجاز: fixed | per_person | custom
+     * اعتبارسنجی حالت شارژ. مقادیر مجاز: fixed | per_person | combined | custom
      */
     public static function normalizeChargeMode($mode): string
     {
         $mode = is_string($mode) ? $mode : 'fixed';
-        return in_array($mode, ['fixed', 'per_person', 'custom'], true) ? $mode : 'fixed';
+        return in_array($mode, ['fixed', 'per_person', 'custom', 'combined'], true) ? $mode : 'fixed';
     }
 
-    public function deleteBuilding(int $buildingId): bool
+    public function deleteBuilding(int $buildingId, int $actorUserId = 0): bool
     {
-        return $this->repo->delete($buildingId);
+        $deleted = $this->repo->delete($buildingId);
+        if ($deleted) {
+            \App\Core\Audit::log($actorUserId, 'building.delete', 'building', $buildingId, $buildingId, []);
+        }
+        return $deleted;
     }
 }

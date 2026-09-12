@@ -33,7 +33,8 @@ $reopen_modal = $reopen_modal ?? '';
 require_once __DIR__ . '/modal.php';
 
 // اگر تعداد اعلانات تعیین نشده بود، از API خوانده شود (نمایش نشان ناوبری و زنگ)
-if (!isset($unread_nav) && function_exists('callAPI')) {
+// در صفحات بدون لاگین/بدون ناوبری (ورود، ثبت‌نام و…) نیازی به واکشی نیست.
+if (!isset($unread_nav) && empty($standalone) && !empty($_SESSION['token']) && function_exists('callAPI')) {
     $unread_nav = 0;
     $notif_response = callAPI('GET', '/notifications');
     if (!empty($notif_response['success'])) {
@@ -47,6 +48,21 @@ if (!isset($unread_nav) && function_exists('callAPI')) {
 if (!isset($unread_nav)) {
     $unread_nav = 0;
 }
+
+// تعداد پیام‌های نخواندهٔ صندوق پیام (برای نشان ناوبری) — اگر صفحه خودش نیاورده باشد
+if (!isset($unread_messages_nav) && empty($standalone) && !empty($_SESSION['token']) && function_exists('callAPI')) {
+    $unread_messages_nav = 0;
+    $msg_building = (int) ($nav_building_id ?? ($building_id ?? ($_SESSION['active_building_id'] ?? 0)));
+    if ($msg_building > 0) {
+        $msg_response = callAPI('GET', '/messages/unread-count', ['building_id' => $msg_building]);
+        if (!empty($msg_response['success'])) {
+            $unread_messages_nav = (int) ($msg_response['data']['unread'] ?? 0);
+        }
+    }
+}
+if (!isset($unread_messages_nav)) {
+    $unread_messages_nav = 0;
+}
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -55,6 +71,65 @@ if (!isset($unread_nav)) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($page_title) ?> | مدیریت ساختمان</title>
+    <!-- حالت شب/روز: روشن، تاریک، یا «پیروی از سیستم» — اعمال پیش از رندر (جلوگیری از فلش) -->
+    <script>
+        (function () {
+            var root = document.documentElement;
+            var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+            function storedPref() {
+                try { return localStorage.getItem('bm_theme') || 'auto'; }
+                catch (e) { return 'auto'; }
+            }
+            function resolved(pref) {
+                if (pref === 'dark') { return 'dark'; }
+                if (pref === 'light') { return 'light'; }
+                return (mq && mq.matches) ? 'dark' : 'light';
+            }
+            function applyTheme(mode) {
+                if (mode === 'dark') { root.setAttribute('data-theme', 'dark'); }
+                else { root.removeAttribute('data-theme'); }
+                var meta = document.querySelector('meta[name="theme-color"]');
+                if (meta) { meta.setAttribute('content', mode === 'dark' ? '#0b1322' : '#010a21'); }
+            }
+
+            applyTheme(resolved(storedPref()));
+
+            /* در حالت خودکار، تغییر تنظیم سیستم بلافاصله اعمال شود */
+            if (mq && mq.addEventListener) {
+                mq.addEventListener('change', function () {
+                    if (storedPref() === 'auto') { applyTheme(resolved('auto')); }
+                });
+            }
+
+            window.__bmThemePref = storedPref;
+
+            window.toggleAppTheme = function () {
+                var order = ['light', 'dark', 'auto'];
+                var cur = storedPref();
+                var idx = order.indexOf(cur);
+                var next = order[(idx + 1) % order.length];
+                try { localStorage.setItem('bm_theme', next); }
+                catch (e) { /* دسترسی به حافظهٔ مرورگر ممکن است بسته باشد */ }
+                /* انیمیشن نرم انتقال رنگ‌ها */
+                root.classList.add('theme-transition');
+                window.setTimeout(function () { root.classList.remove('theme-transition'); }, 520);
+                applyTheme(resolved(next));
+                if (window.syncThemeButtons) { window.syncThemeButtons(); }
+                var labels = { light: 'حالت نمایش: روشن', dark: 'حالت نمایش: تاریک', auto: 'حالت نمایش: پیروی از سیستم' };
+                if (window.showToast) { window.showToast(labels[next], 'success'); }
+            };
+        })();
+    </script>
+    <!-- PWA: نصب اپلیکیشن روی موبایل/دسکتاپ -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#010a21">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="مدیریت ساختمان">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
     <!-- فونت وزیرمتن -->
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
     <!-- Tailwind برای کلاس‌های کاربردی -->
@@ -83,6 +158,15 @@ if (!isset($unread_nav)) {
                         <span class="badge"><?= fa_digits($unread_nav) ?></span>
                     <?php endif; ?>
                 </a>
+                <button type="button" class="theme-toggle-btn" onclick="toggleAppTheme()" aria-label="تغییر حالت شب/روز">
+                    <svg class="ico-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                    </svg>
+                    <svg class="ico-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="4" />
+                        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+                    </svg>
+                </button>
             </div>
 
             <div class="header-title-text">
@@ -115,15 +199,26 @@ if (!isset($unread_nav)) {
                 <?php endif; ?>
             </div>
 
-            <a href="notifications.php" class="notification-bell" aria-label="اعلانات">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                </svg>
-                <?php if ($unread_nav > 0): ?>
-                    <span class="badge"><?= fa_digits($unread_nav) ?></span>
-                <?php endif; ?>
-            </a>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button type="button" class="theme-toggle-btn" onclick="toggleAppTheme()" aria-label="تغییر حالت شب/روز">
+                    <svg class="ico-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                    </svg>
+                    <svg class="ico-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="4" />
+                        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+                    </svg>
+                </button>
+                <a href="notifications.php" class="notification-bell" aria-label="اعلانات">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <?php if ($unread_nav > 0): ?>
+                        <span class="badge"><?= fa_digits($unread_nav) ?></span>
+                    <?php endif; ?>
+                </a>
+            </div>
         </header>
 
 

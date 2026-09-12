@@ -42,7 +42,7 @@ final class Kernel
         try {
             // Apply global middleware pipeline
             $pipeline = new MiddlewarePipeline($this->middleware);
-            $handler = function (Request $req) use ($request, $response) {
+            $handler = function (Request $req) use ($response) {
                 
                 $match = $this->router->match($req);
                 

@@ -103,8 +103,9 @@ require_once 'includes/header.php';
 
     <?php if (empty($common_areas)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">🎯</div>
+            <div class="empty-icon">🎯</div>
             هنوز مشاعی ثبت نشده است.
+            <button type="button" class="empty-action" data-modal-open="add-area">➕ افزودن اولین مشاع</button>
         </div>
     <?php else: ?>
         <div class="space-y-3">

@@ -33,6 +33,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_manager) {
                 $alert_message = $response['message'] ?? 'ارسال پیامک ناموفق بود.';
             }
         }
+    } elseif ($action === 'revoke_invitation') {
+        $inv_id = (int) ($_POST['invitation_id'] ?? 0);
+        if ($inv_id > 0) {
+            $response = callAPI('DELETE', '/invitations/' . $inv_id);
+            if (isset($response['success']) && $response['success'] === true) {
+                $alert_message = 'دعوت‌نامه لغو شد و لینک آن دیگر معتبر نیست.';
+                $alert_type = 'success';
+            } else {
+                $alert_message = $response['message'] ?? 'لغو دعوت‌نامه ناموفق بود.';
+            }
+        }
     } else {
         $invited_name = trim($_POST['invited_name'] ?? '');
         $invited_phone = normalize_phone($_POST['invited_phone'] ?? '');
@@ -107,6 +118,9 @@ require_once 'includes/header.php';
 
     <?php if ($is_manager): ?>
         <?php modal_open_button('invite-member', 'دعوت عضو جدید'); ?>
+        <a href="bulk_users.php?building_id=<?= $building_id ?>" class="btn-view-profile mt-3 inline-block text-center" style="text-decoration:none;">
+            👥➕ ساخت گروهی کاربران و اتصال به واحدها
+        </a>
     <?php else: ?>
         <div class="hint-card">👥 دعوت اعضای جدید فقط توسط مدیر ساختمان انجام می‌شود.</div>
     <?php endif; ?>
@@ -116,11 +130,21 @@ require_once 'includes/header.php';
 
     <?php if (empty($members)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">👥</div>
+            <div class="empty-icon">👥</div>
             هنوز عضوی در ساختمان ثبت نشده است.
+            <?php if ($is_manager): ?>
+                <button type="button" class="empty-action" data-modal-open="invite-member">✉️ دعوت اولین ساکن</button>
+            <?php endif; ?>
         </div>
     <?php else: ?>
-        <div class="space-y-3">
+        <div class="list-filter-bar">
+            <input type="search" class="form-input" data-list-search="members" placeholder="🔍 جستجوی نام، شماره یا واحد…" style="flex:1;">
+            <span class="list-count-chip" data-list-count="members"></span>
+            <?php if ($is_manager): ?>
+                <a class="btn-chip" href="list_export.php?type=members&building_id=<?= (int) $building_id ?>" title="خروجی اکسل اعضا">📥 اکسل</a>
+            <?php endif; ?>
+        </div>
+        <div class="space-y-3" data-list-items="members">
             <?php foreach ($members as $member): ?>
                 <div class="card p-4 flex items-center gap-4">
                     <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 font-bold text-lg">
@@ -157,6 +181,12 @@ require_once 'includes/header.php';
                                     }
                                     ?>
                                     <span class="text-[10px] px-2 py-0.5 rounded-full <?= $rel_class ?>"><?= htmlspecialchars($rel_label) ?></span>
+                                    <?php if (!empty($mu['parking_no'])): ?>
+                                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600" title="قطعه پارکینگ">🚗 پارکینگ <?= fa_digits($mu['parking_no']) ?></span>
+                                    <?php endif; ?>
+                                    <?php if (!empty($mu['storage_no'])): ?>
+                                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600" title="قطعه انباری">📦 انباری <?= fa_digits($mu['storage_no']) ?></span>
+                                    <?php endif; ?>
                                 <?php endforeach; ?>
                             </div>
                         <?php endif; ?>
@@ -167,6 +197,7 @@ require_once 'includes/header.php';
                 </div>
             <?php endforeach; ?>
         </div>
+        <div data-list-pager="members"></div>
     <?php endif; ?>
 
     <!-- دعوت‌نامه‌های در انتظار -->
@@ -189,7 +220,7 @@ require_once 'includes/header.php';
                             <p class="text-xs text-gray-500 mt-1">
                                 نقش: <?= htmlspecialchars($role_labels[$inv['role'] ?? ''] ?? ($inv['role'] ?? 'ساکن')) ?>
                                 <?php if (!empty($inv['expires_at'])): ?>
-                                    • انقضا: <?= htmlspecialchars($inv['expires_at']) ?>
+                                    • انقضا: <?= fa_digits(jdate('j F Y', strtotime((string) $inv['expires_at']))) ?>
                                 <?php endif; ?>
                             </p>
                             <p class="text-[11px] text-gray-400 mt-2 break-all" dir="ltr"><?= htmlspecialchars($invite_link) ?></p>
@@ -207,6 +238,17 @@ require_once 'includes/header.php';
                                 <input type="hidden" name="invitation_id" value="<?= (int) ($inv['id'] ?? 0) ?>">
                                 <button type="submit" class="text-xs bg-green-50 hover:bg-green-100 text-green-700 font-bold px-3 py-2 rounded-lg transition-colors">
                                     ارسال مجدد پیامک
+                                </button>
+                            </form>
+                            <form method="POST" action="" style="display:contents;" data-confirm="دعوت‌نامه لغو شود؟ لینک دعوت دیگر کار نخواهد کرد."
+                                  data-confirm-sheet data-sheet-title="لغو دعوت‌نامه"
+                                  data-sheet-name="دعوت‌نامهٔ «<?= htmlspecialchars($contact) ?>»"
+                                  data-sheet-confirm="لغو دعوت‌نامه">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="form_action" value="revoke_invitation">
+                                <input type="hidden" name="invitation_id" value="<?= (int) ($inv['id'] ?? 0) ?>">
+                                <button type="submit" class="text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-lg transition-colors">
+                                    لغو دعوت
                                 </button>
                             </form>
                         </div>

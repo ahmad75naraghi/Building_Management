@@ -94,7 +94,7 @@ final class BuildingController
         }
         $data = $request->getJsonBody() ?? [];
         try {
-            $building = $this->service->updateBuilding($id, $data);
+            $building = $this->service->updateBuilding($id, $data, $userId);
             if (!$building) {
                 return (new Response())->setStatusCode(404)->setJson([
                     'success' => false,
@@ -130,7 +130,7 @@ final class BuildingController
                 'message' => 'You are not a member of this building',
             ]);
         }
-        $deleted = $this->service->deleteBuilding($id);
+        $deleted = $this->service->deleteBuilding($id, $userId);
         if ($deleted) {
             return (new Response())->setJson([
                 'success' => true,
@@ -647,6 +647,45 @@ final class BuildingController
         }
     }
 
+    /**
+     * لغو دعوت‌نامه — فقط مدیر ساختمان، فقط دعوت‌های در انتظار پذیرش.
+     */
+    public function revokeInvitation(Request $request): Response
+    {
+        $userId = (int) ($request->getAttribute('user_id') ?? 0);
+        $invitationId = (int) ($request->getAttribute('id') ?? 0);
+        if (!$userId || !$invitationId) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false,
+                'message' => 'invitation id is required',
+            ]);
+        }
+        try {
+            $invitation = (new InvitationService())->revokeInvitation($invitationId, $userId);
+            return (new Response())->setJson([
+                'success' => true,
+                'message' => 'دعوت‌نامه لغو شد.',
+                'data' => ['id' => $invitation->id, 'status' => $invitation->status],
+            ]);
+        } catch (\App\Exceptions\AuthException $e) {
+            return (new Response())->setStatusCode(403)->setJson([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        } catch (\App\Exceptions\ValidationException $e) {
+            return (new Response())->setStatusCode(422)->setJson([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        } catch (\Exception $e) {
+            $status = $e->getMessage() === 'Invitation not found' ? 404 : 400;
+            return (new Response())->setStatusCode($status)->setJson([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
     public function invitationInfo(Request $request): Response
     {
         $token = trim((string) ($request->getQueryParam('token') ?? ''));
@@ -720,6 +759,20 @@ final class BuildingController
                 'message' => 'You are not a member of this building',
             ]);
         }
+        return (new Response())->setJson([
+            'success' => true,
+            'data' => $this->buildingMembersWithUnits($buildingId),
+        ]);
+    }
+
+    /**
+     * اعضای ساختمان + واحدهای مرتبط هر عضو (مالک/مستأجر).
+     * واحدها یک‌بار خوانده و بین اعضا تقسیم می‌شوند (بدون کوئری اضافی).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildingMembersWithUnits(int $buildingId): array
+    {
         $db = \App\Core\Database::getConnection();
         $stmt = $db->prepare(
             "SELECT bm.*, u.name, u.email, u.phone
@@ -730,20 +783,19 @@ final class BuildingController
         $stmt->execute([$buildingId]);
         $members = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
-        // اطلاعات واحدهایی که این عضو در آن‌ها مالک/مستاجر/ساکن است
         $unitStmt = $db->prepare(
-            "SELECT id, unit_number, owner_user_id, tenant_user_id, owner_resident
+            "SELECT id, unit_number, owner_user_id, tenant_user_id, owner_resident, parking_no, storage_no
              FROM units
-             WHERE building_id = ? AND (owner_user_id = ? OR tenant_user_id = ?)
+             WHERE building_id = ?
              ORDER BY unit_number ASC"
         );
-        $unitStmt->execute([$buildingId, $userId, $userId]);
-        $relatedUnits = $unitStmt->fetchAll(\PDO::FETCH_ASSOC);
+        $unitStmt->execute([$buildingId]);
+        $allUnits = $unitStmt->fetchAll(\PDO::FETCH_ASSOC);
 
-        $members = array_map(function (array $m) use ($relatedUnits): array {
+        return array_map(function (array $m) use ($allUnits): array {
             $memberId = (int) $m['user_id'];
             $m['units'] = [];
-            foreach ($relatedUnits as $u) {
+            foreach ($allUnits as $u) {
                 $owner = $u['owner_user_id'] !== null ? (int) $u['owner_user_id'] : null;
                 $tenant = $u['tenant_user_id'] !== null ? (int) $u['tenant_user_id'] : null;
                 if ($owner !== $memberId && $tenant !== $memberId) {
@@ -757,14 +809,154 @@ final class BuildingController
                     'id' => (int) $u['id'],
                     'unit_number' => $u['unit_number'],
                     'relation' => $relation, // owner | owner_resident | tenant
+                    'parking_no' => $u['parking_no'] ?? null,
+                    'storage_no' => $u['storage_no'] ?? null,
                 ];
             }
             return $m;
         }, $members);
+    }
+
+    /**
+     * دادهٔ تجمیعی داشبورد ساختمان — همهٔ نیازهای صفحهٔ داشبورد در «یک» پاسخ
+     * (به‌جای ~۱۰ درخواست مجزا): ساختمان، اعضا، واحدها، بلوک‌ها، طبقات،
+     * ماندهٔ واحدها، پرداخت‌ها، هزینه‌ها، اطلاعیه‌ها، تعمیرات و خلاصهٔ مالی.
+     */
+    public function dashboardData(Request $request): Response
+    {
+        $userId = (int) ($request->getAttribute('user_id') ?? 0);
+        $buildingId = (int) $request->getAttribute('building_id');
+        if (!$userId || !$buildingId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false,
+                'message' => 'Authentication and building id required',
+            ]);
+        }
+        if (!$this->isBuildingMember($userId, $buildingId)) {
+            return (new Response())->setStatusCode(403)->setJson([
+                'success' => false,
+                'message' => 'You are not a member of this building',
+            ]);
+        }
+
+        $building = $this->service->getBuildingById($buildingId, $userId);
+        if (!$building) {
+            return (new Response())->setStatusCode(404)->setJson([
+                'success' => false,
+                'message' => 'Building not found',
+            ]);
+        }
+
+        $costService = new \App\Services\CostService();
+        $extraService = new \App\Services\ExtraModulesService();
+        $db = \App\Core\Database::getConnection();
+
+        // شارژ ماهیانهٔ ماه جاری پیش از خلاصهٔ مالی صادر شود (هم‌راستا با /costs)
+        try {
+            $costService->ensureMonthlyCharge($buildingId, $userId);
+        } catch (\Throwable $e) {
+            \App\Core\Logger::warning('dashboard', 'صدور شارژ ماهیانه در داشبورد ناموفق بود', [
+                'building_id' => $buildingId,
+                'reason' => $e->getMessage(),
+            ]);
+        }
+
+        $blockStmt = $db->prepare("SELECT * FROM blocks WHERE building_id = ? ORDER BY id ASC");
+        $blockStmt->execute([$buildingId]);
+        $blocks = $blockStmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $floorStmt = $db->prepare("SELECT * FROM floors WHERE building_id = ? ORDER BY floor_number ASC");
+        $floorStmt->execute([$buildingId]);
+        $floors = $floorStmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        try {
+            $data = [
+                'building' => $building->toArray(),
+                'members' => $this->buildingMembersWithUnits($buildingId),
+                'units' => array_map(fn($u) => $u->toArray(), $this->unitService()->listUnitsByBuilding($buildingId)),
+                'blocks' => $blocks,
+                'floors' => $floors,
+                'unit_balances' => $costService->getUnitBalances($buildingId, $userId),
+                'payments' => $costService->listPaymentsByBuilding($buildingId),
+                'costs' => array_map(fn($c) => $c->toArray(), $costService->listCostsByBuilding($buildingId)),
+                'announcements' => array_map(fn($a) => $a->toArray(), $extraService->listAnnouncements($buildingId, $userId, 50)),
+                'maintenance' => array_map(fn($m) => $m->toArray(), $extraService->listMaintenanceRequests($buildingId, $userId, 50)),
+                'financial_summary' => $costService->getFinancialSummary($buildingId),
+            ];
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        }
 
         return (new Response())->setJson([
             'success' => true,
-            'data' => $members,
+            'data' => $data,
+        ]);
+    }
+
+    /**
+     * ساخت/اتصال گروهی کاربران و انتساب به واحدها — فقط مدیر ساختمان.
+     * بدنه: { rows: [{name, phone, unit_number|unit_id, role, password?}], force?: bool }
+     */
+    public function bulkCreateUsers(Request $request): Response
+    {
+        $buildingId = (int) $request->getAttribute('building_id');
+        if ($guard = $this->managerOnlyGuard($request, $buildingId)) {
+            return $guard;
+        }
+        $managerId = (int) ($request->getAttribute('user_id') ?? 0);
+
+        $body = $request->getJsonBody() ?? [];
+        $rows = $body['rows'] ?? [];
+        if (!is_array($rows)) {
+            return (new Response())->setStatusCode(422)->setJson([
+                'success' => false,
+                'message' => 'فیلد rows باید آرایه‌ای از ردیف‌ها باشد.',
+            ]);
+        }
+
+        $force = !empty($body['force']);
+        $defaultPassword = trim((string) ($body['default_password'] ?? ''));
+        if ($defaultPassword !== '' && mb_strlen($defaultPassword) < 6) {
+            return (new Response())->setStatusCode(422)->setJson([
+                'success' => false,
+                'message' => 'رمز پیش‌فرض باید حداقل ۶ کاراکتر باشد.',
+            ]);
+        }
+
+        // اعمال رمز پیش‌فرض روی ردیف‌هایی که رمز ندارند
+        if ($defaultPassword !== '') {
+            foreach ($rows as &$r) {
+                if (is_array($r) && trim((string) ($r['password'] ?? '')) === '') {
+                    $r['password'] = $defaultPassword;
+                }
+            }
+            unset($r);
+        }
+
+        try {
+            $outcome = (new \App\Services\BulkUserService())
+                ->createBulk($buildingId, $rows, $managerId, $force);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        $allFailed = $outcome['summary']['failed'] === count($rows);
+        return (new Response())->setStatusCode($allFailed ? 422 : 200)->setJson([
+            'success' => true,
+            'message' => sprintf(
+                '%d ساخته شد، %d متصل شد، %d رد شد، %d خطا',
+                $outcome['summary']['created'],
+                $outcome['summary']['linked'],
+                $outcome['summary']['skipped'],
+                $outcome['summary']['failed']
+            ),
+            'data' => $outcome,
         ]);
     }
 }

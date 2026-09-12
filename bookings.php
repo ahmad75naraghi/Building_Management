@@ -143,11 +143,16 @@ require_once 'includes/header.php';
 
     <?php if (empty($bookings)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">📅</div>
+            <div class="empty-icon">📅</div>
             رزروی ثبت نشده است.
+            <button type="button" class="empty-action" data-modal-open="add-booking">📅 ثبت اولین رزرو</button>
         </div>
     <?php else: ?>
-        <div class="space-y-3">
+                <div class="list-filter-bar">
+            <input type="search" class="form-input" data-list-search="bookings-list" placeholder="🔍 جستجوی رزرو، مشاع یا رزروکننده…" style="flex:1;">
+            <span class="list-count-chip" data-list-count="bookings-list"></span>
+        </div>
+        <div class="space-y-3" data-list-items="bookings-list">
             <?php foreach ($bookings as $booking): ?>
                 <?php
                 $b_id = (int) ($booking['id'] ?? 0);
@@ -166,7 +171,7 @@ require_once 'includes/header.php';
                                 <?= htmlspecialchars($area_names[$b_area] ?? 'مشاع') ?>
                             </h3>
                             <p class="text-sm text-gray-500 mt-1">
-                                <?php if ($b_date !== ''): ?>📅 <?= fa_digits($b_date) ?><?php endif; ?>
+                                <?php if ($b_date !== ''): ?>📅 <?= fa_date($b_date) ?><?php endif; ?>
                                 <?php if ($b_start !== ''): ?>
                                     • 🕐 <?= fa_digits(substr($b_start, 0, 5)) ?><?= $b_end !== '' ? ' تا ' . fa_digits(substr($b_end, 0, 5)) : '' ?>
                                 <?php endif; ?>
@@ -220,6 +225,7 @@ require_once 'includes/header.php';
                 </div>
             <?php endforeach; ?>
         </div>
+        <div data-list-pager="bookings-list"></div>
     <?php endif; ?>
 
 </main>

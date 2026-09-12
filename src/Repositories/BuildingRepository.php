@@ -43,9 +43,24 @@ final class BuildingRepository
         $exists = false;
         try {
             $db = Database::getConnection();
-            $stmt = $db->prepare("SHOW COLUMNS FROM buildings LIKE ?");
-            $stmt->execute([$column]);
-            $exists = (bool) $stmt->fetch();
+            if ($db->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+                // مسیر تست (اس‌کیولایت): فهرست ستون‌ها از PRAGMA
+                foreach ($db->query('PRAGMA table_info(buildings)')->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $col) {
+                    if (($col['name'] ?? '') === $column) {
+                        $exists = true;
+                        break;
+                    }
+                }
+            } else {
+                // information_schema به‌جای SHOW COLUMNS LIKE ? — در حالت بومی آماده‌سازی
+                // (بدون شبیه‌سازی کلاینت) جای‌گیر در دستور SHOW پشتیبانی نمی‌شود
+                $stmt = $db->prepare(
+                    "SELECT COUNT(*) FROM information_schema.COLUMNS
+                     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'buildings' AND COLUMN_NAME = ?"
+                );
+                $stmt->execute([$column]);
+                $exists = (int) $stmt->fetchColumn() > 0;
+            }
 
             // خودترمیمی: ستون گمشده را (در صورت شناخته‌شدن) بساز
             if (!$exists && isset(self::OPTIONAL_COLUMNS[$column])) {
@@ -182,6 +197,7 @@ final class BuildingRepository
             'total_floors' => $building->total_floors,
             'has_blocks' => (int) $building->has_blocks,
             'default_image' => $building->default_image,
+            'custom_logo_path' => $building->custom_logo_path,
             'parking_spots' => $building->parking_spots,
             'monthly_charge' => $building->monthly_charge,
             'monthly_charge_enabled' => (int) $building->monthly_charge_enabled,

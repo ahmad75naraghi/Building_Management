@@ -78,6 +78,31 @@ final class TicketRepository
         return $stmt->execute([$status, $assignedTo, $id]);
     }
 
+    /** ویرایش فیلدهای محتوایی تیکت (عنوان، شرح، دسته، اولویت) */
+    public function update(Ticket $ticket): bool
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "UPDATE tickets SET title = ?, description = ?, category = ?, priority = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+        );
+        return $stmt->execute([
+            $ticket->title,
+            $ticket->description,
+            $ticket->category,
+            $ticket->priority,
+            $ticket->id,
+        ]);
+    }
+
+    /** حذف فیزیکی تیکت — کامنت‌ها با ON DELETE CASCADE حذف می‌شوند */
+    public function delete(int $id): bool
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare("DELETE FROM tickets WHERE id = ?");
+        $stmt->execute([$id]);
+        return $stmt->rowCount() > 0;
+    }
+
     private function mapRow(array $row): Ticket
     {
         $t = new Ticket();

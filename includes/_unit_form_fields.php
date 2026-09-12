@@ -24,6 +24,22 @@
     </div>
 </div>
 
+<!-- پارکینگ و انباری -->
+<div style="border-top:1px solid #eef2f7;padding-top:14px;">
+    <p class="text-xs font-bold text-gray-500 mb-3">🚗 پارکینگ و انباری</p>
+    <div class="grid grid-cols-2 gap-3">
+        <div>
+            <label class="form-label">قطعه پارکینگ</label>
+            <input type="text" name="parking_no" maxlength="255" class="form-input" placeholder="مثال: 12 یا P-3">
+        </div>
+        <div>
+            <label class="form-label">قطعه انباری</label>
+            <input type="text" name="storage_no" maxlength="255" class="form-input" placeholder="مثال: 3 یا B-1">
+        </div>
+    </div>
+    <p class="text-[11px] text-gray-400 mt-1.5">اگر واحد چند قطعه دارد، با ویرگول جدا کنید (مثال: 12, 13). خالی بگذارید اگر ندارد.</p>
+</div>
+
 <?php if (!empty($blocks) || !empty($floors)): ?>
     <div class="grid grid-cols-2 gap-3">
         <?php if (!empty($blocks)): ?>
@@ -97,20 +113,22 @@
     <div>
         <label class="form-label">
             تعداد نفرات ساکن
-            <?php if (($charge_mode ?? 'fixed') === 'per_person'): ?>
+            <?php if (in_array(($charge_mode ?? 'fixed'), ['per_person', 'combined'], true)): ?>
                 <span style="color:var(--red-danger);">*</span>
             <?php endif; ?>
         </label>
         <input type="number" name="residents_count" min="0" inputmode="numeric" class="form-input" placeholder="مثال: 3" value="0">
         <?php if (($charge_mode ?? 'fixed') === 'per_person'): ?>
             <p class="text-[11px] text-gray-400 mt-1">شارژ این واحد = تعداد نفرات × نرخ هر نفر.</p>
+        <?php elseif (($charge_mode ?? 'fixed') === 'combined'): ?>
+            <p class="text-[11px] text-gray-400 mt-1">شارژ این واحد = مبلغ ثابت + (تعداد نفرات × نرخ هر نفر).</p>
         <?php endif; ?>
     </div>
 
     <?php if (($charge_mode ?? 'fixed') === 'custom'): ?>
         <div style="margin-top:12px;">
             <label class="form-label">شارژ اختصاصی این واحد (تومان)</label>
-            <input type="number" name="custom_charge" min="0" step="1000" inputmode="numeric" class="form-input" placeholder="مثال: 450000">
+            <input type="number" name="custom_charge" min="0" step="1" inputmode="numeric" class="form-input" placeholder="مثال: 450000">
         </div>
     <?php else: ?>
         <input type="hidden" name="custom_charge" value="">

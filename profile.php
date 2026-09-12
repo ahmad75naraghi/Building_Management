@@ -14,6 +14,39 @@ $user_name = $me_response['data']['name'] ?? ($_SESSION['user_name'] ?? 'کار�
 $user_email = $me_response['data']['email'] ?? '';
 $user_phone = $me_response['data']['phone'] ?? '';
 $first_letter = mb_substr($user_name, 0, 1, 'UTF-8');
+$my_user_id = (int) ($_SESSION['user_id'] ?? ($me_response['data']['id'] ?? 0));
+
+// ساختمان‌های من: نقش + واحدهای مرتبط کاربر در هر ساختمان
+$my_buildings = [];
+$buildings_response = callAPI('GET', '/buildings');
+if (!empty($buildings_response['success']) && is_array($buildings_response['data'] ?? null)) {
+    foreach ($buildings_response['data'] as $bld) {
+        $bid = (int) ($bld['id'] ?? 0);
+        if ($bid <= 0) {
+            continue;
+        }
+        $entry = [
+            'id' => $bid,
+            'name' => (string) ($bld['name'] ?? 'ساختمان'),
+            'role' => (string) ($bld['my_role'] ?? 'resident'),
+            'units' => [],
+        ];
+        $units_response = callAPI('GET', '/buildings/' . $bid . '/units');
+        if (!empty($units_response['success'])) {
+            foreach ($units_response['data']['units'] ?? [] as $u) {
+                $is_owner = (int) ($u['owner_user_id'] ?? 0) === $my_user_id;
+                $is_tenant = (int) ($u['tenant_user_id'] ?? 0) === $my_user_id;
+                if ($is_owner || $is_tenant) {
+                    $entry['units'][] = [
+                        'number' => (string) ($u['unit_number'] ?? ''),
+                        'relation' => $is_owner ? 'مالک' : 'مستأجر',
+                    ];
+                }
+            }
+        }
+        $my_buildings[] = $entry;
+    }
+}
 
 $page_title = 'پروفایل من';
 $header_sub = $user_phone ?: ($user_email ?: 'حساب کاربری');
@@ -44,6 +77,40 @@ require_once 'includes/header.php';
                 </div>
                 <span style="display: inline-block; margin-top: 10px; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); padding: 4px 14px; border-radius: 999px; font-size: 11px; font-weight: 700;">حساب فعال</span>
             </div>
+        </section>
+
+        <!-- ساختمان‌های من: نقش و واحدهای مرتبط -->
+        <section class="quick-access-section" style="margin-top: 20px;">
+            <div class="section-header-row">
+                <span class="section-title">ساختمان‌های من</span>
+                <a href="index.php" class="widget-view-all-link">لیست ساختمان‌ها</a>
+            </div>
+
+            <?php if (empty($my_buildings)): ?>
+                <div class="empty-state">
+                    <div class="empty-icon">🏢</div>
+                    هنوز عضو ساختمانی نیستید.
+                    <a class="empty-action" href="building_add.php">🏢 ثبت ساختمان جدید</a>
+                </div>
+            <?php else: ?>
+                <?php foreach ($my_buildings as $mb): ?>
+                    <a href="dashboard.php?building_id=<?= $mb['id'] ?>" class="info-row">
+                        <div class="info-row-right">
+                            <div class="info-row-icon" style="background: #eff6ff; color: #3b82f6;">🏢</div>
+                            <span class="info-row-label">
+                                <?= htmlspecialchars($mb['name']) ?>
+                                <span style="display:block; font-size:10px; color:var(--text-gray); font-weight:600; margin-top:2px;">
+                                    نقش: <?= htmlspecialchars(member_role_label($mb['role'])) ?>
+                                    <?php if (!empty($mb['units'])): ?>
+                                        · <?php foreach ($mb['units'] as $i => $un): ?><?= $i > 0 ? '، ' : '' ?>واحد <?= fa_digits(htmlspecialchars($un['number'])) ?> (<?= htmlspecialchars($un['relation']) ?>)<?php endforeach; ?>
+                                    <?php endif; ?>
+                                </span>
+                            </span>
+                        </div>
+                        <span class="info-chevron">❯</span>
+                    </a>
+                <?php endforeach; ?>
+            <?php endif; ?>
         </section>
 
         <!-- بخش اطلاعات حساب -->

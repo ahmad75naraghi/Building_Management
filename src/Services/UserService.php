@@ -55,7 +55,7 @@ final class UserService
         try {
             (new SmsService())->sendWelcomeSms($phone, $name);
         } catch (\Throwable $e) {
-            Logger::error('UserService', 'ارسال پیامک خوش‌آمدگویی ناموفق بود', ['user_id' => $userId], $e);
+            Logger::error('UserService', 'ارسال پیامک خوش‌آمدگویی ناموفق بود', ['user_id' => $id], $e);
         }
 
         return $user;

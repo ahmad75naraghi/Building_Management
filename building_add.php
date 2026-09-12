@@ -201,7 +201,7 @@ require_once 'includes/header.php';
                         </label>
                         <div class="mt-3">
                             <label for="monthly_charge" class="form-label">مبلغ شارژ ثابت هر ماه (تومان)</label>
-                            <input type="number" id="monthly_charge" name="monthly_charge" min="0" step="1000" class="form-input" placeholder="مثال: 500000">
+                            <input type="number" id="monthly_charge" name="monthly_charge" min="0" step="1" class="form-input" placeholder="مثال: 500000">
                             <p class="text-[11px] text-gray-500 mt-1">هر ماه به‌صورت خودکار به بدهکاری واحدها اضافه می‌شود.</p>
                         </div>
                     </div>

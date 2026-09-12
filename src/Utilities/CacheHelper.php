@@ -19,8 +19,9 @@ final class CacheHelper
                 'port' => AppConfig::REDIS_PORT,
                 'database' => AppConfig::REDIS_DB,
             ];
-            if (AppConfig::REDIS_PASSWORD !== null) {
-                $params['password'] = AppConfig::REDIS_PASSWORD;
+            $redisPassword = AppConfig::env('REDIS_PASSWORD');
+            if ($redisPassword !== null && $redisPassword !== '') {
+                $params['password'] = $redisPassword;
             }
             self::$redis = new Client($params);
         }

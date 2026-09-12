@@ -66,6 +66,10 @@
         /* 4) تأیید قبل از اقدامات حساس */
         document.querySelectorAll('[data-confirm]').forEach(function (el) {
             el.addEventListener('click', function (e) {
+                /* برگهٔ تأیید شیتمر (ui-enhance.js) مسئول این فرم است */
+                if (el.hasAttribute && el.hasAttribute('data-confirm-sheet')) {
+                    return;
+                }
                 var msg = el.getAttribute('data-confirm') || 'آیا مطمئن هستید؟';
                 if (!window.confirm(msg)) {
                     e.preventDefault();

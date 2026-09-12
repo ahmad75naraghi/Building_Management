@@ -51,6 +51,30 @@ $building_id = (int) ($active_building['id'] ?? 0);
 $my_role = $active_building['my_role'] ?? 'resident';
 $is_manager = ($my_role === 'manager');
 
+// ---- حذف واحد از پاپ‌آپ نمای گرافیکی (فقط مدیر) — سپس ریدایرکت برای جلوگیری از ثبت مجدد ----
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form_action'] ?? '') === 'delete_unit') {
+    $unit_id = (int) ($_POST['unit_id'] ?? 0);
+    if (!$is_manager) {
+        header("Location: dashboard.php?building_id={$building_id}&flash=forbidden");
+        exit;
+    }
+    $del_response = callAPI('DELETE', '/units/' . $unit_id);
+    header("Location: dashboard.php?building_id={$building_id}&flash=" . (!empty($del_response['success']) ? 'unit_deleted' : 'unit_delete_failed'));
+    exit;
+}
+
+// پیام‌های ریدایرکت (PRG)
+$flash_messages = [
+    'unit_deleted' => ['واحد با موفقیت حذف شد.', 'success'],
+    'unit_delete_failed' => ['خطا در حذف واحد.', 'error'],
+    'forbidden' => ['این عملیات فقط برای مدیر ساختمان مجاز است.', 'error'],
+];
+$alert_message = '';
+$alert_type = 'error';
+if (isset($_GET['flash'], $flash_messages[$_GET['flash']])) {
+    [$alert_message, $alert_type] = $flash_messages[$_GET['flash']];
+}
+
 // دریافت اعلانات برای عدد زنگوله
 $notif_response = callAPI('GET', '/notifications');
 $unread_notifs = 0;
@@ -64,30 +88,77 @@ if (isset($notif_response['success']) && $notif_response['success'] === true) {
 
 // ---------- داده‌های واقعی داشبورد (بر اساس ساختمان فعال) ----------
 
-// اعضای ساختمان
-$members_count = 0;
-if ($building_id > 0) {
-    $members_response = callAPI('GET', '/buildings/' . $building_id . '/members');
-    if (isset($members_response['success']) && $members_response['success'] === true) {
-        $members_count = is_array($members_response['data']) ? count($members_response['data']) : 0;
-    }
-}
-
-// اعلان‌های اخیر (ماژول اطلاعیه‌ها)
+// ---------- دادهٔ تجمیعی داشبورد — یک درخواست به‌جای ~۱۰ درخواست مجزا ----------
+$members = [];
+$units = [];
+$blocks = [];
+$floors = [];
+$unit_balances_by_unit = [];
+$all_payments = [];
+$all_costs = [];
 $announcements = [];
+$maintenance_requests = [];
+$financial = [
+    'total_costs' => 0,
+    'total_collected' => 0,
+    'total_remaining' => 0,
+    'collection_percentage' => 0,
+];
 if ($building_id > 0) {
-    $announcements_response = callAPI('GET', '/announcements?building_id=' . $building_id);
-    if (isset($announcements_response['success']) && $announcements_response['success'] === true) {
-        $announcements = is_array($announcements_response['data']) ? $announcements_response['data'] : [];
+    $dash_response = callAPI('GET', '/buildings/' . $building_id . '/dashboard');
+    if (!empty($dash_response['success']) && is_array($dash_response['data'] ?? null)) {
+        $d = $dash_response['data'];
+        $members = is_array($d['members'] ?? null) ? $d['members'] : [];
+        $units = is_array($d['units'] ?? null) ? $d['units'] : [];
+        $blocks = is_array($d['blocks'] ?? null) ? $d['blocks'] : [];
+        $floors = is_array($d['floors'] ?? null) ? $d['floors'] : [];
+        foreach ($d['unit_balances'] ?? [] as $bal) {
+            $unit_balances_by_unit[(int) ($bal['unit_id'] ?? 0)] = $bal;
+        }
+        $all_payments = is_array($d['payments'] ?? null) ? $d['payments'] : [];
+        $all_costs = is_array($d['costs'] ?? null) ? $d['costs'] : [];
+        $announcements = is_array($d['announcements'] ?? null) ? $d['announcements'] : [];
+        $maintenance_requests = is_array($d['maintenance'] ?? null) ? $d['maintenance'] : [];
+        $financial = array_merge($financial, is_array($d['financial_summary'] ?? null) ? $d['financial_summary'] : []);
     }
 }
+$members_count = count($members);
 
-// درخواست‌های اخیر (ماژول تعمیرات)
-$maintenance_requests = [];
-if ($building_id > 0) {
-    $maintenance_response = callAPI('GET', '/maintenance?building_id=' . $building_id);
-    if (isset($maintenance_response['success']) && $maintenance_response['success'] === true) {
-        $maintenance_requests = is_array($maintenance_response['data']) ? $maintenance_response['data'] : [];
+// ---------- «واحد من»: واحدِ کاربر جاری، مانده و پرداخت‌نشده‌ها ----------
+$my_user_id = (int) ($_SESSION['user_id'] ?? 0);
+$my_unit = null;
+foreach ($units as $u) {
+    if ((int) ($u['owner_user_id'] ?? 0) === $my_user_id || (int) ($u['tenant_user_id'] ?? 0) === $my_user_id) {
+        $my_unit = $u;
+        break;
+    }
+}
+$my_balance = $my_unit ? ($unit_balances_by_unit[(int) ($my_unit['id'] ?? 0)] ?? null) : null;
+
+// جمع پرداخت‌نشده‌های من + نزدیک‌ترین مهلت پرداخت
+$my_unpaid_total = 0.0;
+$my_unpaid_count = 0;
+$my_next_due = null;
+if ($my_user_id > 0 && $building_id > 0) {
+    $my_pending_cost_ids = [];
+    foreach ($all_payments as $p) {
+        if ((int) ($p['user_id'] ?? 0) !== $my_user_id || ($p['status'] ?? '') === 'confirmed') {
+            continue;
+        }
+        $my_unpaid_total += (float) ($p['share_amount'] ?? 0);
+        $my_unpaid_count++;
+        $my_pending_cost_ids[] = (int) ($p['cost_id'] ?? 0);
+    }
+    if ($my_pending_cost_ids) {
+        foreach ($all_costs as $c) {
+            if (!in_array((int) ($c['id'] ?? 0), $my_pending_cost_ids, true)) {
+                continue;
+            }
+            $due = (string) ($c['due_date'] ?? '');
+            if ($due !== '' && ($my_next_due === null || $due < $my_next_due)) {
+                $my_next_due = $due;
+            }
+        }
     }
 }
 
@@ -96,20 +167,6 @@ $active_requests_count = 0;
 foreach ($maintenance_requests as $mr) {
     if (in_array($mr['status'] ?? '', ['pending', 'in_progress'], true)) {
         $active_requests_count++;
-    }
-}
-
-// وضعیت مالی ساختمان
-$financial = [
-    'total_costs' => 0,
-    'total_collected' => 0,
-    'total_remaining' => 0,
-    'collection_percentage' => 0,
-];
-if ($building_id > 0) {
-    $financial_response = callAPI('GET', '/costs/summary?building_id=' . $building_id);
-    if (isset($financial_response['success']) && $financial_response['success'] === true) {
-        $financial = array_merge($financial, $financial_response['data']);
     }
 }
 
@@ -160,12 +217,17 @@ require_once 'includes/header.php';
 
                 <?php if ($active_building): ?>
                     <?php if ($is_manager): ?>
-                    <button class="btn-view-profile" onclick="window.location.href='building_view.php?id=<?= $active_building['id'] ?>'">
-                        <span>مشاهده پروفایل ساختمان</span>
+                    <button class="btn-view-profile" onclick="window.location.href='costs.php?building_id=<?= (int) $active_building['id'] ?>'">
+                        <span>مدیریت مالی و شارژ</span>
                         <svg width="6" height="10" viewBox="0 0 6 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M5 9 1 5l4-4" />
                         </svg>
                     </button>
+                    <div style="display:flex; gap:8px; margin-top:8px;">
+                        <button class="btn-view-profile" style="flex:1;" onclick="window.location.href='building_edit.php?id=<?= (int) $active_building['id'] ?>'">
+                            <span>ویرایش اطلاعات ساختمان</span>
+                        </button>
+                    </div>
                     <?php else: ?>
                     <button class="btn-view-profile" onclick="window.location.href='costs.php?building_id=<?= $active_building['id'] ?>'">
                         <span>مشاهده و پرداخت شارژ</span>
@@ -189,9 +251,68 @@ require_once 'includes/header.php';
         </section>
 
         <?php if (!$is_manager): ?>
-        <div class="app-alert" style="background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;border-radius:14px;padding:10px 14px;font-size:12px;margin:12px 0 0;">
+        <div class="app-alert app-alert-info" style="margin:12px 0 0;font-size:12px;">
             شما با نقش «<?= htmlspecialchars(member_role_label($my_role)) ?>» وارد شده‌اید؛ دسترسی‌های مدیریتی برای شما نمایش داده نمی‌شود.
         </div>
+        <?php endif; ?>
+
+        <?php if ($my_unit): ?>
+        <!-- کارت «واحد من»: وضعیت مالی و مشخصات واحد کاربر جاری -->
+        <section class="my-unit-card card" style="margin-top:12px; padding:16px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:20px;">🏠</span>
+                    <div>
+                        <strong style="font-size:13px;">واحد من — <?= fa_digits(htmlspecialchars((string) ($my_unit['unit_number'] ?? ''))) ?></strong>
+                        <div style="font-size:10px; color:var(--text-gray);">
+                            <?= htmlspecialchars($my_unit['type'] === 'commercial' ? 'تجاری' : ($my_unit['type'] === 'office' ? 'اداری' : 'مسکونی')) ?>
+                            <?php if (!empty($my_unit['residents_count'])): ?> · <?= fa_digits($my_unit['residents_count']) ?> ساکن<?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                <?php if ($my_balance): ?>
+                    <?php $bal = (float) ($my_balance['balance'] ?? 0); ?>
+                    <span style="font-size:11px; font-weight:800; padding:5px 10px; border-radius:999px;
+                        background: <?= $bal < 0 ? '#fee2e2' : ($bal > 0 ? '#d1fae5' : '#e2e8f0') ?>;
+                        color: <?= $bal < 0 ? '#991b1b' : ($bal > 0 ? '#065f46' : '#475569') ?>;">
+                        <?= $bal < 0 ? fa_number(abs($bal)) . ' تومان بدهکار' : ($bal > 0 ? fa_number($bal) . ' تومان طلبکار' : 'تسویه شده') ?>
+                    </span>
+                <?php endif; ?>
+            </div>
+
+            <?php if ($my_unpaid_count > 0): ?>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:#fff7ed; border:1px solid #fed7aa; border-radius:12px; padding:10px 12px;">
+                <div style="font-size:12px; color:#9a3412;">
+                    💳 <strong><?= fa_number($my_unpaid_total) ?> تومان</strong>
+                    پرداخت‌نشده (<?= fa_digits($my_unpaid_count) ?> مورد)
+                    <?php if ($my_next_due): ?>
+                        <div style="font-size:10px; margin-top:3px;">⏰ مهلت پرداخت: <?= fa_date($my_next_due) ?></div>
+                    <?php endif; ?>
+                </div>
+                <button class="btn-view-profile" style="white-space:nowrap;" onclick="window.location.href='costs.php?building_id=<?= (int) $building_id ?>'">
+                    <span>پرداخت</span>
+                </button>
+            </div>
+            <?php else: ?>
+            <div style="font-size:12px; color:#047857; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:12px; padding:10px 12px;">
+                ✅ پرداخت باز یا معوقی ندارید.
+                <?php if ($my_next_due): ?>
+                    <div style="font-size:10px; margin-top:3px; color:var(--text-gray);">⏰ مهلت بعدی: <?= fa_date($my_next_due) ?></div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
+            <?php if (!empty($my_unit['parking_no']) || !empty($my_unit['storage_no'])): ?>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;">
+                <?php if (!empty($my_unit['parking_no'])): ?>
+                    <span class="chip chip-gray">🅿️ پارکینگ: <?= fa_digits(htmlspecialchars((string) $my_unit['parking_no'])) ?></span>
+                <?php endif; ?>
+                <?php if (!empty($my_unit['storage_no'])): ?>
+                    <span class="chip chip-gray">📦 انباری: <?= fa_digits(htmlspecialchars((string) $my_unit['storage_no'])) ?></span>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+        </section>
         <?php endif; ?>
 
         <!-- کارت سفید آمار ۴ ستونه -->
@@ -322,6 +443,14 @@ require_once 'includes/header.php';
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                     </svg>
                     <span>مدارک ساختمان</span>
+                </div>
+                <!-- آیتم ۴ب: لاگ ممیزی اقدامات -->
+                <div class="quick-btn-item" onclick="window.location.href='audit_logs.php?building_id=<?= (int) $building_id ?>'" style="cursor:pointer;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                    <span>لاگ اقدامات</span>
                 </div>
                 <?php endif; ?>
                 <!-- آیتم ۵ -->
@@ -538,5 +667,17 @@ require_once 'includes/header.php';
         </section>
 
         <?php endif; ?>
+
+        <?php
+        // بخش‌های ساختمان (ساختار مجتمع، نمای واحدها، ماژول‌ها و اطلاعات اجمالی)
+        // — صفحهٔ جداگانهٔ «پروفایل ساختمان» حذف و در همین داشبورد یکپارچه شده است.
+        $bv_members = $members;
+        $bv_units = $units;
+        $bv_blocks = $blocks;
+        $bv_floors = $floors;
+        $bv_financial = $financial;
+        $bv_balances = $unit_balances_by_unit;
+        require 'includes/_building_profile_sections.php';
+        ?>
 
 <?php require_once 'includes/footer.php'; ?>

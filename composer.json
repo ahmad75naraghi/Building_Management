@@ -14,6 +14,7 @@
         "symfony/http-foundation": "^7.1"
     },
     "require-dev": {
+        "phpstan/phpstan": "^1.12",
         "phpunit/phpunit": "^11.0"
     },
     "autoload": {
@@ -30,6 +31,11 @@
     "scripts": {
         "test": "php tests/Integration/run.php",
         "test:unit": "vendor/bin/phpunit",
+        "analyse": "phpstan analyse",
+        "quality": [
+            "@analyse",
+            "@test"
+        ],
         "health": "php scripts/healthcheck.php",
         "migrate": "php scripts/migrator.php",
         "migrate:status": "php scripts/migrator.php --status",

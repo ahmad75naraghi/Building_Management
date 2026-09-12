@@ -299,8 +299,10 @@ final class ExtraModulesRepository
     {
         $db = Database::getConnection();
         $stmt = $db->prepare(
-            "INSERT INTO documents (building_id, title, file_path, document_type, uploaded_by)
-             VALUES (?, ?, ?, ?, ?)"
+            "INSERT INTO documents
+                (building_id, title, file_path, document_type, uploaded_by,
+                 stored_name, mime_type, file_size, is_visible_to_members)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
         $stmt->execute([
             $document->building_id,
@@ -308,16 +310,52 @@ final class ExtraModulesRepository
             $document->file_path,
             $document->document_type,
             $document->uploaded_by,
+            $document->stored_name,
+            $document->mime_type,
+            $document->file_size,
+            $document->is_visible_to_members,
         ]);
         return (int) $db->lastInsertId();
     }
 
-    public function findDocumentsByBuildingId(int $buildingId): array
+    /**
+     * فهرست اسناد ساختمان.
+     *
+     * @param bool $includeHidden اگر false باشد فقط اسناد قابل رویت برای اعضا برمی‌گردد
+     *                            (نمای اعضا؛ مدیران همیشه فهرست کامل را می‌بینند).
+     */
+    public function findDocumentsByBuildingId(int $buildingId, bool $includeHidden = true): array
     {
         $db = Database::getConnection();
-        $stmt = $db->prepare("SELECT * FROM documents WHERE building_id = ? ORDER BY created_at DESC");
+        $sql = "SELECT * FROM documents WHERE building_id = ?";
+        if (!$includeHidden) {
+            $sql .= " AND is_visible_to_members = 1";
+        }
+        $sql .= " ORDER BY created_at DESC, id DESC";
+        $stmt = $db->prepare($sql);
         $stmt->execute([$buildingId]);
         return array_map(fn($r) => $this->mapDocument($r), $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    public function findDocumentById(int $id): ?Document
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare("SELECT * FROM documents WHERE id = ?");
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row === false ? null : $this->mapDocument($row);
+    }
+
+    /** تعویض فایل یک سند (نام تصادفی جدید + متادیتا) */
+    public function updateDocumentFile(int $id, string $storedName, string $mimeType, int $fileSize): bool
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "UPDATE documents
+             SET stored_name = ?, mime_type = ?, file_size = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?"
+        );
+        return $stmt->execute([$storedName, $mimeType, $fileSize, $id]);
     }
 
     private function mapDocument(array $row): Document
@@ -330,6 +368,12 @@ final class ExtraModulesRepository
         $d->document_type = $row['document_type'];
         $d->uploaded_by = (int) $row['uploaded_by'];
         $d->created_at = $row['created_at'];
+        $d->stored_name = isset($row['stored_name']) && $row['stored_name'] !== null && $row['stored_name'] !== ''
+            ? (string) $row['stored_name'] : null;
+        $d->mime_type = isset($row['mime_type']) ? (string) $row['mime_type'] : null;
+        $d->file_size = isset($row['file_size']) && $row['file_size'] !== null ? (int) $row['file_size'] : null;
+        $d->is_visible_to_members = isset($row['is_visible_to_members']) ? (int) $row['is_visible_to_members'] : 1;
+        $d->updated_at = isset($row['updated_at']) && $row['updated_at'] !== null ? (string) $row['updated_at'] : null;
         return $d;
     }
 
@@ -488,7 +532,13 @@ final class ExtraModulesRepository
     public function findReviewsByBuildingId(int $buildingId): array
     {
         $db = Database::getConnection();
-        $stmt = $db->prepare("SELECT * FROM reviews WHERE building_id = ? ORDER BY created_at DESC");
+        $stmt = $db->prepare(
+            "SELECT r.*, u.name AS user_name
+             FROM reviews r
+             LEFT JOIN users u ON r.user_id = u.id
+             WHERE r.building_id = ?
+             ORDER BY r.created_at DESC, r.id DESC"
+        );
         $stmt->execute([$buildingId]);
         return array_map(fn($r) => $this->mapReview($r), $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
@@ -498,6 +548,7 @@ final class ExtraModulesRepository
         $r = new Review();
         $r->id = (int) $row['id'];
         $r->building_id = (int) $row['building_id'];
+        $r->user_name = isset($row['user_name']) && $row['user_name'] !== null ? (string) $row['user_name'] : null;
         $r->user_id = (int) $row['user_id'];
         $r->category_id = $row['category_id'] !== null ? (int) $row['category_id'] : null;
         $r->rating = (int) $row['rating'];
@@ -537,9 +588,9 @@ final class ExtraModulesRepository
         'bookings' => ['booking_date', 'start_time', 'end_time', 'status', 'common_area_id'],
         'announcements' => ['title', 'content', 'is_pinned'],
         'maintenance' => ['title', 'description', 'status', 'assigned_technician_id'],
-        'votes' => ['title', 'description', 'end_date', 'status'],
+        'votes' => ['title', 'description', 'start_date', 'end_date', 'status'],
         'visitors' => ['visitor_name', 'visitor_car_plate', 'visit_date', 'entry_time', 'exit_time', 'status'],
-        'documents' => ['title', 'document_type'],
+        'documents' => ['title', 'document_type', 'file_path', 'is_visible_to_members'],
         'consumption' => ['consumption_type', 'reading_value', 'reading_date', 'notes', 'unit_id'],
         'emergency-contacts' => ['contact_name', 'contact_role', 'phone', 'email'],
         'meetings' => ['title', 'description', 'meeting_date', 'location', 'status'],

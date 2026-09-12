@@ -101,8 +101,9 @@ require_once 'includes/header.php';
 
     <?php if (empty($blocks)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">🏢</div>
+            <div class="empty-icon">🏢</div>
             هنوز بلوکی ثبت نشده است.
+            <button type="button" class="empty-action" data-modal-open="add-block">➕ افزودن اولین بلوک</button>
         </div>
     <?php else: ?>
         <div class="space-y-3">

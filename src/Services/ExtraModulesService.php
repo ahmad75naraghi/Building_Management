@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Core\Logger;
 use App\Exceptions\AppException;
 use App\Exceptions\ValidationException;
 use App\Models\Announcement;
@@ -43,7 +44,7 @@ final class ExtraModulesService
     private function requireMember(int $userId, int $buildingId): void
     {
         if (!$this->repo->isBuildingMember($userId, $buildingId)) {
-            throw new AppException('You are not a member of this building');
+            throw new AppException('شما عضو این ساختمان نیستید.');
         }
     }
 
@@ -77,6 +78,12 @@ final class ExtraModulesService
 
         $id = $this->repo->createBooking($booking);
         $booking->id = $id;
+
+        // اعلان رزرو جدید به مدیر ساختمان (اگر رزروکننده خودش مدیر نباشد)
+        $this->notifyManagerNewRecord($buildingId, $userId, 'رزرو جدید', 'رزرو جدیدی برای مشاعات ثبت شده و نیازمند بررسی است.', [
+            'booking_id' => $id,
+        ]);
+
         return $booking;
     }
 
@@ -111,6 +118,22 @@ final class ExtraModulesService
 
         $id = $this->repo->createAnnouncement($announcement);
         $announcement->id = $id;
+
+        // اعلان سراسری: همهٔ اعضای فعال ساختمان از اطلاعیهٔ جدید باخبر شوند
+        // (ایجادکننده خودش مطلع است و اعلان نمی‌گیرد)
+        try {
+            (new NotificationService())->broadcastToBuilding(
+                $buildingId,
+                'announcement',
+                '📢 اطلاعیه جدید: ' . $announcement->title,
+                mb_substr((string) $announcement->content, 0, 160),
+                ['announcement_id' => $id],
+                [$userId]
+            );
+        } catch (\Throwable $e) {
+            Logger::error('ExtraModules', 'اعلان اطلاعیهٔ جدید ارسال نشد', ['announcement_id' => $id], $e);
+        }
+
         return $announcement;
     }
 
@@ -143,6 +166,12 @@ final class ExtraModulesService
 
         $id = $this->repo->createMaintenanceRequest($request);
         $request->id = $id;
+
+        // اعلان درخواست تعمیرات جدید به مدیر ساختمان
+        $this->notifyManagerNewRecord($buildingId, $userId, 'درخواست تعمیرات جدید', 'درخواست تعمیرات «' . $request->title . '» ثبت شد.', [
+            'maintenance_id' => $id,
+        ]);
+
         return $request;
     }
 
@@ -159,6 +188,7 @@ final class ExtraModulesService
     public function createVote(array $data, int $userId): Vote
     {
         $buildingId = $this->buildingIdOrThrow($data, $userId);
+        $this->requireManager($userId, $buildingId);
 
         $errors = Validator::validate($data, ['title' => 'required']);
         if (!empty($errors)) {
@@ -180,6 +210,24 @@ final class ExtraModulesService
         // در صورت ارسال گزینه‌ها همراه درخواست، بلافاصله ثبت می‌شوند
         if (!empty($data['options']) && is_array($data['options'])) {
             $this->repo->createVoteOptions($id, $data['options']);
+        }
+
+        \App\Core\Audit::log($userId, 'vote.create', 'vote', $id, $buildingId, [
+            'title' => $vote->title,
+        ]);
+
+        // اعلان سراسری شروع رأی‌گیری برای همهٔ اعضای فعال
+        try {
+            (new NotificationService())->broadcastToBuilding(
+                $buildingId,
+                'vote',
+                '🗳️ رأی‌گیری جدید: ' . $vote->title,
+                'رأی‌گیری جدیدی در ساختمان شروع شده است. لطفاً نظر خود را ثبت کنید.',
+                ['vote_id' => $id],
+                [$userId]
+            );
+        } catch (\Throwable $e) {
+            Logger::error('ExtraModules', 'اعلان رأی‌گیری جدید ارسال نشد', ['vote_id' => $id], $e);
         }
 
         return $this->enrichVote($vote, $userId);
@@ -205,7 +253,7 @@ final class ExtraModulesService
         }
         $this->requireMember($userId, $vote->building_id);
         if ($vote->status !== 'active') {
-            throw new AppException('Vote is closed and cannot accept new options');
+            throw new AppException('رأی‌گیری بسته شده و گزینهٔ جدید نمی‌پذیرد.');
         }
 
         $clean = [];
@@ -236,19 +284,28 @@ final class ExtraModulesService
         $this->requireMember($userId, $vote->building_id);
 
         if ($vote->status !== 'active') {
-            throw new AppException('Vote is closed');
+            throw new AppException('رأی‌گیری بسته شده است.');
         }
-        if ($vote->end_date && strtotime($vote->end_date) < time()) {
-            throw new AppException('Voting period has ended');
+        if ($vote->start_date && strtotime((string) $vote->start_date) > time()) {
+            throw new AppException('رأی‌گیری هنوز شروع نشده است.');
+        }
+        if ($vote->end_date && strtotime((string) $vote->end_date) < time()) {
+            throw new AppException('مهلت رأی‌گیری به پایان رسیده است.');
         }
         if (!$this->repo->optionBelongsToVote($optionId, $voteId)) {
             throw new AppException('Invalid vote option');
         }
         if ($this->repo->hasUserVoted($voteId, $userId)) {
-            throw new AppException('You have already voted in this poll');
+            throw new AppException('شما قبلاً در این نظرسنجی رأی داده‌اید.');
         }
 
-        return $this->repo->castVote($voteId, $userId, $optionId);
+        $cast = $this->repo->castVote($voteId, $userId, $optionId);
+        if ($cast) {
+            \App\Core\Audit::log($userId, 'vote.cast', 'vote', $voteId, $vote->building_id, [
+                'option_id' => $optionId,
+            ]);
+        }
+        return $cast;
     }
 
     /**
@@ -355,9 +412,23 @@ final class ExtraModulesService
     // Documents
     // ------------------------------------------------------------------
 
+    /** ثبت/ویرایش/حذف اسناد ساختمان فقط با مدیر ساختمان است. */
+    private function requireManager(int $userId, int $buildingId): void
+    {
+        if ($this->repo->memberRole($userId, $buildingId) !== 'manager') {
+            throw new AppException('فقط مدیر ساختمان می‌تواند اسناد را مدیریت کند.');
+        }
+    }
+
+    /**
+     * ثبت سند با «لینک خارجی» (بدون آپلود فایل) — فقط مدیر.
+     *
+     * @param array<string, mixed> $data
+     */
     public function createDocument(array $data, int $userId): Document
     {
         $buildingId = $this->buildingIdOrThrow($data, $userId);
+        $this->requireManager($userId, $buildingId);
 
         $errors = Validator::validate($data, [
             'title' => 'required',
@@ -371,18 +442,126 @@ final class ExtraModulesService
         $document->building_id = $buildingId;
         $document->title = $data['title'];
         $document->file_path = $data['file_path'];
-        $document->document_type = $data['document_type'] ?? 'general';
+        $document->document_type = Document::normalizeCategory($data['document_type'] ?? null);
         $document->uploaded_by = $userId;
+        $document->is_visible_to_members = self::flagFromInput($data['is_visible_to_members'] ?? 1);
 
         $id = $this->repo->createDocument($document);
         $document->id = $id;
+        \App\Core\Audit::log($userId, 'document.create', 'document', $id, $buildingId, [
+            'title' => $document->title, 'category' => $document->document_type, 'type' => 'link',
+        ]);
         return $document;
     }
 
+    /**
+     * ثبت سند با آپلود فایل واقعی — فقط مدیر.
+     * فایل با نام تصادفی و خارج از دسترس مستقیم وب ذخیره می‌شود.
+     *
+     * @param array<string, mixed> $meta building_id, title, document_type, is_visible_to_members
+     */
+    public function uploadDocument(array $meta, int $userId, string $fileContent, string $originalName): Document
+    {
+        $buildingId = $this->buildingIdOrThrow($meta, $userId);
+        $this->requireManager($userId, $buildingId);
+
+        $title = trim((string) ($meta['title'] ?? ''));
+        if ($title === '') {
+            throw new ValidationException('title is required');
+        }
+
+        $stored = \App\Utilities\FileStorage::saveDocument($fileContent, $buildingId);
+
+        $document = new Document();
+        $document->building_id = $buildingId;
+        $document->title = $title;
+        // مسیر فیزیکی فقط برای مرجع داخلی؛ هرگز به کاربر نهایی نشان داده نمی‌شود
+        $document->file_path = 'upload://' . $stored['stored_name'];
+        $document->document_type = Document::normalizeCategory($meta['document_type'] ?? null);
+        $document->uploaded_by = $userId;
+        $document->stored_name = $stored['stored_name'];
+        $document->mime_type = $stored['mime_type'];
+        $document->file_size = $stored['file_size'];
+        $document->is_visible_to_members = self::flagFromInput($meta['is_visible_to_members'] ?? 1);
+
+        $id = $this->repo->createDocument($document);
+        $document->id = $id;
+        \App\Core\Audit::log($userId, 'document.create', 'document', $id, $buildingId, [
+            'title' => $document->title, 'category' => $document->document_type, 'type' => 'file',
+        ]);
+        return $document;
+    }
+
+    /** تبدیل ورودی‌های مختلف (بولین/رشته/عدد) به پرچم ۰ یا ۱ */
+    private static function flagFromInput(mixed $value): int
+    {
+        if (is_bool($value)) {
+            return $value ? 1 : 0;
+        }
+        if (is_string($value)) {
+            return filter_var($value, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
+        }
+        return ((int) $value) !== 0 ? 1 : 0;
+    }
+
+    /**
+     * فهرست اسناد ساختمان بر اساس نقش:
+     * مدیر همه اسناد (حتی غیرقابل رویت) و اعضا فقط اسناد قابل رویت را می‌بینند.
+     */
     public function listDocuments(int $buildingId, int $userId): array
     {
         $this->requireMember($userId, $buildingId);
-        return $this->repo->findDocumentsByBuildingId($buildingId);
+        $isManager = $this->repo->memberRole($userId, $buildingId) === 'manager';
+        return $this->repo->findDocumentsByBuildingId($buildingId, $isManager);
+    }
+
+    /**
+     * دریافت یک سند با کنترل رویت: اعضای عادی فقط اسناد قابل رویت را می‌بینند.
+     */
+    public function getDocumentForUser(int $documentId, int $userId): Document
+    {
+        $document = $this->repo->findDocumentById($documentId);
+        if ($document === null) {
+            throw new AppException('سند پیدا نشد.');
+        }
+        $this->requireMember($userId, $document->building_id);
+        $isManager = $this->repo->memberRole($userId, $document->building_id) === 'manager';
+        if (!$isManager && $document->is_visible_to_members !== 1) {
+            throw new AppException('شما به این سند دسترسی ندارید.');
+        }
+        return $document;
+    }
+
+    /** تعویض فایل یک سند (فقط مدیر) — فایل قبلی از دیسک حذف می‌شود. */
+    public function replaceDocumentFile(int $documentId, int $userId, string $fileContent, string $originalName): Document
+    {
+        $document = $this->repo->findDocumentById($documentId);
+        if ($document === null) {
+            throw new AppException('سند پیدا نشد.');
+        }
+        $this->requireManager($userId, $document->building_id);
+
+        $stored = \App\Utilities\FileStorage::saveDocument($fileContent, $document->building_id);
+        $this->repo->updateDocumentFile($documentId, $stored['stored_name'], $stored['mime_type'], $stored['file_size']);
+
+        // حذف فایل قدیمی پس از موفقیت ذخیرهٔ فایل جدید
+        if ($document->stored_name !== null) {
+            try {
+                $oldPath = \App\Utilities\FileStorage::documentPath($document->building_id, $document->stored_name);
+                \App\Utilities\FileStorage::deleteFile($oldPath);
+            } catch (\Throwable $e) {
+                // فایل قدیمی وجود ندارد یا قابل حذف نیست؛ عملیات اصلی نباید شکست بخورد
+                Logger::warning('Documents', 'حذف فایل قدیمی سند ناموفق بود', ['document_id' => $documentId, 'error' => $e->getMessage()]);
+            }
+        }
+
+        $document->stored_name = $stored['stored_name'];
+        $document->mime_type = $stored['mime_type'];
+        $document->file_size = $stored['file_size'];
+        \App\Core\Audit::log($userId, 'document.replace_file', 'document', $documentId, $document->building_id, [
+            'title' => $document->title,
+        ]);
+        return $document;
     }
 
     // ------------------------------------------------------------------
@@ -509,6 +688,9 @@ final class ExtraModulesService
 
         $id = $this->repo->createReview($review);
         $review->id = $id;
+        \App\Core\Audit::log($userId, 'review.create', 'review', $id, $buildingId, [
+            'rating' => $review->rating,
+        ]);
         return $review;
     }
 
@@ -546,13 +728,114 @@ final class ExtraModulesService
             throw new AppException('Item not found');
         }
         $this->requireMember($userId, $buildingId);
+        $this->requireCanModify($module, $id, $userId, $buildingId);
+
+        \App\Core\Audit::log($userId, $module . '.status', $module, $id, $buildingId, [
+            'status' => $status,
+        ]);
 
         // خروج مهمان: علاوه بر وضعیت، زمان خروج هم ثبت می‌شود
         if ($module === 'visitors' && $status === 'exited') {
             return $this->repo->checkoutVisitor($id);
         }
 
-        return $this->repo->updateModuleStatus($module, $id, $status);
+        $updated = $this->repo->updateModuleStatus($module, $id, $status);
+
+        // اعلان تغییر وضعیت رزرو/تعمیرات به ایجادکننده (اگر خودش تغییر نداد)
+        if ($updated && in_array($module, ['bookings', 'maintenance'], true)) {
+            $this->notifyModuleStatusChange($module, $id, $status, $userId, $buildingId);
+        }
+
+        return $updated;
+    }
+
+    /**
+     * اعلان «رکورد جدید» به مدیر ساختمان — برای رزرو و درخواست تعمیرات.
+     * اگر ایجادکننده خودش مدیر باشد، اعلانی فرستاده نمی‌شود.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function notifyManagerNewRecord(int $buildingId, int $creatorId, string $title, string $message, array $data = []): void
+    {
+        $managerId = $this->buildingManagerId($buildingId);
+        if ($managerId <= 0 || $managerId === $creatorId) {
+            return;
+        }
+        try {
+            (new NotificationService())->createNotification([
+                'user_id' => $managerId,
+                'building_id' => $buildingId,
+                'notification_type' => 'general',
+                'title' => $title,
+                'message' => $message,
+                'data' => $data,
+            ]);
+        } catch (\Throwable $e) {
+            \App\Core\Logger::error('ExtraModules', 'اعلان رکورد جدید به مدیر ارسال نشد', [
+                'building_id' => $buildingId,
+            ], $e);
+        }
+    }
+
+    /**
+     * اعلان تغییر وضعیت رزرو/تعمیرات به ایجادکنندهٔ رکورد.
+     */
+    private function notifyModuleStatusChange(string $module, int $id, string $status, int $actorUserId, int $buildingId): void
+    {
+        $row = $this->repo->findModuleEntity($module, $id);
+        if ($row === null) {
+            return;
+        }
+        $ownerId = (int) ($row['user_id'] ?? 0);
+        if ($ownerId <= 0 || $ownerId === $actorUserId) {
+            return;
+        }
+
+        if ($module === 'bookings') {
+            $labels = [
+                'pending' => 'در انتظار تأیید است',
+                'confirmed' => 'تأیید شد ✅',
+                'cancelled' => 'لغو شد',
+                'completed' => 'به پایان رسید',
+            ];
+            $subject = 'رزرو شما';
+        } else {
+            $labels = [
+                'pending' => 'در انتظار بررسی است',
+                'in_progress' => 'در حال انجام است',
+                'resolved' => 'حل شد ✅',
+                'closed' => 'بسته شد',
+            ];
+            $subject = 'درخواست تعمیرات «' . (string) ($row['title'] ?? '') . '»';
+        }
+
+        try {
+            (new NotificationService())->createNotification([
+                'user_id' => $ownerId,
+                'building_id' => $buildingId,
+                'notification_type' => 'general',
+                'title' => 'به‌روزرسانی وضعیت',
+                'message' => $subject . ' ' . ($labels[$status] ?? 'به‌روزرسانی شد') . '.',
+                'data' => [$module === 'bookings' ? 'booking_id' : 'maintenance_id' => $id],
+            ]);
+        } catch (\Throwable $e) {
+            \App\Core\Logger::error('ExtraModules', 'اعلان تغییر وضعیت ارسال نشد', [
+                'module' => $module,
+                'id' => $id,
+            ], $e);
+        }
+    }
+
+    /** شناسهٔ مدیر ساختمان (اولین عضو فعال با نقش مدیر) */
+    private function buildingManagerId(int $buildingId): int
+    {
+        $stmt = \App\Core\Database::getConnection()->prepare(
+            "SELECT user_id FROM building_members
+             WHERE building_id = ? AND role = 'manager' AND status = 'active'
+             ORDER BY id LIMIT 1"
+        );
+        $stmt->execute([$buildingId]);
+        return (int) ($stmt->fetchColumn() ?: 0);
     }
 
     /**
@@ -589,7 +872,7 @@ final class ExtraModulesService
     {
         $role = $this->repo->memberRole($userId, $buildingId);
         if ($role === null) {
-            throw new AppException('You are not a member of this building');
+            throw new AppException('شما عضو این ساختمان نیستید.');
         }
         if ($role === 'manager') {
             return;
@@ -662,6 +945,8 @@ final class ExtraModulesService
 
         $this->repo->updateModuleEntity($module, $id, $payload);
 
+        \App\Core\Audit::log($userId, $module . '.update', $module, $id, $buildingId, []);
+
         $updated = $this->repo->findModuleEntity($module, $id);
         return $updated ?? [];
     }
@@ -674,7 +959,26 @@ final class ExtraModulesService
         }
         $this->requireMember($userId, $buildingId);
         $this->requireCanModify($module, $id, $userId, $buildingId);
-        return $this->repo->deleteModuleEntity($module, $id);
+
+        // برای اسناد، پیش از حذف رکورد، مشخصات فایل فیزیکی را می‌خوانیم
+        $storedDocument = $module === 'documents' ? $this->repo->findDocumentById($id) : null;
+
+        $deleted = $this->repo->deleteModuleEntity($module, $id);
+
+        \App\Core\Audit::log($userId, $module . '.delete', $module, $id, $buildingId, []);
+
+        // حذف فایل سند از دیسک پس از حذف موفق رکورد
+        if ($deleted && $storedDocument !== null && $storedDocument->stored_name !== null) {
+            try {
+                $path = \App\Utilities\FileStorage::documentPath($storedDocument->building_id, $storedDocument->stored_name);
+                \App\Utilities\FileStorage::deleteFile($path);
+            } catch (\Throwable $e) {
+                // نبودن فایل روی دیسک نباید حذف رکورد را خراب گزارش کند
+                Logger::warning('Documents', 'حذف فایل سند پس از حذف رکورد ناموفق بود', ['document_id' => $id, 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $deleted;
     }
 
     // ------------------------------------------------------------------

@@ -153,7 +153,9 @@ function test_db(): PDO
         name TEXT NOT NULL,
         address TEXT,
         custom_name TEXT,
+        custom_logo_path TEXT DEFAULT NULL,
         theme_color TEXT,
+        hierarchy_settings TEXT DEFAULT NULL,
         created_by INTEGER,
         total_units INTEGER DEFAULT NULL,
         total_floors INTEGER DEFAULT NULL,
@@ -169,13 +171,29 @@ function test_db(): PDO
         deleted_at TEXT DEFAULT NULL
     )");
 
+    $pdo->exec("CREATE TABLE building_hierarchy_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL UNIQUE,
+        has_blocks INTEGER DEFAULT 1,
+        has_floors INTEGER DEFAULT 1,
+        has_units INTEGER DEFAULT 1,
+        has_common_areas INTEGER DEFAULT 1,
+        settings_json TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )");
+
     $pdo->exec("CREATE TABLE building_members (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         building_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
         role TEXT NOT NULL DEFAULT 'resident',
         status TEXT NOT NULL DEFAULT 'active',
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        invited_by INTEGER DEFAULT NULL,
+        invitation_token TEXT DEFAULT NULL,
+        invitation_expires_at TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (user_id, building_id)
     )");
 
     $pdo->exec("CREATE TABLE blocks (
@@ -214,6 +232,8 @@ function test_db(): PDO
         tenant_user_id INTEGER DEFAULT NULL,
         owner_resident INTEGER DEFAULT 0,
         residents_count INTEGER DEFAULT 0,
+        parking_no TEXT DEFAULT NULL,
+        storage_no TEXT DEFAULT NULL,
         custom_charge REAL DEFAULT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -230,11 +250,17 @@ function test_db(): PDO
         target_audience TEXT DEFAULT 'all',
         division_method TEXT DEFAULT 'fixed_share',
         division_details TEXT,
+        target_unit_ids TEXT DEFAULT NULL,
         due_date TEXT DEFAULT NULL,
         status TEXT DEFAULT 'pending',
         is_recurring INTEGER DEFAULT 0,
         recurring_interval TEXT DEFAULT NULL,
+        recurring_start_date TEXT DEFAULT NULL,
+        recurring_end_date TEXT DEFAULT NULL,
+        recurring_next_date TEXT DEFAULT NULL,
+        parent_cost_id INTEGER DEFAULT NULL,
         created_by INTEGER,
+        issued_at TEXT DEFAULT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
         deleted_at TEXT DEFAULT NULL
@@ -245,10 +271,255 @@ function test_db(): PDO
         cost_id INTEGER NOT NULL,
         unit_id INTEGER DEFAULT NULL,
         user_id INTEGER DEFAULT NULL,
-        amount REAL NOT NULL,
+        amount REAL DEFAULT NULL,
+        amount_paid REAL DEFAULT NULL,
+        share_amount REAL DEFAULT NULL,
+        receipt_path TEXT DEFAULT NULL,
+        receipt_is_public INTEGER DEFAULT 0,
+        notes TEXT DEFAULT NULL,
         status TEXT DEFAULT 'pending',
         payment_date TEXT DEFAULT NULL,
+        reject_reason TEXT DEFAULT NULL,
         confirmed_by INTEGER DEFAULT NULL,
+        confirmed_at TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )");
+
+    $pdo->exec("CREATE TABLE audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER DEFAULT NULL,
+        action TEXT NOT NULL,
+        entity_type TEXT DEFAULT NULL,
+        entity_id INTEGER DEFAULT NULL,
+        building_id INTEGER DEFAULT NULL,
+        meta TEXT DEFAULT NULL,
+        ip TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )");
+
+    $pdo->exec("CREATE TABLE votes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT DEFAULT NULL,
+        start_date TEXT DEFAULT CURRENT_TIMESTAMP,
+        end_date TEXT DEFAULT NULL,
+        status TEXT DEFAULT 'active',
+        created_by INTEGER NOT NULL
+    )");
+
+    $pdo->exec("CREATE TABLE vote_options (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        vote_id INTEGER NOT NULL,
+        option_text TEXT NOT NULL
+    )");
+
+    $pdo->exec("CREATE TABLE vote_results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        vote_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        option_id INTEGER NOT NULL,
+        voted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (vote_id, user_id)
+    )");
+
+    $pdo->exec("CREATE TABLE review_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL
+    )");
+
+    $pdo->exec("CREATE TABLE reviews (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        category_id INTEGER DEFAULT NULL,
+        rating INTEGER DEFAULT 5,
+        review_text TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )");
+
+    $pdo->exec("CREATE TABLE notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        building_id INTEGER DEFAULT NULL,
+        notification_type TEXT DEFAULT 'general',
+        title TEXT NOT NULL,
+        message TEXT DEFAULT NULL,
+        data TEXT DEFAULT NULL,
+        is_read INTEGER DEFAULT 0,
+        is_email_sent INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        read_at TEXT DEFAULT NULL
+    )");
+
+    $pdo->exec("CREATE TABLE announcements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        content TEXT DEFAULT NULL,
+        is_pinned INTEGER DEFAULT 0,
+        created_by INTEGER NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TEXT DEFAULT NULL
+    )");
+
+    $pdo->exec("CREATE TABLE tickets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT DEFAULT NULL,
+        category TEXT DEFAULT 'technical',
+        priority TEXT DEFAULT 'normal',
+        status TEXT DEFAULT 'open',
+        assigned_to INTEGER DEFAULT NULL,
+        unit_id INTEGER DEFAULT NULL,
+        is_anonymous INTEGER DEFAULT 0,
+        resolved_at TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TEXT DEFAULT NULL
+    )");
+
+    $pdo->exec("CREATE TABLE ticket_comments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ticket_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        comment TEXT DEFAULT NULL,
+        is_internal INTEGER DEFAULT 0,
+        attachment_path TEXT DEFAULT NULL,
+        unit_id INTEGER DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )");
+
+    $pdo->exec("CREATE TABLE penalty_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        penalty_type TEXT DEFAULT 'percentage',
+        penalty_value REAL NOT NULL,
+        delay_days INTEGER DEFAULT 1,
+        applies_to TEXT DEFAULT 'unconfirmed_payments',
+        is_active INTEGER DEFAULT 1,
+        created_by INTEGER NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )");
+
+    $pdo->exec("CREATE TABLE penalties (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cost_payment_id INTEGER NOT NULL,
+        building_id INTEGER NOT NULL,
+        penalty_amount REAL NOT NULL,
+        applied_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        reason TEXT DEFAULT NULL,
+        created_by INTEGER DEFAULT NULL
+    )");
+
+    $pdo->exec("CREATE TABLE documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        document_type TEXT DEFAULT 'general',
+        uploaded_by INTEGER NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        stored_name TEXT DEFAULT NULL,
+        mime_type TEXT DEFAULT NULL,
+        file_size INTEGER DEFAULT NULL,
+        is_visible_to_members INTEGER NOT NULL DEFAULT 1,
+        updated_at TEXT DEFAULT NULL,
+        FOREIGN KEY (building_id) REFERENCES buildings(id),
+        FOREIGN KEY (uploaded_by) REFERENCES users(id)
+    )");
+
+    $pdo->exec("CREATE TABLE messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        sender_id INTEGER NOT NULL,
+        recipient_id INTEGER NOT NULL,
+        body TEXT NOT NULL,
+        is_read INTEGER DEFAULT 0,
+        read_at TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )");
+
+    $pdo->exec("CREATE TABLE debtor_sms_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        unit_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        phone TEXT NOT NULL,
+        amount REAL NOT NULL,
+        period TEXT NOT NULL,
+        sent_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (unit_id, period)
+    )");
+
+    $pdo->exec("CREATE TABLE bookings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        common_area_id INTEGER DEFAULT NULL,
+        user_id INTEGER NOT NULL,
+        booking_date TEXT NOT NULL,
+        start_time TEXT DEFAULT NULL,
+        end_time TEXT DEFAULT NULL,
+        status TEXT DEFAULT 'pending',
+        notes TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TEXT DEFAULT NULL
+    )");
+
+    $pdo->exec("CREATE TABLE maintenance_requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT DEFAULT NULL,
+        status TEXT DEFAULT 'pending',
+        assigned_technician_id INTEGER DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TEXT DEFAULT NULL
+    )");
+
+    $pdo->exec("CREATE TABLE event_reminders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_type TEXT NOT NULL,
+        event_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        building_id INTEGER NOT NULL,
+        remind_at TEXT NOT NULL,
+        channel TEXT NOT NULL DEFAULT 'notification',
+        sent_at TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (event_type, event_id, user_id, channel)
+    )");
+
+    $pdo->exec("CREATE TABLE invitations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        building_id INTEGER NOT NULL,
+        invited_email TEXT DEFAULT NULL,
+        invited_phone TEXT DEFAULT NULL,
+        invited_name TEXT DEFAULT NULL,
+        role TEXT DEFAULT 'resident',
+        unit_id INTEGER DEFAULT NULL,
+        token TEXT UNIQUE NOT NULL,
+        status TEXT DEFAULT 'pending',
+        invited_by INTEGER NOT NULL,
+        expires_at TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        accepted_at TEXT DEFAULT NULL
+    )");
+
+    $pdo->exec("CREATE TABLE receipts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cost_payment_id INTEGER NOT NULL UNIQUE,
+        file_path TEXT NOT NULL,
+        file_size INTEGER DEFAULT NULL,
+        mime_type TEXT DEFAULT NULL,
+        original_name TEXT DEFAULT NULL,
+        is_public INTEGER DEFAULT 0,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )");
 
@@ -265,8 +536,8 @@ function test_db(): PDO
 function test_db_reset(): void
 {
     $db = test_db();
-    foreach (['cost_payments','costs','units','common_areas','floors','blocks',
-              'building_members','buildings','otp_codes','users'] as $t) {
+    foreach (['event_reminders','maintenance_requests','bookings','debtor_sms_log','messages','invitations','receipts','ticket_comments','tickets','announcements','notifications','reviews','vote_results','vote_options','votes','audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
+              'building_members','building_hierarchy_settings','buildings','otp_codes','users'] as $t) {
         $db->exec("DELETE FROM {$t}");
         $db->exec("DELETE FROM sqlite_sequence WHERE name = '{$t}'");
     }

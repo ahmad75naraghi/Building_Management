@@ -149,11 +149,18 @@ require_once 'includes/header.php';
 
     <?php if (empty($votes)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">🗳️</div>
+            <div class="empty-icon">🗳️</div>
             رأی‌گیری‌ای ثبت نشده است.
+            <?php if ($is_manager): ?>
+                <button type="button" class="empty-action" data-modal-open="add-vote">🗳️ شروع اولین رأی‌گیری</button>
+            <?php endif; ?>
         </div>
     <?php else: ?>
-        <div class="space-y-3">
+                <div class="list-filter-bar">
+            <input type="search" class="form-input" data-list-search="votes-list" placeholder="🔍 جستجوی عنوان رأی‌گیری…" style="flex:1;">
+            <span class="list-count-chip" data-list-count="votes-list"></span>
+        </div>
+        <div class="space-y-3" data-list-items="votes-list">
             <?php foreach ($votes as $vote): ?>
                 <?php
                 $v_status = $vote['status'] ?? 'active';
@@ -164,7 +171,12 @@ require_once 'includes/header.php';
                 $result_options = $results['options'] ?? [];
                 $total_votes = (int) ($results['total_votes'] ?? 0);
                 $my_option_id = (int) ($vote['my_option_id'] ?? 0);
-                $can_vote = $is_active && !$user_has_voted && !empty($options);
+                // رأی‌گیری‌هایی که هنوز شروع نشده‌اند قابل رأی نیستند
+                $starts_later = !empty($vote['start_date']) && strtotime((string) $vote['start_date']) > time();
+                $ended_earlier = !empty($vote['end_date']) && strtotime((string) $vote['end_date']) < time();
+                $can_vote = $is_active && !$user_has_voted && !empty($options) && !$starts_later && !$ended_earlier;
+                // نتایج عددی فقط پس از رأی‌دادن یا پس از بسته‌شدن نمایش داده می‌شود
+                $show_results = $user_has_voted || !$is_active;
                 ?>
                 <div class="card p-4">
                     <div class="flex items-start justify-between gap-3">
@@ -176,8 +188,14 @@ require_once 'includes/header.php';
                     <?php if (!empty($vote['description'])): ?>
                         <p class="text-sm text-gray-500 mt-2 leading-6"><?= nl2br(htmlspecialchars($vote['description'])) ?></p>
                     <?php endif; ?>
-                    <?php if (!empty($vote['end_date'])): ?>
-                        <p class="text-xs text-gray-400 mt-2">پایان: <?= htmlspecialchars($vote['end_date']) ?></p>
+                    <?php if (!empty($vote['start_date']) || !empty($vote['end_date'])): ?>
+                        <p class="text-xs text-gray-400 mt-2">
+                            <?php if (!empty($vote['start_date'])): ?>شروع: <?= fa_date($vote['start_date']) ?><?php endif; ?>
+                            <?php if (!empty($vote['end_date'])): ?><?= !empty($vote['start_date']) ? ' • ' : '' ?>پایان: <?= fa_date($vote['end_date']) ?><?php endif; ?>
+                        </p>
+                    <?php endif; ?>
+                    <?php if ($starts_later && $is_active): ?>
+                        <span class="chip chip-amber" style="margin-top:6px;display:inline-block;">🕒 هنوز شروع نشده — از <?= fa_date($vote['start_date']) ?></span>
                     <?php endif; ?>
 
                     <?php if ($can_vote): ?>
@@ -197,12 +215,14 @@ require_once 'includes/header.php';
                             </button>
                         </form>
                     <?php elseif (!empty($options)): ?>
-                        <!-- نمایش نتایج -->
+                        <!-- نمایش نتایج (فقط پس از رأی یا پس از بسته‌شدن) -->
                         <div class="mt-3 space-y-2">
+                            <?php if ($show_results): ?>
                             <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
-                                <span><?= $user_has_voted ? 'نتیجه رأی‌گیری' : 'نتایج (پس از رأی شما نمایش داده می‌شود)' ?></span>
+                                <span><?= $user_has_voted ? 'نتیجه رأی‌گیری' : 'نتیجه نهایی رأی‌گیری' ?></span>
                                 <span><?= fa_digits($total_votes) ?> رأی</span>
                             </div>
+        <div data-list-pager="votes-list"></div>
                             <?php foreach ($result_options as $ro): ?>
                                 <?php $pct = (float) ($ro['percentage'] ?? 0); ?>
                                 <div class="<?= ((int) ($ro['option_id'] ?? 0) === $my_option_id) ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50' ?> rounded-xl p-3">
@@ -220,6 +240,12 @@ require_once 'includes/header.php';
                                     </div>
                                 </div>
                             <?php endforeach; ?>
+                            <?php else: ?>
+                                <?php foreach ($options as $opt): ?>
+                                    <div class="bg-gray-50 rounded-xl p-3 text-sm text-gray-700"><?= htmlspecialchars($opt['option_text'] ?? '') ?></div>
+                                <?php endforeach; ?>
+                                <p class="text-[11px] text-gray-400">🔒 نتایج عددی پس از ثبت رأی شما نمایش داده می‌شود تا رأی‌گیری بی‌طرف بماند.</p>
+                            <?php endif; ?>
                             <?php if (!$user_has_voted && !$is_active): ?>
                                 <p class="text-[11px] text-gray-400">این رأی‌گیری بسته شده است.</p>
                             <?php elseif ($user_has_voted && $is_active): ?>
@@ -237,8 +263,8 @@ require_once 'includes/header.php';
                                     data-set-vote_id="<?= (int) $vote['id'] ?>"
                                     data-set-title="<?= htmlspecialchars($vote['title'] ?? '') ?>"
                                     data-set-description="<?= htmlspecialchars($vote['description'] ?? '') ?>"
-                                    data-set-start_date="<?= htmlspecialchars($vote['start_date'] ?? '') ?>"
-                                    data-set-end_date="<?= htmlspecialchars($vote['end_date'] ?? '') ?>">
+                                    data-set-start_date="<?= htmlspecialchars(substr((string) ($vote['start_date'] ?? ''), 0, 10)) ?>"
+                                    data-set-end_date="<?= htmlspecialchars(substr((string) ($vote['end_date'] ?? ''), 0, 10)) ?>">
                                 ویرایش
                             </button>
                             <form method="POST" action="" style="display:inline;">

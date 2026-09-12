@@ -1,0 +1,29 @@
+# ============================================================
+# PHPStan — سطح‌بندی کیفیت استاتیک کد
+#
+# اجرا روی سرور توسعه:
+#   composer install            (نصب وابستگی‌های dev شامل phpstan)
+#   composer analyse            # یا: vendor/bin/phpstan analyse
+#
+# اسکوپ: هستهٔ شیءگرا (src/) در سطح ۶. فایل‌های رویه‌ای صفحات و اسکریپت‌ها
+# به‌دلیل ماهیت اسکریپتی (نشست/خروجی مستقیم) در اسکوپ نیستند، اما سینتکس
+# همهٔ آن‌ها توسط سوئیت «سلامت کدبیس» در تست‌ها بازرسی می‌شود.
+# ============================================================
+
+parameters:
+    level: 5
+    paths:
+        - src
+    scanFiles:
+        - config/routes.php
+        - config/app.php
+        - vendor/autoload.php
+    tmpDir: storage/phpstan-cache
+    treatPhpDocTypesAsCertain: false
+    parallel:
+        maximumNumberOfProcesses: 1
+    ignoreErrors:
+        # بازوی «پیش‌فرض» در تطبیق نوع فایل، دفاعی است (نگهبان اجازه فقط تایپ‌های لیست را می‌دهد)
+        -
+            message: '#Match arm is unreachable#'
+            path: src/Utilities/FileStorage.php
