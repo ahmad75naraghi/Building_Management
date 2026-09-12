@@ -12,7 +12,7 @@
  * بالا برود تا کش‌های قدیمی کاربران در اولین بازدید پاک شود.
  * ============================================================ */
 
-var VERSION = 'bms-v7';
+var VERSION = 'bms-v8';
 var STATIC_CACHE = VERSION + '-static';
 var RUNTIME_CACHE = VERSION + '-runtime';
 
@@ -23,6 +23,7 @@ var PRECACHE = [
     'assets/js/main.js',
     'assets/js/ui-enhance.js',
     'assets/js/charts.js',
+    'assets/js/push.js',
     'assets/js/pwa.js',
     'assets/icons/icon-192.png',
     'assets/icons/icon-512.png',
@@ -123,6 +124,41 @@ self.addEventListener('fetch', function (event) {
                 });
             }
             return fetch(request);
+        })
+    );
+});
+
+/* ==================== اعلان فوری وب (Web Push) ==================== */
+self.addEventListener('push', function (event) {
+    var data = {};
+    try { data = event.data ? event.data.json() : {}; } catch (e) { data = {}; }
+    var title = data.title || 'مدیریت ساختمان';
+    var options = {
+        body: data.body || '',
+        dir: 'rtl',
+        lang: 'fa',
+        icon: 'assets/icons/icon-192.png',
+        badge: 'assets/icons/icon-192.png',
+        data: { url: data.url || 'dashboard.php' },
+        vibrate: [120, 60, 120],
+        tag: 'bms-push'
+    };
+    event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', function (event) {
+    event.notification.close();
+    var target = (event.notification.data && event.notification.data.url) || 'dashboard.php';
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
+            for (var i = 0; i < list.length; i++) {
+                var client = list[i];
+                if ('focus' in client) {
+                    client.navigate(target);
+                    return client.focus();
+                }
+            }
+            return clients.openWindow(target);
         })
     );
 });

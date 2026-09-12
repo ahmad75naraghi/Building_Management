@@ -4784,6 +4784,100 @@
             "description": "همهٔ اعلان‌های خوانده‌نشدهٔ کاربر جاری را خوانده می‌کند؛ تعداد علامت‌خورده‌ها در data.marked برمی‌گردد"
           },
           "response": []
+        },
+        {
+          "name": "کلید عمومی وب‌پوش",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/push/public-key",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "push",
+                "public-key"
+              ]
+            },
+            "description": "کلید عمومی VAPID برای ثبت اشتراک مرورگر؛ اگر وب‌پوش در سرور فعال نباشد «enabled: false» برمی‌گردد."
+          },
+          "response": []
+        },
+        {
+          "name": "وضعیت اشتراک وب‌پوش",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/push/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "push",
+                "status"
+              ]
+            },
+            "description": "تعداد دستگاه‌های دارای اشتراک اعلان فوری برای کاربر جاری."
+          },
+          "response": []
+        },
+        {
+          "name": "ثبت اشتراک وب‌پوش",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/push/subscribe",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "push",
+                "subscribe"
+              ]
+            },
+            "description": "بدنه همان خروجی «(await reg.pushManager.subscribe(...)).toJSON()» در مرورگر است. اندپوینت باید https باشد.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"endpoint\": \"https://fcm.googleapis.com/fcm/send/EXAMPLE\",\n  \"keys\": {\n    \"p256dh\": \"BASE64URL_P256DH\",\n    \"auth\": \"BASE64URL_AUTH\"\n  }\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "حذف اشتراک وب‌پوش",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/push/unsubscribe",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "push",
+                "unsubscribe"
+              ]
+            },
+            "description": "حذف اشتراک یک دستگاه (با همان اندپوینت ثبت‌شده).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"endpoint\": \"https://fcm.googleapis.com/fcm/send/EXAMPLE\"\n}"
+            }
+          },
+          "response": []
         }
       ]
     },

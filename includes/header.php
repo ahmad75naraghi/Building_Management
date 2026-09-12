@@ -70,6 +70,10 @@ if (!isset($unread_messages_nav)) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <?php if (!empty($_SESSION['token'])): ?>
+    <!-- توکن نشست برای درخواست‌های مرورگری (مثل ثبت اعلان فوری) -->
+    <meta name="bms-token" content="<?= htmlspecialchars((string) $_SESSION['token'], ENT_QUOTES) ?>">
+    <?php endif; ?>
     <title><?= htmlspecialchars($page_title) ?> | مدیریت ساختمان</title>
     <!-- حالت شب/روز: روشن، تاریک، یا «پیروی از سیستم» — اعمال پیش از رندر (جلوگیری از فلش) -->
     <script>

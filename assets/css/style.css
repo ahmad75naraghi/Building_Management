@@ -2514,6 +2514,20 @@
             transition: transform .15s ease, box-shadow .2s ease, filter .2s ease;
         }
         .btn-gold:active, .btn-primary:active, .empty-action:active { transform: scale(.97); }
+
+        /* نشان وضعیت اعلان فوری (پروفایل) */
+        .push-state-badge {
+            font-size: 10px;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 8px;
+            background: var(--surface-2, #f1f5f9);
+            color: var(--text-gray);
+            white-space: nowrap;
+        }
+        .push-state-badge.on { background: rgba(16, 185, 129, .14); color: #059669; }
+        .push-state-badge.off { background: var(--surface-2, #f1f5f9); color: var(--text-gray); }
+        html[data-theme="dark"] .push-state-badge.on { color: #34d399; }
         .btn-gold:hover::after, .btn-primary:hover::after {
             content: '';
             position: absolute;

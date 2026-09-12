@@ -16,6 +16,9 @@
     ],
     "tags": [
         {
+            "name": "push"
+        },
+        {
             "name": "احراز هویت"
         },
         {
@@ -5716,6 +5719,168 @@
                         "schema": {
                             "type": "integer"
                         }
+                    }
+                ]
+            }
+        },
+        "/push/public-key": {
+            "get": {
+                "tags": [
+                    "push"
+                ],
+                "summary": "دریافت /api/push/public-key",
+                "responses": {
+                    "200": {
+                        "description": "پاسخ موفق",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "نیازمند احراز هویت",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/push/status": {
+            "get": {
+                "tags": [
+                    "push"
+                ],
+                "summary": "دریافت /api/push/status",
+                "responses": {
+                    "200": {
+                        "description": "پاسخ موفق",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "نیازمند احراز هویت",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/push/subscribe": {
+            "post": {
+                "tags": [
+                    "push"
+                ],
+                "summary": "/api/push/subscribe",
+                "responses": {
+                    "200": {
+                        "description": "پاسخ موفق",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "نیازمند احراز هویت",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": true
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/push/unsubscribe": {
+            "post": {
+                "tags": [
+                    "push"
+                ],
+                "summary": "/api/push/unsubscribe",
+                "responses": {
+                    "200": {
+                        "description": "پاسخ موفق",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "نیازمند احراز هویت",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": true
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
                     }
                 ]
             }

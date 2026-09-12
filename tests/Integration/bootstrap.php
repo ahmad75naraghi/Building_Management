@@ -509,6 +509,17 @@ function test_db(): PDO
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )");
 
+    $pdo->exec("CREATE TABLE push_subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        endpoint TEXT NOT NULL,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        user_agent TEXT DEFAULT NULL,
+        last_used_at TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )");
+
     $pdo->exec("CREATE TABLE invitations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         building_id INTEGER NOT NULL,
@@ -549,7 +560,7 @@ function test_db(): PDO
 function test_db_reset(): void
 {
     $db = test_db();
-    foreach (['jobs','event_reminders','maintenance_requests','bookings','debtor_sms_log','messages','invitations','receipts','ticket_comments','tickets','announcements','notifications','reviews','vote_results','vote_options','votes','audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
+    foreach (['push_subscriptions','jobs','event_reminders','maintenance_requests','bookings','debtor_sms_log','messages','invitations','receipts','ticket_comments','tickets','announcements','notifications','reviews','vote_results','vote_options','votes','audit_logs','documents','cost_payments','costs','units','common_areas','floors','blocks',
               'building_members','building_hierarchy_settings','buildings','otp_codes','users'] as $t) {
         $db->exec("DELETE FROM {$t}");
         $db->exec("DELETE FROM sqlite_sequence WHERE name = '{$t}'");

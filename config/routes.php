@@ -7,6 +7,12 @@ namespace App\Config;
 final class Routes
 {
     public static array $routes = [
+        // Web Push (اعلان فوری مرورگر)
+        'GET /api/push/public-key' => ['App\Http\Controllers\PushController', 'publicKey'],
+        'GET /api/push/status' => ['App\Http\Controllers\PushController', 'status'],
+        'POST /api/push/subscribe' => ['App\Http\Controllers\PushController', 'subscribe'],
+        'POST /api/push/unsubscribe' => ['App\Http\Controllers\PushController', 'unsubscribe'],
+
         // Auth
         'POST /api/auth/register' => ['App\Http\Controllers\AuthController', 'register'],
         'POST /api/auth/login' => ['App\Http\Controllers\AuthController', 'login'],

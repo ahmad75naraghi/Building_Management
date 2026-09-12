@@ -27,6 +27,18 @@ final class NotificationService
         $id = $this->repo->create($notification);
         $notification->id = $id;
 
+        // اعلان فوری مرورگر (مکمل اعلان درون‌برنامه‌ای؛ در صورت فعال‌بودن وب‌پوش)
+        // خطا هرگز نباید جریان اصلی را متوقف کند.
+        try {
+            PushService::notifyUser(
+                $notification->user_id,
+                $notification->title,
+                (string) ($notification->message ?? '')
+            );
+        } catch (\Throwable $e) {
+            \App\Core\Logger::warning('push', 'خطای وب‌پوش: ' . $e->getMessage());
+        }
+
         // Queue for async processing (using Redis as a simple queue)
         CacheHelper::set("notification:queue:{$id}", [
             'notification_id' => $id,
