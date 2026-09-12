@@ -170,6 +170,7 @@ $pages = [
     'building_add.php' => [],
     // building_view.php دیگر صفحهٔ مستقل نیست؛ صرفاً به داشبورد ریدایرکت می‌کند
     'building_edit.php' => ['id' => $bid],
+    // building_delete.php صفحهٔ اکشن است (همیشه ریدایرکت+خروج) — در رندر نمی‌گنجد
     'floors.php' => ['building_id' => $bid],
     'blocks.php' => ['building_id' => $bid],
     'units.php' => ['building_id' => $bid],
@@ -196,6 +197,8 @@ $pages = [
     'messages.php' => ['building_id' => $bid],
     'messages.php?chat' => ['building_id' => $bid, 'with' => $tenant],
     'notifications.php' => [],
+    'notifications.php?filter=financial' => [],
+    'notifications.php?filter=general' => [],
     'profile.php' => [],
     'profile_edit.php' => [],
     'change_password.php' => [],

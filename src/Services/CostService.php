@@ -1887,7 +1887,7 @@ final class CostService
     public function createPenaltySetting(array $data, int $userId): PenaltySetting
     {
         $setting = new PenaltySetting();
-        $setting->building_id = (int) $data['building_id'];
+        $setting->building_id = (int) ($data['building_id'] ?? 0);
         // سازگاری با مستندات API: هم `penalty_type/penalty_value` و هم `type/amount` پذیرفته می‌شود
         $penaltyType = (string) ($data['penalty_type'] ?? $data['type'] ?? 'percentage');
         if ($penaltyType === 'fixed') {

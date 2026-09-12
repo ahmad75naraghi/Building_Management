@@ -110,12 +110,12 @@ final class TicketRepository
         $t->building_id = (int) $row['building_id'];
         $t->user_id = (int) $row['user_id'];
         $t->unit_id = $row['unit_id'] ? (int) $row['unit_id'] : null;
-        $t->category = $row['category'];
+        $t->category = $row['category'] ?? 'technical';
         $t->is_anonymous = (bool) $row['is_anonymous'];
         $t->title = $row['title'];
-        $t->description = $row['description'];
-        $t->status = $row['status'];
-        $t->priority = $row['priority'];
+        $t->description = $row['description'] ?? null;
+        $t->status = $row['status'] ?? 'open';
+        $t->priority = $row['priority'] ?? 'normal';
         $t->assigned_to = $row['assigned_to'] ? (int) $row['assigned_to'] : null;
         $t->resolved_at = $row['resolved_at'];
         $t->created_at = $row['created_at'];
