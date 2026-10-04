@@ -179,6 +179,17 @@ if ($building_id > 0) {
     }
 }
 
+// ارسال صورت‌حساب ماهانه برای واحدها (فقط مدیر)
+$alert_message = '';
+$alert_type = 'error';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $building_id > 0 && $is_manager) {
+    if (($_POST['form_action'] ?? '') === 'send_statements') {
+        $response = callAPI('POST', '/buildings/' . $building_id . '/monthly-statements', []);
+        $alert_message = $response['message'] ?? 'خطا در ارسال صورت‌حساب.';
+        $alert_type = !empty($response['success']) ? 'success' : 'error';
+    }
+}
+
 $page_title = 'گزارش‌ها';
 $page_hint = 'گزارش مالی ماهانه، فهرست بدهکاران و خروجی اکسل.';
 $header_sub = $building_name ?: 'نمای کلی عملکرد ساختمان';
@@ -207,6 +218,13 @@ require_once 'includes/page_head.php';
                    class="bg-gray-700 hover:bg-gray-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors flex items-center gap-2">
                     📒 اکسل لجر واحدها
                 </a>
+                <form method="post" style="margin:0;" data-confirm-sheet data-sheet-title="ارسال صورت‌حساب ماهانه" data-confirm="خلاصهٔ مالی (صادرشده، پرداخت‌شده، مانده) برای مالک/مستأجر هر واحد به‌صورت اعلان ارسال می‌شود. ادامه می‌دهید؟">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="form_action" value="send_statements">
+                    <button type="submit" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors flex items-center gap-2">
+                        📤 ارسال صورت‌حساب ماهانه
+                    </button>
+                </form>
             <?php endif; ?>
         </div>
     <?php endif; ?>

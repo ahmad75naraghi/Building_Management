@@ -17,6 +17,10 @@ storage/
 storage/*
 !storage/.gitkeep
 
+# ==================== پشتیبان‌های دیتابیس ====================
+backups/*
+!backups/.htaccess
+
 # ==================== سیستم‌عامل / ادیتور ====================
 .DS_Store
 Thumbs.db

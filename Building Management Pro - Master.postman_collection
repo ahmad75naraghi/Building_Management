@@ -1285,6 +1285,52 @@
           "response": []
         },
         {
+          "name": "ساخت دادهٔ نمونه (Demo Seed)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/buildings/2/demo-seed",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "buildings",
+                "2",
+                "demo-seed"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ارسال صورت‌حساب ماهانه",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/buildings/2/monthly-statements",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "buildings",
+                "2",
+                "monthly-statements"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "تنظیمات داینامیک ساختمان",
           "request": {
             "method": "GET",

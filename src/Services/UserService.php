@@ -61,6 +61,12 @@ final class UserService
         return $user;
     }
 
+    /** دسترسی عمومی به جستجوی کاربر با موبایل (برای سرویس‌هایی مثل ساخت دادهٔ نمونه) */
+    public function findByPhonePublic(string $phone): ?User
+    {
+        return $this->repo->findByPhone($phone);
+    }
+
     /**
      * وضعیت یک شماره موبایل برای تصمیم‌گیری در صفحه ورود یکپارچه.
      *

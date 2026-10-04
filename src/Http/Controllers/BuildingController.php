@@ -334,6 +334,53 @@ final class BuildingController
         ]);
     }
 
+    /** POST /api/buildings/{building_id}/demo-seed — ساخت دادهٔ نمونه برای آشنایی */
+    public function demoSeed(Request $request): Response
+    {
+        $userId = (int) ($request->getAttribute('user_id') ?? 0);
+        $buildingId = (int) $request->getAttribute('building_id');
+        if ($guard = $this->managerOnlyGuard($request, $buildingId)) {
+            return $guard;
+        }
+        try {
+            $result = (new \App\Services\DemoSeederService())->seed($buildingId, $userId);
+            return (new Response())->setJson([
+                'success' => true,
+                'message' => $result['message'],
+                'data' => ['seeded' => $result['seeded'], 'summary' => $result['summary'] ?? null],
+            ]);
+        } catch (\Throwable $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /** POST /api/buildings/{building_id}/monthly-statements — صورت‌حساب ماهانه برای واحدها */
+    public function sendMonthlyStatements(Request $request): Response
+    {
+        $userId = (int) ($request->getAttribute('user_id') ?? 0);
+        $buildingId = (int) $request->getAttribute('building_id');
+        if ($guard = $this->managerOnlyGuard($request, $buildingId)) {
+            return $guard;
+        }
+        try {
+            $result = (new \App\Services\MonthlyStatementService())->send($buildingId, $userId);
+            return (new Response())->setJson([
+                'success' => true,
+                'message' => 'صورت‌حساب برای ' . $result['sent'] . ' واحد ارسال شد'
+                    . ($result['skipped'] > 0 ? ' (' . $result['skipped'] . ' واحد مالک/مستأجر ثبت‌شده نداشت)' : '.'),
+                'data' => $result,
+            ]);
+        } catch (\Throwable $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
     public function storeBlock(Request $request): Response
     {
         $buildingId = (int) $request->getAttribute('building_id');

@@ -7372,6 +7372,70 @@
                     }
                 }
             }
+        },
+        "/buildings/{building_id}/demo-seed": {
+            "post": {
+                "tags": [
+                    "Buildings"
+                ],
+                "summary": "ساخت دادهٔ نمونه برای آشنایی با سامانه",
+                "description": "ساکنین، هزینه، پرداخت تأییدشده، اعلان و تیکت نمونه می‌سازد. ایدمپوتنت است.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "building_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK — خلاصهٔ داده‌های ساخته‌شده در data"
+                    },
+                    "403": {
+                        "description": "فقط مدیر ساختمان"
+                    }
+                }
+            }
+        },
+        "/buildings/{building_id}/monthly-statements": {
+            "post": {
+                "tags": [
+                    "Buildings"
+                ],
+                "summary": "ارسال صورت‌حساب ماهانه برای واحدها",
+                "description": "خلاصهٔ مالی هر واحد (صادرشده، پرداخت‌شده، مانده) به‌صورت اعلان درون‌اپی و وب‌پوش برای مالک/مستأجر ارسال می‌شود.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "building_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK — تعداد ارسال‌شده/ردشده در data"
+                    },
+                    "403": {
+                        "description": "فقط مدیر ساختمان"
+                    }
+                }
+            }
         }
     },
     "components": {

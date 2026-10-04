@@ -155,6 +155,12 @@ if (!isset($unread_messages_nav)) {
 
         <header class="app-header">
             <div class="header-profile-section">
+                <a href="search.php" class="notification-bell header-search-link" aria-label="جستجوی سراسری">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.3-4.3"></path>
+                    </svg>
+                </a>
                 <a href="notifications.php" class="notification-bell" aria-label="اعلانات">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
@@ -206,6 +212,12 @@ if (!isset($unread_messages_nav)) {
             </div>
 
             <div style="display:flex;align-items:center;gap:8px;">
+                <a href="search.php" class="notification-bell header-search-link" aria-label="جستجوی سراسری" style="position:relative;">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.3-4.3"></path>
+                    </svg>
+                </a>
                 <button type="button" class="theme-toggle-btn" onclick="toggleAppTheme()" aria-label="تغییر حالت شب/روز">
                     <svg class="ico-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />

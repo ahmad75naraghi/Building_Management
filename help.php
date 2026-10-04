@@ -114,6 +114,8 @@ require_once 'includes/page_head.php';
                 ['💧', 'مصارف', 'قرائت دوره‌ای کنتورهای آب، برق و گاز', 'consumption.php'],
                 ['☎️', 'تماس اضطراری', 'شماره‌های ضروری برای ساکنین', 'emergency_contacts.php'],
                 ['💬', 'پیام‌ها', 'گفتگوی خصوصی بین ساکنین ساختمان', 'messages.php'],
+                ['🔍', 'جستجو', 'پیدا کردن سریع واحد، ساکن، هزینه و تیکت — از دکمهٔ ذره‌بین بالای صفحات', 'search.php'],
+                ['🗄️', 'پشتیبان‌گیری', 'پشتیبان کامل دیتابیس؛ فقط برای شماره‌های مجاز مدیر سیستم', 'backups.php'],
             ];
             foreach ($help_sections as $sec): ?>
                 <a href="<?= $building_id > 0 ? htmlspecialchars($sec[3] . '?building_id=' . $building_id) : '#' ?>"
@@ -144,8 +146,16 @@ require_once 'includes/page_head.php';
         <details class="p-3 rounded-xl" style="background:var(--soft-gray,#f8fafc);margin-bottom:8px;">
             <summary style="font-size:12.5px;font-weight:800;color:var(--text-dark);cursor:pointer;">واحد‌ها را تک‌تک بسازم؟</summary>
             <p style="font-size:11px;color:var(--text-gray);line-height:2;margin-top:6px;">
-                نه! هنگام ثبت ساختمان، تعداد طبقات و واحدها را بدهید تا خودکار ساخته شوند.
-                بعداً هم می‌توانید تک‌تک ویرایش یا اضافه کنید.
+                نه! سه راه سریع دارید: ۱) هنگام ثبت ساختمان، تعداد طبقات و واحدها را بدهید تا خودکار ساخته شوند؛
+                ۲) در صفحهٔ واحدها، دکمهٔ «ایمپورت از فایل» تا ۵۰۰ واحد را با یک فایل اکسل می‌سازد؛
+                ۳) دکمهٔ «دادهٔ نمونه» ساختمان را برای آشنایی با ساکن و هزینهٔ آزمایشی پر می‌کند.
+            </p>
+        </details>
+        <details class="p-3 rounded-xl" style="background:var(--soft-gray,#f8fafc);margin-bottom:8px;">
+            <summary style="font-size:12.5px;font-weight:800;color:var(--text-dark);cursor:pointer;">رسید پرداخت را چطور به مالک بدهم؟</summary>
+            <p style="font-size:11px;color:var(--text-gray);line-height:2;margin-top:6px;">
+                در بخش هزینه‌ها، روی هر پرداخت «چاپ رسید پرداخت» را بزنید؛ صفحهٔ رسید رسمی باز می‌شود
+                و از همان‌جا می‌توانید چاپ یا به‌صورت PDF ذخیره کنید. صورت‌حساب ماهانهٔ هر واحد هم از بخش گزارش‌ها قابل ارسال است.
             </p>
         </details>
         <details class="p-3 rounded-xl" style="background:var(--soft-gray,#f8fafc);margin-bottom:8px;">

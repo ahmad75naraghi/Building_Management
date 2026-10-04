@@ -38,6 +38,8 @@ final class Routes
         'GET /api/buildings/{building_id}/hierarchy/settings' => ['App\Http\Controllers\BuildingController', 'hierarchySettings'],
         'PUT /api/buildings/{building_id}/hierarchy/settings' => ['App\Http\Controllers\BuildingController', 'updateHierarchySettings'],
         'POST /api/buildings/{building_id}/scaffold' => ['App\Http\Controllers\BuildingController', 'scaffold'],
+        'POST /api/buildings/{building_id}/demo-seed' => ['App\Http\Controllers\BuildingController', 'demoSeed'],
+        'POST /api/buildings/{building_id}/monthly-statements' => ['App\Http\Controllers\BuildingController', 'sendMonthlyStatements'],
 
         // Blocks
         'POST /api/buildings/{building_id}/blocks' => ['App\Http\Controllers\BuildingController', 'storeBlock'],

@@ -510,6 +510,9 @@ require_once 'includes/header.php';
         <div class="list-filter-bar">
             <input type="search" class="form-input" data-list-search="costs-list" placeholder="🔍 جستجوی عنوان یا توضیح هزینه…" style="flex:1;">
             <span class="list-count-chip" data-list-count="costs-list"></span>
+            <?php if ($is_manager): ?>
+                <a class="btn-chip" href="list_export.php?type=costs&building_id=<?= (int) $building_id ?>" title="خروجی اکسل هزینه‌ها">📥 اکسل</a>
+            <?php endif; ?>
         </div>
         <div class="space-y-3" data-list-items="costs-list">
             <?php foreach ($costs as $cost): ?>
@@ -730,6 +733,15 @@ require_once 'includes/header.php';
                                     ✕ رد
                                 </button>
                             <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if (($payment['status'] ?? '') === 'confirmed' || $p_paid): ?>
+                        <div class="card-actions">
+                            <a class="btn-chip btn-chip-neutral" style="text-decoration:none;"
+                               href="receipt.php?payment_id=<?= $p_id ?>" target="_blank" rel="noopener">
+                                🖨️ چاپ رسید پرداخت
+                            </a>
                         </div>
                     <?php endif; ?>
                 </div>

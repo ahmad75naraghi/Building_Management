@@ -2714,3 +2714,53 @@ html[data-theme="dark"] .bldg-unit { background: var(--surface-2); }
     border: 1px dashed var(--line, rgba(255, 255, 255, 0.14));
     border-radius: 12px;
 }
+
+/* ---------------------------------------------------------------
+   جستجوی سراسری (search.php)
+   --------------------------------------------------------------- */
+.search-form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+.search-form .search-input {
+    flex: 1;
+}
+.search-form .search-submit {
+    white-space: nowrap;
+}
+.search-summary {
+    margin: 0 0 12px;
+    font-size: 0.85rem;
+    color: var(--text-gray);
+}
+.search-result-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: #fff;
+    border: 1px solid var(--line, #e5e7eb);
+    text-decoration: none;
+    transition: border-color 0.2s;
+}
+.search-result-card:hover {
+    border-color: var(--gold-primary);
+}
+.search-result-title {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #111827;
+}
+.search-result-sub {
+    font-size: 0.78rem;
+    color: var(--text-gray);
+}
+html[data-theme="dark"] .search-result-card {
+    background: var(--bg-card-dark) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+html[data-theme="dark"] .search-result-title {
+    color: #f3f4f6 !important;
+}

@@ -19,7 +19,7 @@ if (!isset($_SESSION['token']) || empty($_SESSION['token'])) {
 
 $building_id = (int) ($_GET['building_id'] ?? $_SESSION['active_building_id'] ?? 0);
 $type = (string) ($_GET['type'] ?? 'members');
-$allowed_types = ['members', 'payments', 'tickets', 'audit'];
+$allowed_types = ['members', 'payments', 'tickets', 'audit', 'units', 'costs'];
 if (!in_array($type, $allowed_types, true)) {
     $type = 'members';
 }
@@ -27,8 +27,10 @@ if (!in_array($type, $allowed_types, true)) {
 $ctx = building_role_context($building_id);
 $back_page = match ($type) {
     'payments' => 'costs.php',
+    'costs' => 'costs.php',
     'tickets' => 'tickets.php',
     'audit' => 'audit_logs.php',
+    'units' => 'units.php',
     default => 'members.php',
 };
 if ($building_id <= 0 || empty($ctx['is_manager'])) {
@@ -148,6 +150,79 @@ if ($type === 'members') {
         ]);
     }
     $sheets[] = ['name' => 'لاگ اقدامات', 'rows' => $rows];
+} elseif ($type === 'units') {
+    // ---------------- فهرست واحدها ----------------
+    $units_response = callAPI('GET', '/buildings/' . $building_id . '/units');
+    if (empty($units_response['success'])) {
+        header('Location: units.php?building_id=' . $building_id);
+        exit;
+    }
+    $rows = [
+        xls_row([
+            xls_cell('شماره واحد', false, 'hdr'),
+            xls_cell('بلوک', false, 'hdr'),
+            xls_cell('طبقه', false, 'hdr'),
+            xls_cell('مالک', false, 'hdr'),
+            xls_cell('تعداد سکنه', false, 'hdr'),
+            xls_cell('وضعیت سکونت', false, 'hdr'),
+        ]),
+    ];
+    $occupancy_labels = [
+        'owner_occupied' => 'مالک‌نشین',
+        'tenant_occupied' => 'مستأجرنشین',
+        'no_owner' => 'بدون مالک',
+        'vacant' => 'خالی',
+    ];
+    foreach ($units_response['data'] ?? [] as $unit) {
+        $occupancy = (string) ($unit['occupancy_status'] ?? '');
+        $rows[] = xls_row([
+            xls_cell($unit['unit_number'] ?? ''),
+            xls_cell($unit['block_name'] ?? '—'),
+            xls_cell($unit['floor_name'] ?? '—'),
+            xls_cell($unit['owner_name'] ?? '—'),
+            xls_cell((int) ($unit['residents_count'] ?? 0), true),
+            xls_cell($occupancy_labels[$occupancy] ?? ($occupancy !== '' ? $occupancy : '—')),
+        ]);
+    }
+    $sheets[] = ['name' => 'واحدها', 'rows' => $rows];
+} elseif ($type === 'costs') {
+    // ---------------- فهرست هزینه‌ها ----------------
+    $costs_response = callAPI('GET', '/costs', ['building_id' => $building_id]);
+    if (empty($costs_response['success'])) {
+        header('Location: costs.php?building_id=' . $building_id);
+        exit;
+    }
+    $rows = [
+        xls_row([
+            xls_cell('عنوان', false, 'hdr'),
+            xls_cell('مبلغ (تومان)', false, 'hdr'),
+            xls_cell('نوع', false, 'hdr'),
+            xls_cell('مخاطبان', false, 'hdr'),
+            xls_cell('وضعیت', false, 'hdr'),
+            xls_cell('تاریخ ثبت', false, 'hdr'),
+        ]),
+    ];
+    $audience_labels = [
+        'all' => 'همه اعضا',
+        'residents' => 'ساکنین',
+        'owners' => 'مالکین',
+        'tenants' => 'مستأجرین',
+        'specific_units' => 'واحدهای خاص',
+    ];
+    $type_labels = ['fixed' => 'ثابت', 'per_person' => 'نفری', 'one_time' => 'موردی'];
+    foreach ($costs_response['data'] ?? [] as $cost) {
+        $audience = (string) ($cost['applies_to'] ?? $cost['audience'] ?? '');
+        $ctype = (string) ($cost['cost_type'] ?? '');
+        $rows[] = xls_row([
+            xls_cell($cost['title'] ?? ''),
+            xls_cell((float) ($cost['amount'] ?? 0), true),
+            xls_cell($type_labels[$ctype] ?? ($ctype !== '' ? $ctype : '—')),
+            xls_cell($audience_labels[$audience] ?? ($audience !== '' ? $audience : '—')),
+            xls_cell($cost['status'] ?? ''),
+            xls_cell(!empty($cost['created_at']) ? fa_date($cost['created_at']) : ''),
+        ]);
+    }
+    $sheets[] = ['name' => 'هزینه‌ها', 'rows' => $rows];
 } else {
     // ---------------- فهرست تیکت‌ها ----------------
     $tickets_response = callAPI('GET', '/tickets', ['building_id' => $building_id]);

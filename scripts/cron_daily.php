@@ -26,6 +26,7 @@ if (PHP_SAPI !== 'cli') {
 require __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../config/app.php';
 
+use App\Services\BackupService;
 use App\Services\CostService;
 use App\Services\DebtorReminderService;
 
@@ -40,6 +41,20 @@ $monthly = $service->generateAllMonthlyCharges();
 // ۳) یادآوری پیامکی بدهکاران (حداکثر یک پیامک برای هر واحد در هر ماه شمسی)
 $reminder = (new DebtorReminderService())->run();
 
+// ۴) پشتیبان‌گیری خودکار دیتابیس + نگهداری نسخه‌های اخیر
+$backupInfo = 'رد شد';
+if (\App\Config\AppConfig::env('BACKUP_ENABLED', '1') !== '0') {
+    try {
+        $backupService = new BackupService();
+        $backupPath = $backupService->createBackup();
+        $backupService->prune((int) \App\Config\AppConfig::env('BACKUP_KEEP', '7'));
+        $backupInfo = basename($backupPath);
+    } catch (\Throwable $e) {
+        \App\Core\Logger::error('cron', 'پشتیبان‌گیری خودکار ناموفق بود: ' . $e->getMessage());
+        $backupInfo = 'خطا';
+    }
+}
+
 echo date('Y-m-d H:i:s')
     . " | هزینه‌های دوره‌ای صادرشده: {$recurring['generated']}"
     . " | قالب‌های تمام‌شده: {$recurring['ended']}"
@@ -47,6 +62,7 @@ echo date('Y-m-d H:i:s')
     . " | ردشده/تکراری: {$monthly['skipped']}"
     . " | یادآوری بدهکاران: ارسال {$reminder['sent']} / ردشده(تکراری) {$reminder['skipped']}"
     . ($reminder['sms_disabled'] ? ' [پیامک غیرفعال]' : '')
+    . " | پشتیبان: {$backupInfo}"
     . PHP_EOL;
 
 exit(0);

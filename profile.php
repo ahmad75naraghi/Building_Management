@@ -16,6 +16,17 @@ $user_phone = $me_response['data']['phone'] ?? '';
 $first_letter = mb_substr($user_name, 0, 1, 'UTF-8');
 $my_user_id = (int) ($_SESSION['user_id'] ?? ($me_response['data']['id'] ?? 0));
 
+// آیا این حساب اجازهٔ مدیریت پشتیبان‌ها را دارد؟ (شماره‌های مجاز در تنظیمات محیطی)
+$backup_admin = false;
+try {
+    $backup_probe_user = new \App\Models\User();
+    $backup_probe_user->id = $my_user_id;
+    $backup_probe_user->phone = (string) $user_phone;
+    $backup_admin = (new \App\Services\BackupService())->isAdmin($backup_probe_user);
+} catch (\Throwable $e) {
+    $backup_admin = false;
+}
+
 // ساختمان‌های من: نقش + واحدهای مرتبط کاربر در هر ساختمان
 $my_buildings = [];
 $buildings_response = callAPI('GET', '/buildings');
@@ -189,6 +200,21 @@ require_once 'includes/header.php';
                 </div>
                 <span class="info-row-val" style="color:var(--text-gray);">معرفی بخش‌ها</span>
             </button>
+            <?php if ($backup_admin): ?>
+            <a href="backups.php" class="info-row">
+                <div class="info-row-right">
+                    <div class="info-row-icon" style="background:#eff6ff; color:#3b82f6;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <ellipse cx="12" cy="5" rx="9" ry="3" />
+                            <path d="M3 5v14a9 3 0 0 0 18 0V5" />
+                            <path d="M3 12a9 3 0 0 0 18 0" />
+                        </svg>
+                    </div>
+                    <span class="info-row-label">پشتیبان‌گیری دیتابیس</span>
+                </div>
+                <span class="info-row-val" style="color:var(--text-gray);">مدیر سیستم</span>
+            </a>
+            <?php endif; ?>
             <a href="change_password.php" class="info-row">
                 <div class="info-row-right">
                     <div class="info-row-icon" style="background: #fefce8; color: #eab308;">
