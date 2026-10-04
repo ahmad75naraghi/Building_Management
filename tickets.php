@@ -68,6 +68,34 @@ if (isset($list_response['success']) && $list_response['success'] === true) {
     $tickets = $list_response['data'] ?? [];
 }
 
+// فیلتر وضعیت تیکت با چیپ‌ها
+$status_filter = (string) ($_GET['status'] ?? 'all');
+$status_options = [
+    'all' => 'همه',
+    'open' => 'باز',
+    'in_progress' => 'در حال بررسی',
+    'resolved' => 'حل‌شده',
+    'closed' => 'بسته‌شده',
+    'rejected' => 'ردشده',
+];
+if (!array_key_exists($status_filter, $status_options)) {
+    $status_filter = 'all';
+}
+$status_counts = array_fill_keys(array_keys($status_options), 0);
+$status_counts['all'] = count($tickets);
+foreach ($tickets as $t_item) {
+    $s = (string) ($t_item['status'] ?? '');
+    if (isset($status_counts[$s])) {
+        $status_counts[$s]++;
+    }
+}
+if ($status_filter !== 'all') {
+    $tickets = array_values(array_filter(
+        $tickets,
+        static fn(array $t): bool => (string) ($t['status'] ?? '') === $status_filter
+    ));
+}
+
 $category_labels = [
     'technical' => 'فنی',
     'financial' => 'مالی',
@@ -102,6 +130,20 @@ require_once 'includes/header.php';
             <button type="button" class="empty-action" data-modal-open="add-ticket">🎫 ثبت اولین تیکت</button>
         </div>
     <?php else: ?>
+        <!-- چیپ‌های فیلتر وضعیت -->
+        <div class="flex flex-wrap gap-2 mb-3">
+            <?php foreach ($status_options as $s_key => $s_label): ?>
+                <?php $active = $status_filter === $s_key; ?>
+                <a href="tickets.php?building_id=<?= $building_id ?>&status=<?= htmlspecialchars($s_key, ENT_QUOTES) ?>"
+                   class="text-xs font-bold px-3 py-1.5 rounded-full transition-colors"
+                   style="text-decoration:none;<?= $active
+                       ? 'background:var(--gold-primary);color:#fff;'
+                       : 'background:var(--surface-2,#f3f4f6);color:var(--text-dark,#374151);' ?>">
+                    <?= htmlspecialchars($s_label) ?>
+                    <span style="opacity:.7;"><?= fa_digits((string) $status_counts[$s_key]) ?></span>
+                </a>
+            <?php endforeach; ?>
+        </div>
         <div class="list-filter-bar">
             <input type="search" class="form-input" data-list-search="tickets-list" placeholder="🔍 جستجوی عنوان، دسته یا وضعیت تیکت…" style="flex:1;">
             <span class="list-count-chip" data-list-count="tickets-list"></span>

@@ -96,6 +96,26 @@ final class MessageService
         return $message;
     }
 
+    /**
+     * حذف پیام — فقط فرستنده اجازهٔ حذف پیام خودش را دارد.
+     * خروجی: 'deleted' | 'forbidden' | 'not_found'
+     */
+    public function delete(int $messageId, int $userId): string
+    {
+        $message = $this->repo->findById($messageId);
+        if ($message === null) {
+            return 'not_found';
+        }
+        if ((int) $message->sender_id !== $userId) {
+            return 'forbidden';
+        }
+        $this->repo->delete($messageId);
+        Audit::log($userId, 'message.delete', 'message', $messageId, (int) $message->building_id, [
+            'recipient_id' => $message->recipient_id,
+        ]);
+        return 'deleted';
+    }
+
     /** فهرست گفتگوهای کاربر در ساختمان */
     public function conversations(int $buildingId, int $userId): array
     {

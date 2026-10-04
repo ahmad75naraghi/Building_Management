@@ -177,6 +177,7 @@ if ($building_id > 0) {
         $chart_debtors[] = [
             'label' => 'واحد ' . ($unit_number_by_id[$d_row['unit_id']] ?? (string) $d_row['unit_id']),
             'value' => (int) round($d_row['value']),
+            'href' => 'accounting.php?building_id=' . $building_id,
         ];
     }
 }
@@ -453,6 +454,10 @@ require_once 'includes/header.php';
         <section class="analytics-section">
             <div class="section-header-row">
                 <h2 class="section-title">تحلیل مالی</h2>
+                <a class="edit-action-btn" href="reports.php?building_id=<?= (int) $building_id ?>">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    گزارش کامل
+                </a>
             </div>
             <div class="analytics-grid">
                 <div class="analytics-panel">

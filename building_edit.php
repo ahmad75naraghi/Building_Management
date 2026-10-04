@@ -73,6 +73,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'total_units' => en_digits($_POST['total_units'] ?? '') !== '' ? max(0, (int) en_digits($_POST['total_units'])) : null,
                 'total_floors' => en_digits($_POST['total_floors'] ?? '') !== '' ? max(0, (int) en_digits($_POST['total_floors'])) : null,
                 'has_blocks' => isset($_POST['has_blocks']) && $_POST['has_blocks'] === '1',
+                'hierarchy_settings' => [
+                    'has_blocks' => isset($_POST['has_blocks']) && $_POST['has_blocks'] === '1',
+                    'has_floors' => !empty($_POST['hs_floors']),
+                    'has_units' => !empty($_POST['hs_units']),
+                    'has_common_areas' => !empty($_POST['hs_common_areas']),
+                ],
                 'default_image' => in_array(($_POST['default_image'] ?? 'b1'), ['b1', 'b2', 'b3', 'b4'], true) ? $_POST['default_image'] : 'b1',
                 'parking_spots' => max(0, (int) en_digits($_POST['parking_spots'] ?? 0)),
                 'monthly_charge' => max(0, (float) en_digits($_POST['monthly_charge'] ?? 0)),
@@ -108,6 +114,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $has_blocks_checked = !empty($building['has_blocks']) ? 'checked' : '';
+$hierarchy_defaults = ['has_blocks' => true, 'has_floors' => true, 'has_units' => true, 'has_common_areas' => true];
+$hs = is_array($building['hierarchy_settings'] ?? null) ? array_merge($hierarchy_defaults, $building['hierarchy_settings']) : $hierarchy_defaults;
+$hs['has_blocks'] = (bool) ($building['has_blocks'] ?? $hs['has_blocks']);
 $monthly_checked = !empty($building['monthly_charge_enabled']) ? 'checked' : '';
 $charge_mode = $building['charge_mode'] ?? 'fixed';
 $current_image = $building['default_image'] ?? 'b1';
@@ -156,11 +165,27 @@ require_once 'includes/page_head.php';
             </div>
 
             <div class="card bg-gray-50 p-4">
-                <label class="flex items-center gap-2 text-sm font-bold text-gray-700">
-                    <input type="checkbox" name="has_blocks" value="1" class="rounded" <?= $has_blocks_checked ?>>
-                    ساختمان بلوک دارد
-                </label>
-                <p class="text-[11px] text-gray-400 mt-2">مدیریت بلوک‌ها، طبقات، واحدها و مشاعات از صفحه ساختمان:</p>
+                <p class="text-sm font-bold text-gray-700">ساختار ساختمان</p>
+                <p class="text-[11px] text-gray-400 mt-1">بخش‌هایی را که ساختمان شما دارد فعال کنید تا فقط همان قسمت‌ها در صفحات نمایش داده شود.</p>
+                <div class="grid grid-cols-2 gap-2 mt-3">
+                    <label class="flex items-center gap-2 text-sm font-bold text-gray-700 bg-white border rounded-xl px-3 py-2.5">
+                        <input type="checkbox" name="has_blocks" value="1" class="rounded" <?= $has_blocks_checked ?>>
+                        بلوک دارد
+                    </label>
+                    <label class="flex items-center gap-2 text-sm font-bold text-gray-700 bg-white border rounded-xl px-3 py-2.5">
+                        <input type="checkbox" name="hs_floors" value="1" class="rounded" <?= !empty($hs['has_floors']) ? 'checked' : '' ?>>
+                        طبقه دارد
+                    </label>
+                    <label class="flex items-center gap-2 text-sm font-bold text-gray-700 bg-white border rounded-xl px-3 py-2.5">
+                        <input type="checkbox" name="hs_units" value="1" class="rounded" <?= !empty($hs['has_units']) ? 'checked' : '' ?>>
+                        واحد دارد
+                    </label>
+                    <label class="flex items-center gap-2 text-sm font-bold text-gray-700 bg-white border rounded-xl px-3 py-2.5">
+                        <input type="checkbox" name="hs_common_areas" value="1" class="rounded" <?= !empty($hs['has_common_areas']) ? 'checked' : '' ?>>
+                        مشاعات دارد
+                    </label>
+                </div>
+                <p class="text-[11px] text-gray-400 mt-3">مدیریت بلوک‌ها، طبقات، واحدها و مشاعات از صفحه ساختمان:</p>
                 <div class="grid grid-cols-2 gap-2 mt-2 text-center text-xs font-bold">
                     <a href="blocks.php?building_id=<?= $building_id ?>" class="bg-white border rounded-xl py-2.5 text-indigo-600">بلوک‌ها</a>
                     <a href="floors.php?building_id=<?= $building_id ?>" class="bg-white border rounded-xl py-2.5 text-emerald-600">طبقات</a>

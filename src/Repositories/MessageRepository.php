@@ -21,6 +21,25 @@ final class MessageRepository
         return (int) $db->lastInsertId();
     }
 
+    /** خواندن یک پیام با شناسه */
+    public function findById(int $id): ?Message
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare('SELECT * FROM messages WHERE id = ? LIMIT 1');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? $this->mapRow($row) : null;
+    }
+
+    /** حذف فیزیکی پیام (فقط توسط فرستنده — کنترل در سرویس) */
+    public function delete(int $id): bool
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare('DELETE FROM messages WHERE id = ?');
+        $stmt->execute([$id]);
+        return $stmt->rowCount() > 0;
+    }
+
     /** گفتگو با یک کاربر: پیام‌های رد و بدل شده بین من و او در ساختمان */
     public function thread(int $buildingId, int $userId, int $otherId): array
     {

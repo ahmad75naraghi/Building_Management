@@ -7140,6 +7140,22 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "حذف پیام (فقط فرستنده)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/messages/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": null
+            },
+            "description": "فقط فرستنده می‌تواند پیام خودش را حذف کند؛ برای غیر فرستنده 403 و برای پیام ناموجود 404 برمی‌گرداند."
+          },
+          "response": []
         }
       ]
     }

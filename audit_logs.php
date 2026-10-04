@@ -13,50 +13,6 @@ $action_filter = trim((string) ($_GET['action'] ?? ''));
 $ctx = building_role_context($building_id);
 $is_manager = $ctx['is_manager'];
 
-/* برچسب فارسی اقدام‌های ممیزی */
-$audit_action_labels = [
-    'auth.login' => '🔑 ورود موفق',
-    'auth.login_failed' => '⛔ تلاش ورود ناموفق',
-    'auth.logout' => '🚪 خروج',
-    'auth.register' => '🆕 ثبت‌نام',
-    'building.create' => '🏢 ایجاد ساختمان',
-    'building.update' => '🏢 ویرایش ساختمان',
-    'building.delete' => '🗑️ حذف ساختمان',
-    'unit.create' => ' ایجاد واحد',
-    'unit.update' => '🏠 ویرایش واحد',
-    'unit.delete' => '🗑️ حذف واحد',
-    'cost.create' => '💰 ثبت هزینه',
-    'cost.update' => '💰 ویرایش هزینه',
-    'cost.delete' => '🗑️ حذف هزینه',
-    'cost.issue' => '📨 صدور هزینه برای مخاطبان',
-    'payment.submit' => '💳 ثبت پرداخت',
-    'payment.receipt' => '🧾 آپلود رسید پرداخت',
-    'payment.confirm' => '✅ تأیید پرداخت',
-    'payment.reject' => '❌ رد پرداخت',
-    'penalty_setting.create' => '⚙️ ثبت تنظیم جریمه',
-    'penalty_setting.update' => '⚙️ ویرایش تنظیم جریمه',
-    'penalty_setting.delete' => '⚙️ حذف تنظیم جریمه',
-    'ticket.create' => '🎫 ثبت تیکت',
-    'ticket.update' => '🎫 ویرایش تیکت',
-    'ticket.delete' => '🗑️ حذف تیکت',
-    'ticket.comment' => '💬 دیدگاه روی تیکت',
-    'document.create' => '📄 ثبت سند',
-    'document.replace_file' => '🔄 تعویض فایل سند',
-];
-
-function audit_action_label(string $action, array $labels): string
-{
-    if (isset($labels[$action])) {
-        return $labels[$action];
-    }
-    foreach ($labels as $key => $label) {
-        if (str_starts_with($action, $key)) {
-            return $label;
-        }
-    }
-    return '🔸 ' . $action;
-}
-
 $logs = [];
 $building_name = '';
 if ($building_id > 0 && $is_manager) {
@@ -95,7 +51,7 @@ require_once 'includes/header.php';
                     <label class="form-label">نوع اقدام</label>
                     <select name="action" class="form-input">
                         <option value="">همه اقدام‌ها</option>
-                        <?php foreach (['auth.' => 'ورود/خروج/ثبت‌نام', 'building.' => 'ساختمان', 'unit.' => 'واحدها', 'cost.' => 'هزینه‌ها', 'payment.' => 'پرداخت‌ها', 'ticket.' => 'تیکت‌ها', 'document.' => 'اسناد', 'penalty_setting.' => 'جریمه‌ها'] as $key => $label): ?>
+                        <?php foreach (['auth.' => 'ورود/خروج/ثبت‌نام', 'building.' => 'ساختمان', 'unit.' => 'واحدها', 'cost.' => 'هزینه‌ها', 'payment.' => 'پرداخت‌ها', 'ticket.' => 'تیکت‌ها', 'document.' => 'اسناد', 'penalty_setting.' => 'جریمه‌ها', 'message.' => 'پیام‌ها'] as $key => $label): ?>
                             <option value="<?= htmlspecialchars($key) ?>" <?= $action_filter === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -103,6 +59,12 @@ require_once 'includes/header.php';
                 <button type="submit" class="btn-chip btn-chip-neutral" style="margin-top:22px;">اعمال فیلتر</button>
             </div>
         </form>
+
+        <?php if ($is_manager): ?>
+            <div style="margin:-4px 0 14px;">
+                <a class="btn-chip" href="list_export.php?type=audit&building_id=<?= (int) $building_id ?>" title="خروجی اکسل لاگ اقدامات">📥 خروجی اکسل</a>
+            </div>
+        <?php endif; ?>
 
         <div class="section-header-row" style="margin: 0 0 12px;">
             <h2 class="section-title">آخرین اقدام‌ها (<?= fa_digits(count($logs)) ?>)</h2>
@@ -128,10 +90,10 @@ require_once 'includes/header.php';
                     <div class="card p-4">
                         <div class="flex items-center gap-3">
                             <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#eef2ff;font-size:19px;">
-                                <?= htmlspecialchars(mb_substr(audit_action_label($l_action, $audit_action_labels), 0, 2)) ?>
+                                <?= htmlspecialchars(mb_substr(audit_action_label($l_action), 0, 2)) ?>
                             </div>
                             <div class="flex-1 min-w-0">
-                                <h3 class="font-bold text-gray-800 text-sm"><?= htmlspecialchars(audit_action_label($l_action, $audit_action_labels)) ?></h3>
+                                <h3 class="font-bold text-gray-800 text-sm"><?= htmlspecialchars(audit_action_label($l_action)) ?></h3>
                                 <p class="text-xs text-gray-500 mt-0.5">
                                     👤 <?= htmlspecialchars($log['user_name'] ?? 'سیستم') ?>
                                     •  <?= fa_datetime($log['created_at'] ?? '') ?>

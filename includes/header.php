@@ -136,8 +136,8 @@ if (!isset($unread_messages_nav)) {
     <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
     <!-- فونت وزیرمتن -->
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
-    <!-- Tailwind برای کلاس‌های کاربردی -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- کلاس‌های کاربردی (جایگزین محلی تیلویند؛ آفلاین و بدون وابستگی خارجی) -->
+    <link rel="stylesheet" href="assets/css/utilities.css">
     <!-- استایل استاندارد اپ -->
     <link rel="stylesheet" href="assets/css/style.css">
 </head>

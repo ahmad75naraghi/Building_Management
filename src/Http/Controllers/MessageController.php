@@ -83,6 +83,33 @@ final class MessageController
         }
     }
 
+    /** DELETE /api/messages/{id} — فقط فرستنده می‌تواند پیام خودش را حذف کند */
+    public function destroy(Request $request): Response
+    {
+        $userId = (int) ($request->getAttribute('user_id') ?? 0);
+        $messageId = (int) ($request->getAttribute('id') ?? 0);
+        if (!$userId || !$messageId) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => 'شناسهٔ پیام الزامی است.',
+            ]);
+        }
+        $result = $this->service->delete($messageId, $userId);
+        if ($result === 'not_found') {
+            return (new Response())->setStatusCode(404)->setJson([
+                'success' => false, 'message' => 'پیام یافت نشد.',
+            ]);
+        }
+        if ($result === 'forbidden') {
+            return (new Response())->setStatusCode(403)->setJson([
+                'success' => false, 'message' => 'فقط فرستنده می‌تواند پیام را حذف کند.',
+            ]);
+        }
+        return (new Response())->setJson([
+            'success' => true,
+            'message' => 'پیام حذف شد.',
+        ]);
+    }
+
     /** GET /api/messages/unread-count?building_id= */
     public function unreadCount(Request $request): Response
     {

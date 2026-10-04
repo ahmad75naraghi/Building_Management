@@ -260,6 +260,10 @@ TestLog::run('هیچ مسیری با توکن معتبر خطای سرور (5xx)
             $db->exec("INSERT INTO tickets (building_id, user_id, title, status)
                        VALUES ({$B}, {$GLOBALS['manager_uid']}, 'تیکت یک‌بارمصرف اسموک', 'open')");
             $path = '/tickets/' . (int) $db->lastInsertId();
+        } elseif ($route === 'DELETE /api/messages/{id}') {
+            $db->exec("INSERT INTO messages (building_id, sender_id, recipient_id, body)
+                       VALUES ({$B}, {$GLOBALS['manager_uid']}, {$resident}, 'پیام یک‌بارمصرف اسموک')");
+            $path = '/messages/' . (int) $db->lastInsertId();
         } else {
             $path = smoke_path($route, $idMap, $contextIds);
         }
@@ -319,6 +323,7 @@ TestLog::run('همهٔ مسیرهای حذفی روی موجودیت اختصا�
     $voteId = $mk("INSERT INTO votes (building_id, title, status, created_by) VALUES ({$B}, 'حذف', 'active', {$manager})");
     $targets[] = ['DELETE /api/votes/{id}', $voteId];
     $targets[] = ['DELETE /api/tickets/{id}', $mk("INSERT INTO tickets (building_id, user_id, title, status) VALUES ({$B}, {$manager}, 'حذف', 'open')")];
+    $targets[] = ['DELETE /api/messages/{id}', $mk("INSERT INTO messages (building_id, sender_id, recipient_id, body) VALUES ({$B}, {$manager}, {$resident}, 'حذف')")];
     $targets[] = ['DELETE /api/costs/{id}', $mk("INSERT INTO costs (building_id, title, amount, status, target_audience, division_method) VALUES ({$B}, 'حذف', 1000, 'draft', 'all', 'fixed_share')")];
     $targets[] = ['DELETE /api/common-areas/{id}', $mk("INSERT INTO common_areas (building_id, name) VALUES ({$B}, 'حذف')")];
     $targets[] = ['DELETE /api/blocks/{id}', $mk("INSERT INTO blocks (building_id, name) VALUES ({$B}, 'حذف')")];

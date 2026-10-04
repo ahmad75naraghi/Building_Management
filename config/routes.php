@@ -114,6 +114,7 @@ final class Routes
         'GET /api/messages/thread/{peer_id}' => ['App\Http\Controllers\MessageController', 'thread'],
         'GET /api/messages/unread-count' => ['App\Http\Controllers\MessageController', 'unreadCount'],
         'POST /api/messages' => ['App\Http\Controllers\MessageController', 'store'],
+        'DELETE /api/messages/{id}' => ['App\Http\Controllers\MessageController', 'destroy'],
         'GET /api/audit-logs' => ['App\Http\Controllers\AuditController', 'index'],
         'POST /api/penalty-settings' => ['App\Http\Controllers\CostController', 'createPenaltySetting'],
         'GET /api/penalty-settings' => ['App\Http\Controllers\CostController', 'indexPenaltySettings'],

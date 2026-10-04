@@ -12,7 +12,7 @@
  * بالا برود تا کش‌های قدیمی کاربران در اولین بازدید پاک شود.
  * ============================================================ */
 
-var VERSION = 'bms-v8';
+var VERSION = 'bms-v9';
 var STATIC_CACHE = VERSION + '-static';
 var RUNTIME_CACHE = VERSION + '-runtime';
 
@@ -20,6 +20,7 @@ var PRECACHE = [
     'manifest.json',
     'offline.html',
     'assets/css/style.css',
+    'assets/css/utilities.css',
     'assets/js/main.js',
     'assets/js/ui-enhance.js',
     'assets/js/charts.js',

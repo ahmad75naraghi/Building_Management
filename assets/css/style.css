@@ -2588,3 +2588,14 @@
             font-size: 12px; font-weight: 800;
             padding: 8px 18px; border-radius: 10px;
         }
+
+/* ==================== چاپ نقشهٔ ساختمان (خروجی برای تابلوی اعلانات) ==================== */
+@media print {
+    body.printing-map * { visibility: hidden; }
+    body.printing-map #building-map-section,
+    body.printing-map #building-map-section * { visibility: visible; }
+    body.printing-map #building-map-section { position: absolute; inset: 0; width: 100%; padding: 16px; }
+    body.printing-map .bms-print-only { display: block !important; }
+    body.printing-map .no-print { display: none !important; }
+    body.printing-map .bldg-card { box-shadow: none; border: 1px solid #ddd; }
+}

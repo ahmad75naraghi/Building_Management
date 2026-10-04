@@ -294,10 +294,19 @@ foreach ($units as $u) {
         </section>
 
         <!-- نمای گرافیکی ساختمان -->
-        <section class="quick-access-section">
+        <section class="quick-access-section" id="building-map-section">
             <div class="section-header-row">
                 <span class="section-title">🏢 نمای ساختمان</span>
-                <a href="units.php?building_id=<?= (int) $building_id ?>" class="widget-view-all-link"><?= fa_digits(count($units)) ?> واحد</a>
+                <span class="flex items-center gap-2">
+                    <?php if (!empty($units)): ?>
+                    <button type="button" class="btn-chip btn-chip-neutral no-print" onclick="printBuildingMap()" title="چاپ یا ذخیرهٔ تصویر نقشهٔ ساختمان">🖨️ چاپ نقشه</button>
+                    <?php endif; ?>
+                    <a href="units.php?building_id=<?= (int) $building_id ?>" class="widget-view-all-link"><?= fa_digits(count($units)) ?> واحد</a>
+                </span>
+            </div>
+            <div class="bms-print-only" style="display:none;">
+                <h2 style="font-size:18px;font-weight:900;margin:0 0 4px;">نمای ساختمان «<?= htmlspecialchars($building['name'] ?? '') ?>»</h2>
+                <p style="font-size:11px;color:#666;margin:0 0 14px;">تهیه‌شده از سامانهٔ مدیریت ساختمان — <?= fa_date(date('Y-m-d H:i:s')) ?></p>
             </div>
 
             <?php if (empty($units)): ?>

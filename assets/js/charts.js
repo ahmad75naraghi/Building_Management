@@ -128,12 +128,14 @@
         items.forEach(function (x) {
             var w = Math.max(4, (Math.abs(x.value) / max) * 100);
             var valText = cfg.money === false ? faNum(x.value) : faMoney(x.value) + ' تومان';
-            html +=
-                '<div class="bms-hbar-row">' +
+            var href = x.href || cfg.href || '';
+            var row =
                 '<span class="bms-hbar-label">' + x.label + '</span>' +
                 '<span class="bms-hbar-track"><span class="bms-hbar-fill" style="width:' + w + '%;background:' + color + ';"></span></span>' +
-                '<span class="bms-hbar-value">' + valText + '</span>' +
-                '</div>';
+                '<span class="bms-hbar-value">' + valText + '</span>';
+            html += href
+                ? '<a class="bms-hbar-row" href="' + href + '" style="text-decoration:none;color:inherit;">' + row + '</a>'
+                : '<div class="bms-hbar-row">' + row + '</div>';
         });
         el.innerHTML = html;
     }

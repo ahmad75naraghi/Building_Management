@@ -62,6 +62,51 @@ $filtered_notifications = array_values(array_filter(
         || ($filter === 'financial') === $notif_is_financial($n)
 ));
 
+/** لینک عمیق هر اعلان به صفحهٔ مرتبط (از روی محمولهٔ داده یا نوع اعلان) */
+if (!function_exists('notification_deep_link')) {
+function notification_deep_link(array $n): string
+{
+    $data = is_array($n['data'] ?? null) ? $n['data'] : [];
+    if (!empty($data['cost_id'])) {
+        return 'costs.php';
+    }
+    if (!empty($data['ticket_id'])) {
+        return 'ticket_view.php?id=' . (int) $data['ticket_id'];
+    }
+    if (!empty($data['booking_id'])) {
+        return 'bookings.php';
+    }
+    if (!empty($data['maintenance_id'])) {
+        return 'maintenance.php';
+    }
+    if (!empty($data['meeting_id'])) {
+        return 'meetings.php';
+    }
+    if (!empty($data['vote_id'])) {
+        return 'votes.php';
+    }
+    if (!empty($data['invitation_id'])) {
+        return 'members.php';
+    }
+    if (!empty($data['from'])) {
+        return 'messages.php?with=' . (int) $data['from'];
+    }
+    $by_type = [
+        'payment' => 'costs.php',
+        'ticket' => 'tickets.php',
+        'booking' => 'bookings.php',
+        'maintenance' => 'maintenance.php',
+        'meeting' => 'meetings.php',
+        'announcement' => 'announcements.php',
+        'vote' => 'votes.php',
+        'message' => 'messages.php',
+        'invitation' => 'members.php',
+        'reminder' => 'costs.php',
+    ];
+    return $by_type[(string) ($n['notification_type'] ?? '')] ?? '';
+}
+} // !function_exists
+
 $page_title = 'اعلانات من';
 $header_sub = 'پیام‌ها و رویدادها';
 $back_url = 'index.php';
@@ -152,15 +197,26 @@ require_once 'includes/page_head.php';
                         </div>
                         <span class="text-[11px] text-gray-400 flex-shrink-0"><?= fa_smart_time($notification['created_at'] ?? '') ?></span>
                     </div>
-                    <?php if (empty($notification['is_read'])): ?>
-                        <form method="POST" action="" class="mt-3">
-                            <?= csrf_field() ?>
-                            <input type="hidden" name="form_action" value="mark_read">
-                            <input type="hidden" name="notification_id" value="<?= (int) $notification['id'] ?>">
-                            <button type="submit" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-bold py-2.5 rounded-xl transition-all">
-                                علامت‌گذاری به‌عنوان خوانده‌شده
-                            </button>
-                        </form>
+                    <?php
+                    $deep_link = notification_deep_link($notification);
+                    if ($deep_link !== '' || empty($notification['is_read'])): ?>
+                        <div class="flex gap-2 mt-3">
+                            <?php if ($deep_link !== ''): ?>
+                                <a href="<?= htmlspecialchars($deep_link, ENT_QUOTES) ?>" class="btn-secondary" style="flex:1;text-decoration:none;">
+                                    مشاهدهٔ جزئیات
+                                </a>
+                            <?php endif; ?>
+                            <?php if (empty($notification['is_read'])): ?>
+                                <form method="POST" action="" class="flex-1">
+                                    <?= csrf_field() ?>
+                                    <input type="hidden" name="form_action" value="mark_read">
+                                    <input type="hidden" name="notification_id" value="<?= (int) $notification['id'] ?>">
+                                    <button type="submit" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-bold py-2.5 rounded-xl transition-all">
+                                        خوانده شد
+                                    </button>
+                                </form>
+                            <?php endif; ?>
+                        </div>
                     <?php endif; ?>
                 </div>
             <?php endforeach; ?>

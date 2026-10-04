@@ -5,6 +5,7 @@
  *   list_export.php?building_id=1&type=members    فهرست اعضا با نقش و واحدها
  *   list_export.php?building_id=1&type=payments   فهرست پرداخت‌ها (همهٔ هزینه‌ها)
  *   list_export.php?building_id=1&type=tickets    فهرست تیکت‌ها
+ *   list_export.php?building_id=1&type=audit      لاگ اقدامات (۲۰۰ مورد آخر)
  *
  * خروجی در قالب SpreadsheetML (سازگار با اکسل، راست‌به‌چپ) دانلود می‌شود.
  */
@@ -18,13 +19,18 @@ if (!isset($_SESSION['token']) || empty($_SESSION['token'])) {
 
 $building_id = (int) ($_GET['building_id'] ?? $_SESSION['active_building_id'] ?? 0);
 $type = (string) ($_GET['type'] ?? 'members');
-$allowed_types = ['members', 'payments', 'tickets'];
+$allowed_types = ['members', 'payments', 'tickets', 'audit'];
 if (!in_array($type, $allowed_types, true)) {
     $type = 'members';
 }
 
 $ctx = building_role_context($building_id);
-$back_page = $type === 'payments' ? 'costs.php' : ($type === 'tickets' ? 'tickets.php' : 'members.php');
+$back_page = match ($type) {
+    'payments' => 'costs.php',
+    'tickets' => 'tickets.php',
+    'audit' => 'audit_logs.php',
+    default => 'members.php',
+};
 if ($building_id <= 0 || empty($ctx['is_manager'])) {
     header('Location: ' . $back_page . ($building_id > 0 ? '?building_id=' . $building_id : ''));
     exit;
@@ -114,6 +120,34 @@ if ($type === 'members') {
         ]);
     }
     $sheets[] = ['name' => 'پرداخت‌ها', 'rows' => $rows];
+} elseif ($type === 'audit') {
+    // ---------------- لاگ اقدامات ----------------
+    $logs_response = callAPI('GET', '/audit-logs', ['building_id' => $building_id, 'limit' => 200]);
+    if (empty($logs_response['success'])) {
+        header('Location: audit_logs.php?building_id=' . $building_id);
+        exit;
+    }
+    $logs = $logs_response['data'] ?? [];
+
+    $rows = [
+        xls_row([
+            xls_cell('تاریخ و ساعت', false, 'hdr'),
+            xls_cell('کاربر', false, 'hdr'),
+            xls_cell('اقدام', false, 'hdr'),
+            xls_cell('موضوع', false, 'hdr'),
+        ]),
+    ];
+    foreach ($logs as $log) {
+        $entity_type = (string) ($log['entity_type'] ?? '');
+        $entity_id = (int) ($log['entity_id'] ?? 0);
+        $rows[] = xls_row([
+            xls_cell(!empty($log['created_at']) ? fa_datetime($log['created_at']) : ''),
+            xls_cell($log['user_name'] ?? ''),
+            xls_cell(audit_action_label((string) ($log['action'] ?? ''))),
+            xls_cell($entity_type !== '' ? $entity_type . ($entity_id > 0 ? ' #' . $entity_id : '') : ''),
+        ]);
+    }
+    $sheets[] = ['name' => 'لاگ اقدامات', 'rows' => $rows];
 } else {
     // ---------------- فهرست تیکت‌ها ----------------
     $tickets_response = callAPI('GET', '/tickets', ['building_id' => $building_id]);

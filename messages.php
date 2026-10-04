@@ -33,6 +33,19 @@ $response = callAPI('POST', '/messages', [
     }
 }
 
+// حذف پیام (فقط فرستنده)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action']) && $_POST['form_action'] === 'delete_message') {
+    $msg_id = (int) ($_POST['message_id'] ?? 0);
+    if ($building_id > 0 && $msg_id > 0) {
+        $del_response = callAPI('DELETE', '/messages/' . $msg_id);
+        if (!empty($del_response['success'])) {
+            header('Location: messages.php?building_id=' . $building_id . '&with=' . $peer_id);
+            exit;
+        }
+        $alert_message = $del_response['message'] ?? 'حذف پیام ناموفق بود.';
+    }
+}
+
 // نام ساختمان
 $building_name = '';
 if ($building_id > 0) {
@@ -125,6 +138,8 @@ require_once 'includes/header.php';
                                     <?php $seen = !empty($msg['is_read']); ?>
                                     <span title="<?= $seen ? 'خوانده شده' : 'ارسال شده' ?>"
                                           style="font-weight:900;letter-spacing:-1px;opacity:<?= $seen ? '1' : '.6' ?>;font-size:10px;"><?= $seen ? '✓✓' : '✓' ?></span>
+                                    <button type="button" title="حذف پیام" onclick="msgDeleteAsk(<?= (int) ($msg['id'] ?? 0) ?>)"
+                                            style="background:none;border:none;cursor:pointer;opacity:.7;font-size:10px;padding:0;line-height:1;">🗑️</button>
                                 <?php endif; ?>
                             </p>
                         </div>
@@ -141,6 +156,55 @@ require_once 'includes/header.php';
                 <button type="submit" class="btn-primary" style="height:44px;">ارسال</button>
             </form>
         </div>
+
+        <!-- برگهٔ تأیید حذف پیام -->
+        <div id="msg-delete-sheet" class="sheet-overlay" style="display:none;">
+            <div class="app-sheet">
+                <p class="font-bold text-gray-800 mb-1">حذف پیام</p>
+                <p class="text-xs text-gray-400 mb-4">این پیام برای هر دو طرف حذف می‌شود و قابل بازگشت نیست.</p>
+                <form method="POST" action="">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="form_action" value="delete_message">
+                    <input type="hidden" name="message_id" id="msg-delete-id" value="">
+                    <button type="submit" class="btn-danger w-full">حذف پیام</button>
+                </form>
+                <button type="button" class="btn-secondary w-full mt-2" onclick="msgDeleteClose()">انصراف</button>
+            </div>
+        </div>
+        <script>
+            // تازه‌سازی خودکار گفتگو هر ۱۵ ثانیه بدون پرش اسکرول
+            (function () {
+                var area = document.querySelector('.chat-thread-area');
+                if (!area) return;
+                var timer = setInterval(function () {
+                    if (document.hidden) return;
+                    fetch(window.location.href, { headers: { 'Accept': 'text/html' } })
+                        .then(function (r) { return r.ok ? r.text() : null; })
+                        .then(function (html) {
+                            if (!html) return;
+                            var doc = new DOMParser().parseFromString(html, 'text/html');
+                            var fresh = doc.querySelector('.chat-thread-area');
+                            if (!fresh) return;
+                            var keepScroll = Math.abs(area.scrollTop + area.clientHeight - area.scrollHeight) < 40;
+                            area.innerHTML = fresh.innerHTML;
+                            if (keepScroll) area.scrollTop = area.scrollHeight;
+                        })
+                        .catch(function () { /* آفلاین: نادیده بگیر */ });
+                }, 15000);
+                window.addEventListener('pagehide', function () { clearInterval(timer); });
+            })();
+            function msgDeleteAsk(id) {
+                if (!id) return;
+                document.getElementById('msg-delete-id').value = id;
+                document.getElementById('msg-delete-sheet').style.display = 'flex';
+            }
+            function msgDeleteClose() {
+                document.getElementById('msg-delete-sheet').style.display = 'none';
+            }
+            document.getElementById('msg-delete-sheet').addEventListener('click', function (e) {
+                if (e.target === this) msgDeleteClose();
+            });
+        </script>
 
     <?php else: ?>
         <!-- ==================== فهرست گفتگوها ==================== -->

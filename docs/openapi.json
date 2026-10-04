@@ -7286,6 +7286,60 @@
                     }
                 ]
             }
+        },
+        "/messages/{id}": {
+            "delete": {
+                "summary": "حذف پیام خصوصی",
+                "description": "فقط فرستنده می‌تواند پیام خودش را حذف کند. 403 برای غیر فرستنده و 404 برای پیام ناموجود.",
+                "tags": [
+                    "اعلانیه‌ها"
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "شناسهٔ پیام"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "پیام حذف شد",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "شناسهٔ پیام نامعتبر"
+                    },
+                    "403": {
+                        "description": "کاربر فرستندهٔ پیام نیست"
+                    },
+                    "404": {
+                        "description": "پیام یافت نشد"
+                    }
+                }
+            }
         }
     },
     "components": {

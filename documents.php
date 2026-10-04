@@ -199,7 +199,7 @@ require_once 'includes/header.php';
 <main class="p-5">
 
     <?php if ($is_manager): ?>
-        <?php modal_open_button('add-document', '📤 بارگذاری سند جدید'); ?>
+        <?php modal_open_button('add-document', 'بارگذاری سند جدید'); ?>
     <?php else: ?>
         <div class="hint-card">📄 اسناد ساختمان توسط مدیر بارگذاری می‌شوند؛ شما می‌توانید اسناد قابل رویت را مشاهده و دانلود کنید.</div>
     <?php endif; ?>

@@ -611,3 +611,16 @@
     // API برنامه‌ای برای سایر اسکریپت‌ها
     window.showToast = showToast;
 })();
+
+// چاپ نقشهٔ ساختمان: فقط بخش نمای ساختمان چاپ می‌شود (قابل ذخیره به PDF از پنجرهٔ چاپ)
+window.printBuildingMap = function () {
+    var section = document.getElementById('building-map-section');
+    if (!section) { return; }
+    document.body.classList.add('printing-map');
+    var cleanup = function () {
+        document.body.classList.remove('printing-map');
+        window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    setTimeout(function () { window.print(); }, 60);
+};

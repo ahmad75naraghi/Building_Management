@@ -121,12 +121,15 @@ require_once 'includes/header.php';
 
     <?php if ($is_manager): ?>
         <div class="flex gap-2 flex-wrap mb-4">
-            <?php modal_open_button('direct-payment', '📥 ثبت پرداخت واحد'); ?>
-            <?php modal_open_button('unit-charge', '📤 ثبت بدهی برای واحد'); ?>
+            <?php modal_open_button('direct-payment', 'ثبت پرداخت واحد'); ?>
+            <?php modal_open_button('unit-charge', 'ثبت بدهی برای واحد'); ?>
             <form method="POST" action="" style="display:contents;">
                 <?= csrf_field() ?>
                 <input type="hidden" name="form_action" value="run_engine">
-                <button type="submit" class="btn-secondary" style="font-size:12px;">⚙️ اجرای موتور دوره‌ای</button>
+                <button type="submit" class="btn-secondary" style="font-size:12px;display:inline-flex;align-items:center;gap:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    اجرای موتور دوره‌ای
+                </button>
             </form>
         </div>
     <?php endif; ?>

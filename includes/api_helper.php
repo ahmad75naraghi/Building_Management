@@ -1029,4 +1029,51 @@ function occupancy_label($unit)
     return $map[$status] ?? 'نامشخص';
 }
 
+/**
+ * برچسب فارسی اقدام‌های لاگ ممیزی (مشترک بین صفحهٔ لاگ و خروجی اکسل).
+ */
+function audit_action_label(string $action): string
+{
+    $labels = [
+        'auth.login' => '🔑 ورود موفق',
+        'auth.login_failed' => '⛔ تلاش ورود ناموفق',
+        'auth.logout' => '🚪 خروج',
+        'auth.register' => '🆕 ثبت‌نام',
+        'building.create' => '🏢 ایجاد ساختمان',
+        'building.update' => '🏢 ویرایش ساختمان',
+        'building.delete' => '🗑️ حذف ساختمان',
+        'unit.create' => '🏠 ایجاد واحد',
+        'unit.update' => '🏠 ویرایش واحد',
+        'unit.delete' => '🗑️ حذف واحد',
+        'cost.create' => '💰 ثبت هزینه',
+        'cost.update' => '💰 ویرایش هزینه',
+        'cost.delete' => '🗑️ حذف هزینه',
+        'cost.issue' => '📨 صدور هزینه برای مخاطبان',
+        'payment.submit' => '💳 ثبت پرداخت',
+        'payment.receipt' => '🧾 آپلود رسید پرداخت',
+        'payment.confirm' => '✅ تأیید پرداخت',
+        'payment.reject' => '❌ رد پرداخت',
+        'penalty_setting.create' => '⚙️ ثبت تنظیم جریمه',
+        'penalty_setting.update' => '⚙️ ویرایش تنظیم جریمه',
+        'penalty_setting.delete' => '⚙️ حذف تنظیم جریمه',
+        'ticket.create' => '🎫 ثبت تیکت',
+        'ticket.update' => '🎫 ویرایش تیکت',
+        'ticket.delete' => '🗑️ حذف تیکت',
+        'ticket.comment' => '💬 دیدگاه روی تیکت',
+        'document.create' => '📄 ثبت سند',
+        'document.replace_file' => '🔄 تعویض فایل سند',
+        'message.send' => '💬 ارسال پیام خصوصی',
+        'message.delete' => '🗑️ حذف پیام خصوصی',
+    ];
+    if (isset($labels[$action])) {
+        return $labels[$action];
+    }
+    foreach ($labels as $key => $label) {
+        if (str_starts_with($action, $key)) {
+            return $label;
+        }
+    }
+    return '🔸 ' . $action;
+}
+
 ?>
