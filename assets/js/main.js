@@ -84,17 +84,35 @@
          *    بستن:     دکمه با data-modal-close یا کلیک روی پس‌زمینه یا Esc
          *    پیش‌پر کردن فرم ویرایش: data-set-* روی دکمه، مقدار در فیلد هم‌نام
          */
-        function openModal(id) {
+        function openModal(id, trigger) {
             var overlay = document.getElementById(id);
             if (!overlay) {
                 return;
             }
+            overlay.__trigger = trigger || document.activeElement;
             overlay.classList.add('is-open');
             overlay.setAttribute('aria-hidden', 'false');
             document.body.classList.add('modal-open');
             var focusable = overlay.querySelector('input:not([type=hidden]), textarea, select');
             if (focusable) {
                 setTimeout(function () { focusable.focus(); }, 280);
+            }
+            /* تلهٔ فوکوس: کلید تب داخل پاپ‌آپ می‌ماند */
+            if (!overlay.__trapBound) {
+                overlay.__trapBound = true;
+                overlay.addEventListener('keydown', function (e) {
+                    if (e.key !== 'Tab') { return; }
+                    var items = overlay.querySelectorAll(
+                        'button:not([disabled]), input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+                    );
+                    if (!items.length) { return; }
+                    var first = items[0], last = items[items.length - 1];
+                    if (e.shiftKey && document.activeElement === first) {
+                        e.preventDefault(); last.focus();
+                    } else if (!e.shiftKey && document.activeElement === last) {
+                        e.preventDefault(); first.focus();
+                    }
+                });
             }
         }
 
@@ -106,6 +124,10 @@
             overlay.setAttribute('aria-hidden', 'true');
             if (!document.querySelector('.modal-overlay.is-open')) {
                 document.body.classList.remove('modal-open');
+            }
+            /* بازگرداندن فوکوس به دکمه‌ای که پاپ‌آپ را باز کرد */
+            if (overlay.__trigger && typeof overlay.__trigger.focus === 'function') {
+                overlay.__trigger.focus();
             }
         }
 
@@ -149,7 +171,7 @@
                     });
                 });
 
-                openModal(id);
+                openModal(id, trigger);
             });
         });
 

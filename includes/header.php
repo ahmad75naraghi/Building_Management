@@ -144,6 +144,7 @@ if (!isset($unread_messages_nav)) {
 
 <body class="app-body"<?= $reopen_modal !== '' ? ' data-reopen-modal="' . htmlspecialchars($reopen_modal) . '"' : '' ?>>
 
+    <a href="#main-content" class="skip-link">پرش به محتوای اصلی</a>
     <div class="app-container">
 
         <?php if (!$standalone): ?>

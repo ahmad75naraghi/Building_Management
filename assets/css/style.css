@@ -2659,3 +2659,46 @@ html[data-theme="dark"] .choice-item { background: var(--surface-2); border-colo
 html[data-theme="dark"] .choice-item:has(input:checked) { background: rgba(59, 130, 246, 0.14); }
 html[data-theme="dark"] .unit-info-row { background: var(--surface-2); border-color: var(--line); }
 html[data-theme="dark"] .card-actions { border-top-color: var(--line); }
+
+/* ==================== دسترسی‌پذیری ==================== */
+/* لینک پرش: فقط با فوکوس کیبورد دیده می‌شود */
+.skip-link {
+    position: absolute; top: -60px; right: 8px; z-index: 2000;
+    background: var(--gold-primary, #d4a373); color: #fff;
+    padding: 10px 18px; border-radius: 12px; font-weight: 800; font-size: 13px;
+    text-decoration: none; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+    transition: top 0.2s ease;
+}
+.skip-link:focus { top: 8px; }
+
+/* حلقهٔ فوکوس مشخص برای عناصر تعاملی سفارشی */
+.quick-btn-item:focus-visible, .nav-item-link:focus-visible, .cal-day:focus-visible,
+.bldg-unit:focus-visible, .btn-chip:focus-visible, .empty-action:focus-visible,
+.widget-view-all-link:focus-visible, .edit-action-btn:focus-visible,
+.btn-view-profile:focus-visible, .announcement-list-item:focus-visible {
+    outline: 2px solid var(--gold-primary, #d4a373);
+    outline-offset: 2px;
+}
+
+/* کاهش حرکت برای کاربرانی که آن را ترجیح می‌دهند */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* پوشش تکمیلی حالت شب (دور دسترسی‌پذیری/ظاهر) */
+html[data-theme="dark"] .modal-close { background: var(--surface-3); color: var(--text-gray); }
+html[data-theme="dark"] .modal-close:hover { background: var(--line); }
+html[data-theme="dark"] .auth-body { background: var(--bg-light-canvas); }
+html[data-theme="dark"] .auth-step-dot { background: var(--line); }
+html[data-theme="dark"] .auth-alert-error { background: #3b1216; color: #fecaca; border-color: #7f1d1d; }
+html[data-theme="dark"] .auth-alert-info { background: #12233f; color: #93c5fd; border-color: #1e3a5f; }
+html[data-theme="dark"] .btn-chip-ghost:hover { background: var(--surface-2); }
+html[data-theme="dark"] .doc-tab { background: var(--surface-2); }
+html[data-theme="dark"] .jalali-nav:hover { background: var(--surface-3); }
+html[data-theme="dark"] .jalali-today-btn:hover { background: rgba(212, 163, 115, 0.15); }
+html[data-theme="dark"] .bldg-unit { background: var(--surface-2); }

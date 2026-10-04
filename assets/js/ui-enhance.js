@@ -30,6 +30,8 @@
         if (!c) {
             c = document.createElement('div');
             c.id = 'toast-stack';
+            c.setAttribute('aria-live', 'polite');
+            c.setAttribute('role', 'status');
             document.body.appendChild(c);
         }
         return c;
@@ -496,6 +498,59 @@
         render();
     }
 
+    /* ----------------------------------------------------------
+     * ۹) لایهٔ سراسری دسترسی‌پذیری
+     * ---------------------------------------------------------- */
+    function hookAccessibility() {
+        /* ۱) ورودی‌های فقط دارای placeholder: برچسب متنی برای صفحه‌خوان */
+        document.querySelectorAll('input[placeholder], textarea[placeholder]').forEach(function (el) {
+            if (el.getAttribute('aria-label') || el.closest('label')) { return; }
+            if (el.id && document.querySelector('label[for="' + el.id + '"]')) { return; }
+            el.setAttribute('aria-label', el.getAttribute('placeholder').replace(/^[^\w\u0600-\u06FF]+/, ''));
+        });
+
+        /* ۲) برچسب‌های کنار فیلد (الگوی رایج فرم‌ها) به فیلد متصل می‌شوند */
+        document.querySelectorAll('.form-input').forEach(function (el) {
+            if (el.getAttribute('aria-label')) { return; }
+            if (el.id && document.querySelector('label[for="' + el.id + '"]')) { return; }
+            var group = el.closest('div');
+            if (!group) { return; }
+            var label = group.querySelector(':scope > label.form-label, :scope > .form-label');
+            if (label && label.textContent.trim()) {
+                el.setAttribute('aria-label', label.textContent.trim());
+            }
+        });
+
+        /* ۳) آیکون‌های تزئینی از دید صفحه‌خوان پنهان می‌شوند */
+        document.querySelectorAll('svg').forEach(function (svg) {
+            if (svg.getAttribute('aria-label') || svg.getAttribute('role') === 'img') { return; }
+            svg.setAttribute('aria-hidden', 'true');
+            svg.setAttribute('focusable', 'false');
+        });
+
+        /* ۴) عناصر کلیک‌پذیر غیردکمه با کیبورد هم کار می‌کنند */
+        document.querySelectorAll('div[onclick], span[onclick]').forEach(function (el) {
+            if (el.getAttribute('role')) { return; }
+            el.setAttribute('role', 'button');
+            el.setAttribute('tabindex', '0');
+            el.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
+            });
+        });
+
+        /* ۵) آیتم فعال ناوبری پایین برای صفحه‌خوان مشخص می‌شود */
+        document.querySelectorAll('.bottom-nav-bar .nav-item-link.active').forEach(function (a) {
+            a.setAttribute('aria-current', 'page');
+        });
+
+        /* ۶) مقصد لینک پرش: اولین <main> قابل فوکوس می‌شود */
+        var main = document.querySelector('main');
+        if (main && !main.id) {
+            main.id = 'main-content';
+            main.setAttribute('tabindex', '-1');
+        }
+    }
+
     ready(function () {
         convertServerAlerts();
         hookNavigationProgress();
@@ -503,6 +558,7 @@
         setupBulkPayments();
         hookNewChatButton();
         hookStickySubmit();
+        hookAccessibility();
         syncThemeButtons();
         var ids = {};
         var nodes = document.querySelectorAll('[data-list-items]');

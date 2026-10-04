@@ -348,7 +348,7 @@ require_once 'includes/page_head.php';
         <div id="day-panel" class="card p-4 mt-4 hidden">
             <div class="flex items-center justify-between mb-3">
                 <h3 id="day-panel-title" class="font-bold text-gray-800 text-sm"></h3>
-                <button type="button" id="day-panel-close" class="text-gray-400 hover:text-gray-600 text-lg leading-none" aria-label="بستن">×</button>
+                <button type="button" id="day-panel-close" class="text-gray-400 hover:text-gray-600 text-lg leading-none" style="padding:8px 12px;border-radius:10px;" aria-label="بستن پنل روز">×</button>
             </div>
             <div id="day-panel-body" class="space-y-2"></div>
         </div>
