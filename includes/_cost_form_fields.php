@@ -97,7 +97,7 @@
 </div>
 
 <!-- هزینهٔ دوره‌ای با تناوب دلخواه؛ کران روزانه در هر نوبت آن را صادر می‌کند -->
-<div style="background:#f8fafc;border:1px solid #e9eef5;border-radius:12px;padding:12px 14px;">
+<div style="background:var(--soft-gray,#f8fafc);border:1px solid var(--soft-line,#e9eef5);border-radius:12px;padding:12px 14px;">
     <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--text-dark);cursor:pointer;">
         <input type="checkbox" name="is_recurring" value="1" data-recurring-toggle>
         🔁 این هزینه دوره‌ای است و تکرار می‌شود

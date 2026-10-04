@@ -12,7 +12,7 @@
  * بالا برود تا کش‌های قدیمی کاربران در اولین بازدید پاک شود.
  * ============================================================ */
 
-var VERSION = 'bms-v11';
+var VERSION = 'bms-v12';
 var STATIC_CACHE = VERSION + '-static';
 var RUNTIME_CACHE = VERSION + '-runtime';
 

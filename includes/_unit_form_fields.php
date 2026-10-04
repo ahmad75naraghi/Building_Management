@@ -91,7 +91,7 @@
                     <?php endforeach; ?>
                 </select>
             </div>
-            <label class="flex items-center gap-3 cursor-pointer" style="background:#f8fafc;border:1px solid #e9eef5;border-radius:12px;padding:12px 14px;">
+            <label class="flex items-center gap-3 cursor-pointer" style="background:var(--soft-gray,#f8fafc);border:1px solid var(--soft-line,#e9eef5);border-radius:12px;padding:12px 14px;">
                 <input type="checkbox" name="owner_resident" value="1" class="rounded">
                 <span>
                     <span class="text-sm font-medium text-gray-700">مالک در این واحد ساکن است</span>

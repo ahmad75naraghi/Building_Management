@@ -339,8 +339,8 @@ require_once 'includes/header.php';
             </div>
 
             <?php if ($my_unpaid_count > 0): ?>
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:#fff7ed; border:1px solid #fed7aa; border-radius:12px; padding:10px 12px;">
-                <div style="font-size:12px; color:#9a3412;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--warn-bg); border:1px solid var(--warn-line); border-radius:12px; padding:10px 12px;">
+                <div style="font-size:12px; color:var(--warn-ink);">
                     💳 <strong><?= fa_number($my_unpaid_total) ?> تومان</strong>
                     پرداخت‌نشده (<?= fa_digits($my_unpaid_count) ?> مورد)
                     <?php if ($my_next_due): ?>

@@ -4,6 +4,14 @@
  * هوک‌های «حالت شب» برای رنگ‌های روشن در انتها تعریف شده‌اند.
  */
 
+
+/* بازسازی حداقلی preflight تیلویند: حذف ظاهر پیش‌فرض مرورگر از دکمه‌ها و فرم‌ها */
+*, ::before, ::after { border-width: 0; border-style: solid; border-color: var(--line, #e5e7eb); }
+button { background-color: transparent; border: 0 solid transparent; font-family: inherit; font-size: 100%; color: inherit; cursor: pointer; padding: 0; }
+input, select, textarea { font-family: inherit; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--gold-primary, #d4a373); outline-offset: 2px; }
+
+
 .aspect-square { aspect-ratio:1/1 }
 .bg-amber-100 { background-color: #fef3c7 }
 .bg-amber-400 { background-color: #fbbf24 }
@@ -30,16 +38,16 @@
 .bg-slate-100 { background-color: #f1f5f9 }
 .bg-violet-50 { background-color: #f5f3ff }
 .block { display:block }
-.border { border-width:1px; border-style:solid }
-.border-2 { border-width:2px; border-style:solid }
-.border-b { border-bottom-width:1px; border-bottom-style:solid }
+.border { border-width:1px; border-style:solid; border-color: var(--line, #e5e7eb) }
+.border-2 { border-width:2px; border-style:solid; border-color: var(--line, #e5e7eb) }
+.border-b { border-bottom-width:1px; border-bottom-style:solid; border-bottom-color: var(--line, #e5e7eb) }
 .border-emerald-100 { border-color: #d1fae5 }
 .border-gray-100 { border-color: #f3f4f6 }
 .border-gray-200 { border-color: #e5e7eb }
 .border-gray-50 { border-color: #f9fafb }
 .border-r-blue-600 { border-right-color: #2563eb }
 .border-red-200 { border-color: #fecaca }
-.border-t { border-top-width:1px; border-top-style:solid }
+.border-t { border-top-width:1px; border-top-style:solid; border-top-color: var(--line, #e5e7eb) }
 .border-transparent { border-color:transparent }
 .cursor-pointer { cursor:pointer }
 .flex { display:flex }
@@ -246,6 +254,13 @@
 .text-purple-700 { color: #7e22ce }
 .text-white\/70 { color: rgba(255,255,255,.7) }
 
+
+/* کلاس‌هایی که جاوااسکریپت به‌صورت پویا اضافه می‌کند */
+.cursor-not-allowed { cursor: not-allowed }
+.opacity-70 { opacity: .7 }
+.relative { position: relative }
+.ring-blue-400 { box-shadow: 0 0 0 2px rgba(96,165,250,.7) }
+
 /* ==================== حالت شب: معادل تیرهٔ رنگ‌های روشن ==================== */
 html[data-theme="dark"] .bg-gray-50 { background-color: var(--surface-2, #111a31); }
 html[data-theme="dark"] .bg-gray-100 { background-color: var(--surface-2, #111a31); }
@@ -276,3 +291,5 @@ html[data-theme="dark"] .bg-purple-100 { background-color: rgba(126,58,206,.2); 
 html[data-theme="dark"] .bg-green-100 { background-color: rgba(22,163,74,.2); }
 html[data-theme="dark"] .border-blue-200 { border-color: rgba(59,130,246,.35); }
 html[data-theme="dark"] .ring-blue-100, html[data-theme="dark"] .ring-blue-300 { box-shadow: 0 0 0 2px rgba(59,130,246,.4); }
+
+.focus\:ring-blue-500:focus { box-shadow: 0 0 0 2px rgba(59,130,246,.5) }

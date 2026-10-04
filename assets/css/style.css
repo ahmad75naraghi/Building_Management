@@ -7,6 +7,9 @@
             --chip-credit-ink: #065f46;
             --chip-zero-bg: #e2e8f0;
             --chip-zero-ink: #475569;
+            --warn-bg: #fff7ed;
+            --warn-line: #fed7aa;
+            --warn-ink: #9a3412;
             --bg-dark-blue: #010a21;
             --bg-card-dark: #0a1931;
             --bg-light-canvas: #f6f8fb;
@@ -2614,6 +2617,9 @@ html[data-theme="dark"] {
     --chip-credit-ink: #6ee7b7;
     --chip-zero-bg: var(--surface-3);
     --chip-zero-ink: var(--text-gray);
+    --warn-bg: rgba(245, 158, 11, 0.14);
+    --warn-line: rgba(245, 158, 11, 0.35);
+    --warn-ink: #fdba74;
     --soft-indigo: rgba(99, 102, 241, 0.2);
     --indigo-ink: #a5b4fc;
     --soft-gray: var(--surface-2);

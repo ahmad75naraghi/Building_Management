@@ -120,7 +120,7 @@ require_once 'includes/header.php';
                 </div>
             </div>
 
-            <div class="chat-thread-area flex-1 p-4 space-y-3 overflow-y-auto" style="background:#f8fafc;max-height:55vh;">
+            <div class="chat-thread-area flex-1 p-4 space-y-3 overflow-y-auto" style="background:var(--soft-gray,#f8fafc);max-height:55vh;">
                 <?php if (empty($thread)): ?>
                     <p class="text-center text-xs text-gray-400 py-8">هنوز پیامی رد و بدل نشده است. اولین پیام را شما بفرستید! 👋</p>
                 <?php endif; ?>
@@ -132,16 +132,24 @@ require_once 'includes/header.php';
                                       border-radius:14px;padding:8px 12px;font-size:13px;line-height:1.8;
                                       box-shadow:0 1px 2px rgba(3,12,34,.06);">
                             <p style="white-space:pre-wrap;word-break:break-word;"><?= htmlspecialchars($msg['body'] ?? '') ?></p>
-                            <p style="font-size:9px;opacity:.75;margin-top:2px;text-align:left;display:flex;align-items:center;justify-content:flex-end;gap:4px;">
+                            <div style="font-size:9px;opacity:.75;margin-top:2px;text-align:left;display:flex;align-items:center;justify-content:flex-end;gap:4px;">
                                 <?= !empty($msg['created_at']) ? fa_datetime($msg['created_at']) : '' ?>
                                 <?php if ($mine): ?>
                                     <?php $seen = !empty($msg['is_read']); ?>
                                     <span title="<?= $seen ? 'خوانده شده' : 'ارسال شده' ?>"
                                           style="font-weight:900;letter-spacing:-1px;opacity:<?= $seen ? '1' : '.6' ?>;font-size:10px;"><?= $seen ? '✓✓' : '✓' ?></span>
-                                    <button type="button" title="حذف پیام" onclick="msgDeleteAsk(<?= (int) ($msg['id'] ?? 0) ?>)"
-                                            style="background:none;border:none;cursor:pointer;opacity:.7;font-size:10px;padding:0;line-height:1;">🗑️</button>
+                                    <form method="POST" action="" data-confirm-sheet style="display:inline;"
+                                          data-sheet-title="حذف پیام"
+                                          data-sheet-name="<?= htmlspecialchars(mb_substr((string) ($msg['body'] ?? ''), 0, 40, 'UTF-8')) ?>"
+                                          data-confirm="حذف پیام">
+                                        <?= csrf_field() ?>
+                                        <input type="hidden" name="form_action" value="delete_message">
+                                        <input type="hidden" name="message_id" value="<?= (int) ($msg['id'] ?? 0) ?>">
+                                        <button type="submit" title="حذف پیام"
+                                                style="background:none;border:none;cursor:pointer;opacity:.7;font-size:10px;padding:0;line-height:1;">🗑️</button>
+                                    </form>
                                 <?php endif; ?>
-                            </p>
+                            </div>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -157,20 +165,6 @@ require_once 'includes/header.php';
             </form>
         </div>
 
-        <!-- برگهٔ تأیید حذف پیام -->
-        <div id="msg-delete-sheet" class="sheet-overlay" style="display:none;">
-            <div class="app-sheet">
-                <p class="font-bold text-gray-800 mb-1">حذف پیام</p>
-                <p class="text-xs text-gray-400 mb-4">این پیام برای هر دو طرف حذف می‌شود و قابل بازگشت نیست.</p>
-                <form method="POST" action="">
-                    <?= csrf_field() ?>
-                    <input type="hidden" name="form_action" value="delete_message">
-                    <input type="hidden" name="message_id" id="msg-delete-id" value="">
-                    <button type="submit" class="btn-danger w-full">حذف پیام</button>
-                </form>
-                <button type="button" class="btn-secondary w-full mt-2" onclick="msgDeleteClose()">انصراف</button>
-            </div>
-        </div>
         <script>
             // تازه‌سازی خودکار گفتگو هر ۱۵ ثانیه بدون پرش اسکرول
             (function () {
@@ -193,17 +187,6 @@ require_once 'includes/header.php';
                 }, 15000);
                 window.addEventListener('pagehide', function () { clearInterval(timer); });
             })();
-            function msgDeleteAsk(id) {
-                if (!id) return;
-                document.getElementById('msg-delete-id').value = id;
-                document.getElementById('msg-delete-sheet').style.display = 'flex';
-            }
-            function msgDeleteClose() {
-                document.getElementById('msg-delete-sheet').style.display = 'none';
-            }
-            document.getElementById('msg-delete-sheet').addEventListener('click', function (e) {
-                if (e.target === this) msgDeleteClose();
-            });
         </script>
 
     <?php else: ?>
