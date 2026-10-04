@@ -105,6 +105,7 @@ $category_labels = [
 ];
 
 $page_title = 'تیکت‌ها';
+$page_hint = 'اعلام مشکلات و درخواست‌ها؛ ساکن تیکت می‌زند، شما بررسی و پاسخ می‌دهید.';
 $header_sub = $building_name ?: 'پشتیبانی و درخواست‌ها';
 $back_url = $building_id > 0 ? 'dashboard.php?building_id=' . $building_id : 'index.php';
 $nav_active = 'tickets';

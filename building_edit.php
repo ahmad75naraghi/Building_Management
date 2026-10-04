@@ -24,6 +24,7 @@ if ($building_id > 0) {
 
 if (!$building) {
     $page_title = 'ویرایش ساختمان';
+$page_hint = 'ویرایش مشخصات ساختمان، حالت شارژ و ساختار (بلوک/طبقه/واحد/مشاعات).';
     $header_sub = 'ساختمان یافت نشد';
     $back_url = 'index.php';
     $active_nav = 'home';

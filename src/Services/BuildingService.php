@@ -210,6 +210,44 @@ final class BuildingService
     }
 
     /**
+     * ساخت خودکار طبقات و واحدها از مشخصات ذخیره‌شدهٔ ساختمان
+     * (تعداد طبقه/واحد در فرم ثبت ساختمان) — فقط وقتی ساختمان هنوز واحدی ندارد.
+     * خروجی: تعداد واحدهای ساخته‌شده (صفر یعنی از قبل واحد داشت یا مشخصاتی نبود).
+     */
+    public function scaffoldFromSpecs(int $buildingId): int
+    {
+        $building = $this->repo->findById($buildingId);
+        if (!$building) {
+            return 0;
+        }
+        $db = \App\Core\Database::getConnection();
+
+        $stmt = $db->prepare('SELECT COUNT(*) FROM units WHERE building_id = ?');
+        $stmt->execute([$buildingId]);
+        if ((int) $stmt->fetchColumn() > 0) {
+            return 0; // ساختمان از قبل ساختار دارد
+        }
+
+        $blockStmt = $db->prepare('SELECT id FROM blocks WHERE building_id = ? ORDER BY id');
+        $blockStmt->execute([$buildingId]);
+        $blockIds = array_map('intval', $blockStmt->fetchAll(\PDO::FETCH_COLUMN));
+
+        $this->scaffoldFloorsAndUnits(
+            $buildingId,
+            $building->total_floors,
+            $building->total_units,
+            $blockIds
+        );
+
+        $stmt->execute([$buildingId]);
+        $created = (int) $stmt->fetchColumn();
+        \App\Core\Audit::log((int) ($building->created_by ?? 0), 'building.scaffold', 'building', $buildingId, $buildingId, [
+            'units_created' => $created,
+        ]);
+        return $created;
+    }
+
+    /**
      * ویرایش ساختمان (نام، آدرس، نام سفارشی، رنگ تم، مشخصات ساختمانی، شارژ ثابت و ...).
      * فیلدهای ارسال‌نشده روی مقادیر قبلی باقی می‌مانند.
      */

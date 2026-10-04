@@ -189,6 +189,7 @@ function doc_fa_size(?int $bytes): string
 }
 
 $page_title = 'اسناد ساختمان';
+$page_hint = 'اسناد ساختمان با دسترسی امن؛ برای هر سند مشخص کنید چه کسانی ببینند.';
 $header_sub = $building_name ?: 'آرشیو اسناد';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';

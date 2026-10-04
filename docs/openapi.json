@@ -7340,6 +7340,38 @@
                     }
                 }
             }
+        },
+        "/buildings/{building_id}/scaffold": {
+            "post": {
+                "tags": [
+                    "Buildings"
+                ],
+                "summary": "ساخت خودکار واحدها از مشخصات ساختمان",
+                "description": "طبقات و واحدها را بر اساس تعداد طبقه/واحد ثبت‌شده در مشخصات ساختمان به‌صورت خودکار می‌سازد. فقط وقتی ساختمان هنوز واحدی ندارد عمل می‌کند.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "building_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK — تعداد واحدهای ساخته‌شده در data.units_created"
+                    },
+                    "403": {
+                        "description": "فقط مدیر ساختمان"
+                    }
+                }
+            }
         }
     },
     "components": {

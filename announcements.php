@@ -88,6 +88,7 @@ if ($building_id > 0) {
 }
 
 $page_title = 'اطلاعیه‌ها';
+$page_hint = 'اطلاعیهٔ عمومی برای همهٔ ساکنین؛ اطلاعیه‌های مهم را سنجاق کنید.';
 $header_sub = $building_name ?: 'اعلان‌های ساختمان';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';

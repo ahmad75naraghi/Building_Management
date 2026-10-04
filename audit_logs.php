@@ -31,6 +31,7 @@ if ($building_id > 0 && $is_manager) {
 }
 
 $page_title = 'لاگ اقدامات';
+$page_hint = 'ردپای تمام عملیات کاربران؛ چه کسی، چه کاری، چه زمانی.';
 $header_sub = $building_name ?: 'ممیزی اقدامات کاربران';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';

@@ -372,6 +372,7 @@ $division_labels = [
 ];
 
 $page_title = 'مالی و شارژ';
+$page_hint = 'ثبت شارژ و هزینه‌ها، صدور بین واحدها و تأیید پرداخت‌ها. ساکنین فیش را همین‌جا می‌فرستند.';
 $header_sub = $building_name ?: 'هزینه‌ها و پرداخت‌ها';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';

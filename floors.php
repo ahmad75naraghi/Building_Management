@@ -95,6 +95,7 @@ foreach ($blocks as $b) {
 }
 
 $page_title = 'مدیریت طبقات';
+$page_hint = 'طبقه‌بندی ساختمان؛ هر واحد روی یک طبقه قرار می‌گیرد.';
 $header_sub = $building_name ?: 'ساختار مجتمع';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';

@@ -22,6 +22,7 @@
 $page_title   = $page_title ?? 'مدیریت ساختمان';
 $back_url     = $back_url ?? 'index.php';
 $header_sub   = $header_sub ?? '';
+$page_hint    = $page_hint ?? '';
 $nav_active   = $nav_active ?? ($active_nav ?? 'none');
 $alert_message = $alert_message ?? '';
 $alert_type   = $alert_type ?? 'error';
@@ -229,6 +230,10 @@ if (!isset($unread_messages_nav)) {
 
         <?php endif; ?>
 
+        <?php endif; ?>
+
+        <?php if ($page_hint !== ''): ?>
+            <p class="page-hint" role="note">💡 <?= htmlspecialchars($page_hint) ?></p>
         <?php endif; ?>
 
         <?php if (!empty($alert_message)): ?>

@@ -180,6 +180,7 @@ if ($building_id > 0) {
 }
 
 $page_title = 'گزارش‌ها';
+$page_hint = 'گزارش مالی ماهانه، فهرست بدهکاران و خروجی اکسل.';
 $header_sub = $building_name ?: 'نمای کلی عملکرد ساختمان';
 $back_url = 'index.php';
 $active_nav = 'home';

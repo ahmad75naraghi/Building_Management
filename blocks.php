@@ -80,6 +80,7 @@ if ($building_id > 0) {
 }
 
 $page_title = 'مدیریت بلوک‌ها';
+$page_hint = 'اگر ساختمان چند بلوک دارد، اول بلوک‌ها را تعریف کنید؛ طبقات و واحدها به بلوک متصل می‌شوند.';
 $header_sub = $building_name ?: 'ساختار مجتمع';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';

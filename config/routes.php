@@ -37,6 +37,7 @@ final class Routes
         // Building Hierarchy (Dynamic)
         'GET /api/buildings/{building_id}/hierarchy/settings' => ['App\Http\Controllers\BuildingController', 'hierarchySettings'],
         'PUT /api/buildings/{building_id}/hierarchy/settings' => ['App\Http\Controllers\BuildingController', 'updateHierarchySettings'],
+        'POST /api/buildings/{building_id}/scaffold' => ['App\Http\Controllers\BuildingController', 'scaffold'],
 
         // Blocks
         'POST /api/buildings/{building_id}/blocks' => ['App\Http\Controllers\BuildingController', 'storeBlock'],

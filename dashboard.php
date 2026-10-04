@@ -238,6 +238,7 @@ $request_status_map = [
 ];
 
 $page_title     = 'داشبورد';
+$page_hint = 'مرکز مدیریت ساختمان؛ خلاصهٔ مالی، اعلان‌ها، وضعیت واحدها و میان‌برها این‌جاست. اگر تازه‌کارید، از «مسیر راه‌اندازی» بالای صفحه شروع کنید.';
 $header_sub     = 'به خانه‌تان خوش آمدید 👋';
 $header_variant = 'home';
 $nav_active     = 'dashboard';
@@ -375,6 +376,70 @@ require_once 'includes/header.php';
 
         <!-- کارت سفید آمار ۴ ستونه -->
         <?php if ($is_manager): ?>
+        <?php
+        // ---------- مسیر راه‌اندازی: گام‌های طلایی شروع کار برای مدیر تازه‌وارد ----------
+        $setup_steps = [];
+        if ($is_manager && $building_id > 0) {
+            $setup_steps[] = [
+                'done' => count($units) > 0,
+                'title' => 'ساختار ساختمان را تعریف کنید',
+                'text' => 'بلوک، طبقه و واحدها را بسازید تا هزینه‌ها بین واحدها تقسیم شود.',
+                'link' => 'units.php?building_id=' . $building_id,
+                'cta' => count($units) > 0 ? '' : 'تعریف واحدها',
+            ];
+            $setup_steps[] = [
+                'done' => $members_count > 1,
+                'title' => 'ساکنین را دعوت کنید',
+                'text' => 'با لینک دعوت پیامکی، ساکنین عضو شوند و به واحدشان متصل شوند.',
+                'link' => 'members.php?building_id=' . $building_id,
+                'cta' => $members_count > 1 ? '' : 'دعوت اعضا',
+            ];
+            $setup_steps[] = [
+                'done' => (float) ($financial['expense'] ?? 0) > 0 || (float) ($financial['income'] ?? 0) > 0,
+                'title' => 'اولین هزینه را ثبت کنید',
+                'text' => 'مثلاً شارژ ماهانه؛ سامانه آن را بین واحدها تقسیم و صادر می‌کند.',
+                'link' => 'costs.php?building_id=' . $building_id,
+                'cta' => ((float) ($financial['expense'] ?? 0) > 0 || (float) ($financial['income'] ?? 0) > 0) ? '' : 'ثبت هزینه',
+            ];
+            $setup_steps[] = [
+                'done' => (float) ($financial['income'] ?? 0) > 0,
+                'title' => 'پرداخت‌ها را پیگیری و تأیید کنید',
+                'text' => 'ساکنین فیش پرداخت می‌فرستند؛ شما تأیید می‌کنید و به حساب واحد می‌نشیند.',
+                'link' => 'costs.php?building_id=' . $building_id,
+                'cta' => (float) ($financial['income'] ?? 0) > 0 ? '' : 'مدیریت پرداخت‌ها',
+            ];
+            $setup_done_count = count(array_filter($setup_steps, fn($s) => $s['done']));
+            $setup_all_done = $setup_done_count === count($setup_steps);
+        }
+        ?>
+        <?php if (!empty($setup_steps) && !$setup_all_done): ?>
+        <section class="card p-4" style="margin-bottom:12px;border:1.5px solid var(--gold-primary);">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="font-bold text-gray-800 text-sm">🧭 مسیر راه‌اندازی ساختمان</h2>
+                <span class="text-[11px] font-bold" style="color:var(--gold-primary);"><?= fa_digits($setup_done_count) ?> از <?= fa_digits(count($setup_steps)) ?> گام</span>
+            </div>
+            <div style="height:6px;border-radius:99px;background:var(--soft-gray,#f1f5f9);overflow:hidden;margin-bottom:12px;">
+                <div style="height:100%;width:<?= (int) round($setup_done_count / count($setup_steps) * 100) ?>%;background:var(--gold-primary);border-radius:99px;transition:width .4s;"></div>
+            </div>
+            <div class="space-y-2">
+                <?php foreach ($setup_steps as $st): ?>
+                    <div class="flex items-center gap-3 p-2.5 rounded-xl <?= $st['done'] ? 'opacity-60' : '' ?>" style="background:var(--soft-gray,#f8fafc);">
+                        <span style="font-size:16px;" aria-hidden="true"><?= $st['done'] ? '✅' : '⭕' ?></span>
+                        <span class="flex-1 min-w-0">
+                            <span class="block text-sm font-bold text-gray-800"><?= $st['done'] ? '<s>' : '' ?><?= htmlspecialchars($st['title']) ?><?= $st['done'] ? '</s>' : '' ?></span>
+                            <?php if (!$st['done']): ?>
+                            <span class="block text-[11px] text-gray-400" style="line-height:1.7;"><?= htmlspecialchars($st['text']) ?></span>
+                            <?php endif; ?>
+                        </span>
+                        <?php if ($st['cta'] !== ''): ?>
+                            <a href="<?= htmlspecialchars($st['link']) ?>" class="btn-chip btn-chip-gold" style="text-decoration:none;white-space:nowrap;"><?= htmlspecialchars($st['cta']) ?></a>
+                        <?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </section>
+        <?php endif; ?>
+
         <section class="statistics-grid-card">
             <!-- ستون ۱ (راست) -->
             <div class="stat-column">

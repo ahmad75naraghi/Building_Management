@@ -317,6 +317,23 @@ final class BuildingController
         ]);
     }
 
+    /** POST /api/buildings/{building_id}/scaffold — ساخت خودکار واحدها از مشخصات ساختمان */
+    public function scaffold(Request $request): Response
+    {
+        $buildingId = (int) $request->getAttribute('building_id');
+        if ($guard = $this->managerOnlyGuard($request, $buildingId)) {
+            return $guard;
+        }
+        $created = $this->service->scaffoldFromSpecs($buildingId);
+        return (new Response())->setJson([
+            'success' => true,
+            'message' => $created > 0
+                ? $created . ' واحد به‌صورت خودکار ساخته شد.'
+                : 'واحدی ساخته نشد؛ ساختمان یا از قبل واحد دارد یا تعداد طبقه/واحد در مشخصاتش ثبت نشده است.',
+            'data' => ['units_created' => $created],
+        ]);
+    }
+
     public function storeBlock(Request $request): Response
     {
         $buildingId = (int) $request->getAttribute('building_id');

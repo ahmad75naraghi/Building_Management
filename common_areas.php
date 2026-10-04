@@ -82,6 +82,7 @@ if ($building_id > 0) {
 }
 
 $page_title = 'مدیریت مشاعات';
+$page_hint = 'مشاعات (سالن، پیک‌نیک، ورزشی…) را تعریف کنید تا ساکنین بتوانند رزرو کنند.';
 $header_sub = $building_name ?: 'ساختار مجتمع';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';

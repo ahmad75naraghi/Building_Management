@@ -86,6 +86,7 @@ foreach (array_slice($buildings, 0, 5) as $b) {
 usort($today_events, fn($x, $y) => $x['ts'] <=> $y['ts']);
 
 $page_title     = 'ساختمان‌های من';
+$page_hint = 'فهرست ساختمان‌های شما؛ برای ورود به مدیریت، یک ساختمان را انتخاب کنید یا ساختمان جدید بسازید.';
 $header_sub     = $userName . ' خوش آمدید 👋';
 $header_variant = 'home';
 $nav_active     = 'buildings';

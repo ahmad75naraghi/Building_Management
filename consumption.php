@@ -112,6 +112,7 @@ foreach ($units as $u) {
 }
 
 $page_title = 'مصرف انرژی';
+$page_hint = 'ثبت قرائت کنتورهای آب، برق و گاز در هر دوره.';
 $header_sub = $building_name ?: 'قرائت کنتور';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';

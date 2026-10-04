@@ -2702,3 +2702,15 @@ html[data-theme="dark"] .doc-tab { background: var(--surface-2); }
 html[data-theme="dark"] .jalali-nav:hover { background: var(--surface-3); }
 html[data-theme="dark"] .jalali-today-btn:hover { background: rgba(212, 163, 115, 0.15); }
 html[data-theme="dark"] .bldg-unit { background: var(--surface-2); }
+
+/* راهنمای کوتاه صفحه: یک خط توضیح زیر هدر */
+.page-hint {
+    margin: 10px 16px 0;
+    padding: 9px 12px;
+    font-size: 11.5px;
+    line-height: 1.9;
+    color: var(--text-gray);
+    background: var(--surface-2, rgba(255, 255, 255, 0.06));
+    border: 1px dashed var(--line, rgba(255, 255, 255, 0.14));
+    border-radius: 12px;
+}

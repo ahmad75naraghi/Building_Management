@@ -1262,6 +1262,29 @@
       "name": "۳. ساختار و سلسله مراتب (Hierarchy)",
       "item": [
         {
+          "name": "ساخت خودکار واحدها از مشخصات (Scaffold)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/buildings/2/scaffold",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "buildings",
+                "2",
+                "scaffold"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "تنظیمات داینامیک ساختمان",
           "request": {
             "method": "GET",

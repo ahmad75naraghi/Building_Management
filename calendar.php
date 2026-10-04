@@ -268,6 +268,7 @@ foreach ($eventsByDay as $key => $items) {
 $panelJson = json_encode($panelData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
 
 $page_title = 'تقویم';
+$page_hint = 'تقویم شمسی ساختمان؛ جلسه‌ها، رزروها و مهلت پرداخت‌ها روی روزها دیده می‌شوند.';
 $header_sub = $building_name ?: (jalali_month_name($view_jm) . ' ' . fa_digits($view_jy));
 $back_url = 'index.php';
 $active_nav = 'calendar';

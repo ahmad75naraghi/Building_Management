@@ -105,6 +105,7 @@ $status_chips = [
 ];
 
 $page_title = 'درخواست تعمیرات';
+$page_hint = 'درخواست‌های تعمیر و نگهداری تأسیسات ساختمان.';
 $header_sub = $building_name ?: 'پشتیبانی فنی';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';

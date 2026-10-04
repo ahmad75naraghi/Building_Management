@@ -96,6 +96,7 @@ if ($peer_id > 0 && $building_id > 0) {
 }
 
 $page_title = 'پیام‌های من';
+$page_hint = 'گفتگوی خصوصی با ساکنین همین ساختمان.';
 $header_sub = $peer_id > 0 ? $peer_name : ($building_name ?: 'صندوق پیام ساختمان');
 $back_url = $peer_id > 0
     ? 'messages.php?building_id=' . $building_id

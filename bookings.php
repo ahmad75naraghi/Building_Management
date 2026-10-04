@@ -120,6 +120,7 @@ $status_chips = [
 ];
 
 $page_title = 'رزرو مشاعات';
+$page_hint = 'درخواست‌های رزرو مشاعات؛ به‌عنوان مدیر تأیید یا لغو کنید.';
 $header_sub = $building_name ?: 'سالن، استخر و...';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';

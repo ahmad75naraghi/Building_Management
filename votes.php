@@ -128,6 +128,7 @@ if ($building_id > 0) {
 }
 
 $page_title = 'رأی‌گیری‌ها';
+$page_hint = 'برای تصمیم‌های جمعی (مثل تعمیر آسانسور) رأی‌گیری بسازید.';
 $header_sub = $building_name ?: 'نظرسنجی ساکنین';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';

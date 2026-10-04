@@ -117,6 +117,7 @@ $status_chips = [
 ];
 
 $page_title = 'جلسات';
+$page_hint = 'جلسات ساختمان را زمان‌بندی کنید و بعد از جلسه، صورت‌جلسه بگذارید.';
 $header_sub = $building_name ?: 'جلسات ساختمان';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';

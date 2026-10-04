@@ -107,6 +107,7 @@ $role_labels = [
 ];
 
 $page_title = 'اعضای ساختمان';
+$page_hint = 'اعضای ساختمان و نقش آن‌ها. با «دعوت اعضا» لینک پیامکی بفرستید تا ساکنین اضافه شوند.';
 $header_sub = $building_name ?: 'ساکنین و مدیران';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';

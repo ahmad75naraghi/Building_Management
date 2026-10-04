@@ -129,6 +129,7 @@ if ($building_id > 0) {
 }
 
 $page_title = 'مخاطبین اضطراری';
+$page_hint = 'شماره‌های ضروری که ساکنین در مواقع اضطراری می‌بینند.';
 $header_sub = $building_name ?: 'شماره‌های مهم';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';

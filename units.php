@@ -42,6 +42,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $building_id > 0) {
 
     if (!$is_manager) {
         $alert_message = 'فقط مدیر ساختمان می‌تواند واحدها را مدیریت کند.';
+    } elseif ($action === 'scaffold') {
+        $response = callAPI('POST', '/buildings/' . $building_id . '/scaffold', []);
+        if ((int) ($response['data']['units_created'] ?? 0) > 0) {
+            $alert_message = $response['message'] ?? 'واحدها به‌صورت خودکار ساخته شد.';
+            $alert_type = 'success';
+        } else {
+            $alert_message = $response['message'] ?? 'امکان ساخت خودکار واحدها وجود ندارد.';
+        }
     } elseif ($action === 'delete') {
         $unit_id = (int) ($_POST['unit_id'] ?? 0);
         if ($unit_id > 0) {
@@ -144,6 +152,7 @@ $occupancy_chips = [
 ];
 
 $page_title = 'مدیریت واحدها';
+$page_hint = 'واحد‌ها مقصدِ تقسیم هزینه‌اند. واحد بسازید و مالک/ساکن هر واحد را مشخص کنید.';
 $header_sub = $building_name ?: 'ساختار مجتمع';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';
@@ -183,7 +192,16 @@ require_once 'includes/header.php';
         <div class="empty-state">
             <div class="empty-icon">🏠</div>
             هنوز واحدی ثبت نشده است.
-            <button type="button" class="empty-action" data-modal-open="add-unit">➕ افزودن اولین واحد</button>
+            <div style="display:flex; flex-direction:column; gap:8px; align-items:center; margin-top:8px;">
+                <?php if ((int) ($building['total_units'] ?? 0) > 0): ?>
+                    <form method="post" class="empty-action" style="width:100%;">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="form_action" value="scaffold">
+                        <button type="submit" class="btn btn-primary" style="width:100%; margin-top:4px;">✨ ساخت خودکار واحدها از مشخصات ساختمان (<?= fa_digits((int) $building['total_units']) ?> واحد)</button>
+                    </form>
+                <?php endif; ?>
+                <button type="button" class="empty-action btn btn-secondary" data-modal-open="add-unit">➕ افزودن دستی واحد</button>
+            </div>
         </div>
     <?php else: ?>
                 <div class="list-filter-bar">

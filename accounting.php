@@ -110,6 +110,7 @@ uksort($persons, static fn($a, $b) => strcmp($a, $b));
 $totals = $ledger['totals'] ?? ['debt' => 0, 'credit' => 0, 'balance' => 0];
 
 $page_title = 'حسابداری ساختمان';
+$page_hint = 'گردش مالی هر واحد به تفکیک؛ ماندهٔ بدهکار/طلبکار، جریمهٔ تأخیر و پرداخت مستقیم.';
 $header_sub = $building_name ?: 'بدهکار و طلبکار واحدها';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';

@@ -81,6 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $page_title = 'ثبت ساختمان';
+$page_hint = 'ساختمان جدید بسازید؛ نام، آدرس و تعداد طبقات/واحدها کافی است — واحد‌ها خودکار ساخته می‌شوند.';
 $header_sub = 'ایجاد مجتمع جدید';
 $back_url = 'index.php';
 $nav_active = 'none';

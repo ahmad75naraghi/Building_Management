@@ -108,6 +108,7 @@ function notification_deep_link(array $n): string
 } // !function_exists
 
 $page_title = 'اعلانات من';
+$page_hint = 'اعلان‌های شما: پرداخت‌ها، تیکت‌ها، جلسات و پیام‌ها. با لمس هر اعلان به صفحهٔ مرتبط می‌روید.';
 $header_sub = 'پیام‌ها و رویدادها';
 $back_url = 'index.php';
 $active_nav = 'messages';

@@ -91,6 +91,7 @@ if ($building_id > 0) {
 }
 
 $page_title = 'مهمان‌ها';
+$page_hint = 'ثبت مهمان‌ها و مراجعه‌کنندگان برای دربانی.';
 $header_sub = $building_name ?: 'مدیریت ورود و خروج';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';

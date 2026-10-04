@@ -99,6 +99,7 @@ if (!empty($reviews)) {
 }
 
 $page_title = 'نظرات و امتیازها';
+$page_hint = 'امتیاز و نظرات ساکنین دربارهٔ مدیریت ساختمان.';
 $header_sub = $building_name ?: 'بازخورد ساکنین';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';

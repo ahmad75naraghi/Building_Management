@@ -49,6 +49,7 @@ if (!empty($buildings_response['success']) && is_array($buildings_response['data
 }
 
 $page_title = 'پروفایل من';
+$page_hint = 'تنظیمات حساب کاربری، امنیت و تنظیمات اپ.';
 $header_sub = $user_phone ?: ($user_email ?: 'حساب کاربری');
 $back_url = 'index.php';
 $nav_active = 'profile';
@@ -163,6 +164,31 @@ require_once 'includes/header.php';
                 </div>
                 <span class="push-state-badge" id="push-toggle-state">…</span>
             </div>
+            <a href="help.php" class="info-row">
+                <div class="info-row-right">
+                    <div class="info-row-icon" style="background: var(--soft-indigo,#eef2ff); color: var(--indigo-ink,#6366f1);">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg>
+                    </div>
+                    <span class="info-row-label">راهنمای استفاده از سامانه</span>
+                </div>
+                <span class="info-row-val" style="color:var(--text-gray);">آموزش گام‌به‌گام</span>
+            </a>
+            <button type="button" class="info-row" style="width:100%; text-align:right; cursor:pointer; font:inherit;" onclick="if (window.location.pathname.indexOf('dashboard.php') !== -1 &amp;&amp; window.bmsStartTour) { window.bmsStartTour(true); } else { showToast('تور راهنما در صفحهٔ اصلی اجرا می‌شود؛ به داشبورد بروید.', 'info'); }">
+                <div class="info-row-right">
+                    <div class="info-row-icon" style="background:#ecfdf5; color:#10b981;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <polygon points="10 8 16 12 10 16 10 8" />
+                        </svg>
+                    </div>
+                    <span class="info-row-label">نمایش دوبارهٔ تور راهنما</span>
+                </div>
+                <span class="info-row-val" style="color:var(--text-gray);">معرفی بخش‌ها</span>
+            </button>
             <a href="change_password.php" class="info-row">
                 <div class="info-row-right">
                     <div class="info-row-icon" style="background: #fefce8; color: #eab308;">
