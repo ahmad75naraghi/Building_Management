@@ -134,8 +134,8 @@ if (!isset($unread_messages_nav)) {
     <meta name="apple-mobile-web-app-title" content="مدیریت ساختمان">
     <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
     <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
-    <!-- فونت وزیرمتن -->
-    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+    <!-- فونت وزیرمتن (میزبانی محلی — آفلاین کامل) -->
+    <link rel="stylesheet" href="assets/css/fonts.css">
     <!-- کلاس‌های کاربردی (جایگزین محلی تیلویند؛ آفلاین و بدون وابستگی خارجی) -->
     <link rel="stylesheet" href="assets/css/utilities.css">
     <!-- استایل استاندارد اپ -->

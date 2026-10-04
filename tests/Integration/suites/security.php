@@ -221,3 +221,63 @@ TestLog::run('بررسی SSL دیگر به‌صورت ثابت خاموش نیس
     TestLog::assertTrue('تابع متمرکز تنظیم SSL وجود دارد',
         str_contains($src, 'function api_apply_ssl_options'));
 });
+
+// ------------------------------------------------------------ تمدید توکن (JWT)
+
+TestLog::run('تمدید توکن: سالم، منقضی در دورهٔ مهلت، و بیش‌ازحد قدیمی', function () {
+    if (!defined('API_INTERNAL_DISPATCH')) {
+        define('API_INTERNAL_DISPATCH', true);
+    }
+    if (!function_exists('getallheaders')) {
+        function getallheaders(): array { return []; }
+    }
+    putenv('JWT_SECRET=test-refresh-secret-key-0123456789abcdef');
+    putenv('APP_ENV=production');
+    require_once dirname(__DIR__, 3) . '/includes/api_helper.php';
+
+    // ۱) توکن معتبر → تمدید موفق و توکن تازه
+    $valid = \App\Utilities\JwtHelper::generate(['sub' => 77, 'name' => 'تست']);
+    $res = callAPI_dispatch('POST', '/auth/refresh', ['token' => $valid]);
+    TestLog::assertSame('توکن معتبر تمدید می‌شود', true, $res['success'] ?? false);
+    TestLog::assertTrue('توکن تازه برمی‌گردد', !empty($res['token']) && $res['token'] !== $valid);
+    $payload = \App\Utilities\JwtHelper::verify((string) $res['token']);
+    TestLog::assertSame('هویت در توکن تازه حفظ می‌شود', 77, (int) ($payload['sub'] ?? 0));
+
+    // ۲) توکن تازه‌منقضی (۱ دقیقه) → هنوز در دورهٔ مهلت است
+    $expired = \App\Utilities\JwtHelper::generate(['sub' => 77], -60);
+    $res2 = callAPI_dispatch('POST', '/auth/refresh', ['token' => $expired]);
+    TestLog::assertSame('توکن منقضی در دورهٔ مهلت تمدید می‌شود', true, $res2['success'] ?? false);
+
+    // ۳) توکن بیش از دورهٔ مهلت قدیمی (۸ روز) → رد می‌شود
+    $old = \App\Utilities\JwtHelper::generate(['sub' => 77], -(8 * 24 * 3600));
+    $res3 = callAPI_dispatch('POST', '/auth/refresh', ['token' => $old]);
+    TestLog::assertSame('توکن گذشته از مهلت رد می‌شود', false, $res3['success'] ?? false);
+    TestLog::assertSame('کد ۴۰۱ برمی‌گردد', 401, (int) ($res3['http_code'] ?? 0));
+
+    // ۴) توکن جعلی → رد می‌شود
+    $res4 = callAPI_dispatch('POST', '/auth/refresh', ['token' => 'garbage.token.here']);
+    TestLog::assertSame('توکن نامعتبر رد می‌شود', false, $res4['success'] ?? false);
+    TestLog::assertSame('برای توکن جعلی هم ۴۰۱ برمی‌گردد', 401, (int) ($res4['http_code'] ?? 0));
+
+    putenv('APP_ENV=development');
+});
+
+TestLog::run('کمکی‌های تمدید خودکار سمت صفحه', function () {
+    require_once dirname(__DIR__, 3) . '/includes/api_helper.php';
+    TestLog::assertTrue('bms_token_exp موجود است', function_exists('bms_token_exp'));
+    TestLog::assertTrue('bms_refresh_session_token موجود است', function_exists('bms_refresh_session_token'));
+    TestLog::assertTrue('bms_ensure_fresh_token موجود است', function_exists('bms_ensure_fresh_token'));
+
+    // خواندن exp از توکن بدون اعتبارسنجی امضا
+    $t = \App\Utilities\JwtHelper::generate(['sub' => 1]);
+    $exp = bms_token_exp($t);
+    TestLog::assertTrue('exp از پی‌لود خوانده می‌شود', $exp > time() && $exp <= time() + 3700);
+    TestLog::assertSame('توکن مخدوش صفر برمی‌گرداند', 0, bms_token_exp('not-a-jwt'));
+
+    // بدون توکن نشست، تمدید بی‌صدمه رد می‌شود
+    $saved = $_SESSION['token'] ?? null;
+    unset($_SESSION['token']);
+    TestLog::assertSame('بدون توکن نشست، تمدید ناموفق است', false, bms_refresh_session_token());
+    bms_ensure_fresh_token('/buildings/1'); // نباید خطا بدهد
+    if ($saved !== null) { $_SESSION['token'] = $saved; }
+});

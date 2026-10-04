@@ -41,6 +41,26 @@ if ($next_jm > 12) {
     $next_jm = 1;
     $next_jy++;
 }
+// اقدام سریع مدیر از پنل روز: تأیید/رد رزرو و لغو جلسه
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action']) && $building_id > 0) {
+    $cal_action = (string) $_POST['form_action'];
+    $cal_target = (int) ($_POST['target_id'] ?? 0);
+    $cal_actions = [
+        'confirm_booking' => ['confirmed', 'booking'],
+        'cancel_booking' => ['cancelled', 'booking'],
+        'cancel_meeting' => ['cancelled', 'meeting'],
+    ];
+    if ($cal_target > 0 && isset($cal_actions[$cal_action])) {
+        [$cal_status, $cal_kind] = $cal_actions[$cal_action];
+        $cal_endpoint = $cal_kind === 'booking'
+            ? '/bookings/' . $cal_target . '/status'
+            : '/meetings/' . $cal_target . '/status';
+        callAPI('PUT', $cal_endpoint, ['status' => $cal_status]);
+    }
+    header('Location: calendar.php?m=' . sprintf('%04d-%02d', $view_jy, $view_jm) . '&building_id=' . $building_id);
+    exit;
+}
+
 $prev_url = sprintf('calendar.php?m=%04d-%02d&building_id=%d', $prev_jy, $prev_jm, $building_id);
 $next_url = sprintf('calendar.php?m=%04d-%02d&building_id=%d', $next_jy, $next_jm, $building_id);
 $today_url = sprintf('calendar.php?m=%04d-%02d&building_id=%d', $today_jy, $today_jm, $building_id);
@@ -129,6 +149,8 @@ foreach ($meetings as $meeting) {
         'location' => (string) ($meeting['location'] ?? ''),
         'status_label' => meeting_status_label($status),
         'ts' => $ts,
+        'id' => (int) ($meeting['id'] ?? 0),
+        'status' => $status,
     ];
     $eventsByDay[$key][] = $item;
     if ($ts >= strtotime($today_g) && $ts < $horizon_ts) {
@@ -165,6 +187,8 @@ foreach ($bookings as $booking) {
         'location' => '',
         'status_label' => booking_status_label($status),
         'ts' => $event_ts,
+        'id' => (int) ($booking['id'] ?? 0),
+        'status' => $status,
     ];
     $eventsByDay[$key][] = $item;
     if ($event_ts >= strtotime($today_g) && $event_ts < $horizon_ts) {
@@ -237,6 +261,8 @@ foreach ($eventsByDay as $key => $items) {
         'loc' => $it['location'],
         'type' => $it['type'],
         'st' => $it['status_label'],
+        'id' => $it['id'] ?? 0,
+        'status' => $it['status'] ?? '',
     ], $items);
 }
 $panelJson = json_encode($panelData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
@@ -366,6 +392,33 @@ require_once 'includes/page_head.php';
         <script>
             (function () {
                 var DAY_EVENTS = <?= $panelJson ?>;
+                var IS_MANAGER = <?= !empty($cal_is_manager) ? 'true' : 'false' ?>;
+                var CSRF_FIELD = <?= json_encode(csrf_field()) ?>;
+
+                // دکمهٔ اقدام سریع مدیر: فرم مخفی با تأیید برگه‌ای ساده
+                function quickAction(action, id, label, danger) {
+                    return '<form method="POST" action="" style="display:inline;">'
+                        + CSRF_FIELD
+                        + '<input type="hidden" name="form_action" value="' + action + '">'
+                        + '<input type="hidden" name="target_id" value="' + id + '">'
+                        + '<button type="submit" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition-colors '
+                        + (danger ? 'bg-red-100 hover:bg-red-200 text-red-700' : 'bg-green-100 hover:bg-green-200 text-green-700')
+                        + '">' + label + '</button></form>';
+                }
+                function actionButtons(ev) {
+                    if (!IS_MANAGER || !ev.id) return '';
+                    var out = '';
+                    if (ev.type === 'booking' && ev.status === 'pending') {
+                        out += quickAction('confirm_booking', ev.id, 'تأیید رزرو', false);
+                        out += quickAction('cancel_booking', ev.id, 'لغو', true);
+                    } else if (ev.type === 'booking' && ev.status === 'confirmed') {
+                        out += quickAction('cancel_booking', ev.id, 'لغو رزرو', true);
+                    } else if (ev.type === 'meeting' && ev.status === 'scheduled') {
+                        out += quickAction('cancel_meeting', ev.id, 'لغو جلسه', true);
+                    }
+                    return out ? '<span class="flex gap-1.5 shrink-0">' + out + '</span>' : '';
+                }
+
                 var panel = document.getElementById('day-panel');
                 var panelTitle = document.getElementById('day-panel-title');
                 var panelBody = document.getElementById('day-panel-body');
@@ -408,7 +461,9 @@ require_once 'includes/page_head.php';
                                 + (ev.time ? 'ساعت ' + esc(faNum(ev.time)) : '')
                                 + (ev.loc ? (ev.time ? ' — ' : '') + esc(ev.loc) : '')
                                 + (ev.st ? ' — ' + esc(ev.st) : '')
-                                + '</span></span></div>';
+                                + '</span></span>'
+                                + actionButtons(ev)
+                                + '</div>';
                         }).join('');
                     }
                     panel.classList.remove('hidden');

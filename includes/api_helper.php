@@ -154,6 +154,63 @@ function api_transport_error_message(int $curlErrno, int $httpStatus): string
     return 'پاسخ سرور نامعتبر بود (کد ' . $httpStatus . '). لطفاً دوباره تلاش کنید.';
 }
 
+/** زمان انقضای توکن فعلی (از پی‌لود، بدون اعتبارسنجی امضا) — برای تصمیم تمدید پیشاپیش */
+function bms_token_exp(string $token): int
+{
+    $parts = explode('.', $token);
+    if (count($parts) !== 3) {
+        return 0;
+    }
+    $payload = json_decode(base64_decode(strtr($parts[1], '-_', '+/')), true);
+    return is_array($payload) ? (int) ($payload['exp'] ?? 0) : 0;
+}
+
+/**
+ * تمدید توکن نشست با همان توکن فعلی (با دورهٔ مهلت سمت سرور).
+ * در موفقیت، $_SESSION['token'] به‌روز می‌شود و true برمی‌گردد.
+ */
+function bms_refresh_session_token(): bool
+{
+    static $in_flight = false;
+    if ($in_flight) {
+        return false; // جلوگیری از حلقهٔ بازگشتی
+    }
+    $token = (string) ($_SESSION['token'] ?? '');
+    if ($token === '') {
+        return false;
+    }
+    $in_flight = true;
+    try {
+        $res = callAPI_dispatch('POST', '/auth/refresh', ['token' => $token]);
+        if (!empty($res['success']) && !empty($res['token'])) {
+            $_SESSION['token'] = (string) $res['token'];
+            return true;
+        }
+    } finally {
+        $in_flight = false;
+    }
+    return false;
+}
+
+/**
+ * تمدید پیشاپیش: اگر کمتر از ۵ دقیقه به انقضای توکن مانده، قبل از
+ * ارسال درخواست اصلی تمدید کن تا کاربر وسط کار با ۴۰۱ مواجه نشود.
+ */
+function bms_ensure_fresh_token(string $endpoint): void
+{
+    if (str_starts_with($endpoint, '/auth/')) {
+        return;
+    }
+    $token = (string) ($_SESSION['token'] ?? '');
+    if ($token === '') {
+        return;
+    }
+    $exp = bms_token_exp($token);
+    if ($exp > 0 && ($exp - time()) < 300) {
+        bms_refresh_session_token();
+    }
+}
+
 function callAPI($method, $endpoint, $data = false) {
     // کش scoped به درخواست: GETهای صرفاً خواندنی که در یک صفحه چندبار
     // تکرار می‌شوند، فقط یک‌بار دیسپچ می‌شوند (کاهش رفت‌وآمد کرنل/شبکه).
@@ -169,7 +226,17 @@ function callAPI($method, $endpoint, $data = false) {
         }
     }
 
+    bms_ensure_fresh_token($normalized);
+
     $response = callAPI_dispatch($method, $endpoint, $data);
+
+    // تلاش مجدد پس از تمدید: توکن حین کار منقضی شد (مثلاً بازگشت طولانی کاربر)
+    if ((int) ($response['http_code'] ?? 0) === 401 && !str_starts_with($normalized, '/auth/')) {
+        if (bms_refresh_session_token()) {
+            $response = callAPI_dispatch($method, $endpoint, $data);
+        }
+    }
+
     if ($cache_key !== null) {
         $__get_cache[$cache_key] = $response;
     }

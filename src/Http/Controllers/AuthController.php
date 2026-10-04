@@ -313,6 +313,9 @@ final class AuthController
         }
     }
 
+    /** دورهٔ مهلت تمدید: توکن تا این مدت پس از انقضا همچنان قابل تمدید است */
+    private const REFRESH_GRACE_SECONDS = 7 * 24 * 3600;
+
     public function refresh(Request $request): Response
     {
         $data = $request->getJsonBody() ?? [];
@@ -325,7 +328,18 @@ final class AuthController
         }
 
         try {
-            $payload = JwtHelper::verify($token);
+            try {
+                $payload = JwtHelper::verify($token);
+            } catch (\Firebase\JWT\ExpiredException $e) {
+                // توکن منقضی‌شده فقط در «دورهٔ مهلت» قابل تمدید است؛
+                // امضا و بقیهٔ ادعاها همچنان به‌طور کامل اعتبارسنجی می‌شوند.
+                \Firebase\JWT\JWT::$leeway = self::REFRESH_GRACE_SECONDS;
+                try {
+                    $payload = JwtHelper::verify($token);
+                } finally {
+                    \Firebase\JWT\JWT::$leeway = 0;
+                }
+            }
             $newToken = JwtHelper::generate([
                 'sub' => $payload['sub'] ?? null,
                 'email' => $payload['email'] ?? null,

@@ -330,9 +330,9 @@ require_once 'includes/header.php';
                 </div>
                 <?php if ($my_balance): ?>
                     <?php $bal = (float) ($my_balance['balance'] ?? 0); ?>
-                    <span style="font-size:11px; font-weight:800; padding:5px 10px; border-radius:999px;
-                        background: <?= $bal < 0 ? '#fee2e2' : ($bal > 0 ? '#d1fae5' : '#e2e8f0') ?>;
-                        color: <?= $bal < 0 ? '#991b1b' : ($bal > 0 ? '#065f46' : '#475569') ?>;">
+                    <span class="bms-balance-chip" style="font-size:11px; font-weight:800; padding:5px 10px; border-radius:999px;
+                        background: <?= $bal < 0 ? 'var(--chip-debt-bg)' : ($bal > 0 ? 'var(--chip-credit-bg)' : 'var(--chip-zero-bg)') ?>;
+                        color: <?= $bal < 0 ? 'var(--chip-debt-ink)' : ($bal > 0 ? 'var(--chip-credit-ink)' : 'var(--chip-zero-ink)') ?>;">
                         <?= $bal < 0 ? fa_number(abs($bal)) . ' تومان بدهکار' : ($bal > 0 ? fa_number($bal) . ' تومان طلبکار' : 'تسویه شده') ?>
                     </span>
                 <?php endif; ?>
