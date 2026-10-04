@@ -259,7 +259,7 @@ foreach ($units as $u) {
             </div>
             <div class="tile-grid">
                 <a href="blocks.php?building_id=<?= (int) $building_id ?>" class="tile-card">
-                    <div class="tile-icon" style="background: #eef2ff; color: #6366f1;">
+                    <div class="tile-icon" style="background: var(--soft-indigo,#eef2ff); color: var(--indigo-ink,#6366f1);">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5m-4 0h4" />
                         </svg>
@@ -562,7 +562,7 @@ foreach ($units as $u) {
                     <span class="tile-label">اضطراری</span>
                 </a>
                 <a href="meetings.php?building_id=<?= (int) $building_id ?>" class="tile-card">
-                    <div class="tile-icon" style="background: #eef2ff; color: #6366f1;">
+                    <div class="tile-icon" style="background: var(--soft-indigo,#eef2ff); color: var(--indigo-ink,#6366f1);">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M17 20h5v-2a3 3 0 0 0-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 0 1 5.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 1 9.288 0M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" />
                         </svg>
@@ -608,7 +608,7 @@ foreach ($units as $u) {
             </div>
             <a href="members.php?building_id=<?= (int) $building_id ?>" class="info-row">
                 <div class="info-row-right">
-                    <div class="info-row-icon" style="background: #eef2ff; color: #6366f1;">
+                    <div class="info-row-icon" style="background: var(--soft-indigo,#eef2ff); color: var(--indigo-ink,#6366f1);">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                             <circle cx="9" cy="7" r="4" />

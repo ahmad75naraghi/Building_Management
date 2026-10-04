@@ -248,7 +248,7 @@ require_once 'includes/page_head.php';
             <div style="overflow-x:auto;">
                 <table style="width:100%;border-collapse:collapse;font-size:11px;">
                     <thead>
-                        <tr style="background:#f1f5f9;color:var(--text-gray);">
+                        <tr style="background:var(--soft-gray,#f1f5f9);color:var(--text-gray);">
                             <th style="padding:8px 6px;text-align:right;">ماه</th>
                             <th style="padding:8px 6px;">صادرشده</th>
                             <th style="padding:8px 6px;">پرداخت‌شده</th>
@@ -257,7 +257,7 @@ require_once 'includes/page_head.php';
                     </thead>
                     <tbody>
                         <?php foreach (array_reverse($monthly_report['months']) as $m): ?>
-                            <tr style="border-top:1px solid #f1f5f9;">
+                            <tr style="border-top:1px solid var(--soft-line,#f1f5f9);">
                                 <td style="padding:7px 6px;text-align:right;" class="font-bold text-gray-700"><?= htmlspecialchars($m['label']) ?></td>
                                 <td style="padding:7px 6px;text-align:center;" class="text-gray-600"><?= fa_number($m['charge']) ?></td>
                                 <td style="padding:7px 6px;text-align:center;" class="text-gray-600"><?= fa_number($m['paid']) ?></td>

@@ -444,7 +444,7 @@ require_once 'includes/header.php';
             </div>
 
             <?php if (!empty($charge_preview['units'])): ?>
-                <div style="margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9;">
+                <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--soft-line,#f1f5f9);">
                     <p class="text-xs text-gray-500 mb-2">
                         جمع شارژ این ماه: <strong style="color:var(--text-dark);"><?= fa_number($charge_preview['total']) ?> تومان</strong>
                         از <?= fa_digits(count($charge_preview['units'])) ?> واحد
@@ -874,7 +874,7 @@ require_once 'includes/header.php';
                 </div>
             </div>
 
-            <label class="flex items-center gap-3 cursor-pointer" style="background:#f8fafc;border:1px solid #e9eef5;border-radius:12px;padding:12px 14px;">
+            <label class="flex items-center gap-3 cursor-pointer" style="background:var(--soft-gray,#f8fafc);border:1px solid var(--soft-line,#e9eef5);border-radius:12px;padding:12px 14px;">
                 <input type="checkbox" name="monthly_charge_enabled" value="1" class="rounded" <?= !empty($building['monthly_charge_enabled']) ? 'checked' : '' ?>>
                 <span class="text-sm font-medium text-gray-700">شارژ ماهیانه فعال باشد</span>
             </label>
@@ -923,7 +923,7 @@ require_once 'includes/header.php';
                     $ps_active = !empty($ps['is_active']);
                     $value_label = $ps_type === 'percentage' ? fa_digits($ps_value) . '٪' : fa_number($ps_value) . ' تومان';
                     ?>
-                    <div class="flex items-center gap-2" style="background:#f8fafc;border:1px solid #e9eef5;border-radius:12px;padding:10px 12px;">
+                    <div class="flex items-center gap-2" style="background:var(--soft-gray,#f8fafc);border:1px solid var(--soft-line,#e9eef5);border-radius:12px;padding:10px 12px;">
                         <div class="flex-1 min-w-0">
                             <p class="text-sm font-bold text-gray-700">
                                 <?= htmlspecialchars($penalty_type_labels[$ps_type] ?? $ps_type) ?>: <?= $value_label ?>
@@ -951,7 +951,7 @@ require_once 'includes/header.php';
                     </div>
                 <?php endforeach; ?>
             </div>
-            <hr style="border:none;border-top:1px solid #e9eef5;margin-bottom:16px;">
+            <hr style="border:none;border-top:1px solid var(--soft-line,#e9eef5);margin-bottom:16px;">
             <p class="form-label" style="margin-bottom:8px;">افزودن تنظیم جدید</p>
         <?php endif; ?>
 
@@ -997,7 +997,7 @@ require_once 'includes/header.php';
                 <label class="form-label">آستانه تأخیر (روز) *</label>
                 <input type="number" name="delay_days" required min="1" inputmode="numeric" class="form-input">
             </div>
-            <label class="flex items-center gap-3 cursor-pointer" style="background:#f8fafc;border:1px solid #e9eef5;border-radius:12px;padding:12px 14px;">
+            <label class="flex items-center gap-3 cursor-pointer" style="background:var(--soft-gray,#f8fafc);border:1px solid var(--soft-line,#e9eef5);border-radius:12px;padding:12px 14px;">
                 <input type="checkbox" name="is_active" value="1" class="rounded">
                 <span class="text-sm font-medium text-gray-700">این جریمه فعال باشد</span>
             </label>

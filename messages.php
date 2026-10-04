@@ -128,7 +128,7 @@ require_once 'includes/header.php';
                 <?php foreach ($thread as $msg): ?>
                     <?php $mine = (int) ($msg['sender_id'] ?? 0) === $my_id; ?>
                     <div class="flex <?= $mine ? 'justify-start flex-row-reverse' : 'justify-start' ?>">
-                        <div style="max-width:75%;background:<?= $mine ? 'var(--gold-primary)' : '#fff' ?>;color:<?= $mine ? '#fff' : 'var(--text-dark)' ?>;
+                        <div style="max-width:75%;background:<?= $mine ? 'var(--gold-primary)' : 'var(--surface-3,#fff)' ?>;color:<?= $mine ? '#fff' : 'var(--text-dark)' ?>;
                                       border-radius:14px;padding:8px 12px;font-size:13px;line-height:1.8;
                                       box-shadow:0 1px 2px rgba(3,12,34,.06);">
                             <p style="white-space:pre-wrap;word-break:break-word;"><?= htmlspecialchars($msg['body'] ?? '') ?></p>

@@ -89,7 +89,7 @@ require_once 'includes/header.php';
                     ?>
                     <div class="card p-4">
                         <div class="flex items-center gap-3">
-                            <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#eef2ff;font-size:19px;">
+                            <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style="background:var(--soft-indigo,#eef2ff);font-size:19px;">
                                 <?= htmlspecialchars(mb_substr(audit_action_label($l_action), 0, 2)) ?>
                             </div>
                             <div class="flex-1 min-w-0">

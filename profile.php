@@ -120,7 +120,7 @@ require_once 'includes/header.php';
             </div>
             <a href="profile_edit.php" class="info-row">
                 <div class="info-row-right">
-                    <div class="info-row-icon" style="background: #eef2ff; color: #6366f1;">
+                    <div class="info-row-icon" style="background: var(--soft-indigo,#eef2ff); color: var(--indigo-ink,#6366f1);">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM12 14a7 7 0 0 0-7 7h14a7 7 0 0 0-7-7z" />
                         </svg>
@@ -151,7 +151,7 @@ require_once 'includes/header.php';
             <!-- اعلان فوری وب (پوش مرورگر) -->
             <div class="info-row" id="push-toggle-btn" style="cursor:pointer;" title="فعال یا غیرفعال‌کردن اعلان فوری روی این دستگاه">
                 <div class="info-row-right">
-                    <div class="info-row-icon" style="background: #eef2ff; color: #6366f1;">
+                    <div class="info-row-icon" style="background: var(--soft-indigo,#eef2ff); color: var(--indigo-ink,#6366f1);">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                             <path d="M13.73 21a2 2 0 0 1-3.46 0" />

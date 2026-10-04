@@ -193,7 +193,7 @@ require_once 'includes/header.php';
                 <label for="add_content" class="form-label">متن اطلاعیه *</label>
                 <textarea id="add_content" name="content" rows="4" required class="form-input" placeholder="متن کامل اطلاعیه را بنویسید..."></textarea>
             </div>
-            <label class="flex items-center gap-3 cursor-pointer" style="background:#f8fafc;border:1px solid #e9eef5;border-radius:12px;padding:12px 14px;">
+            <label class="flex items-center gap-3 cursor-pointer" style="background:var(--soft-gray,#f8fafc);border:1px solid var(--soft-line,#e9eef5);border-radius:12px;padding:12px 14px;">
                 <input type="checkbox" name="is_pinned" value="1" class="rounded">
                 <span class="text-sm font-medium text-gray-700">پین شود (نمایش در ابتدای لیست)</span>
             </label>
@@ -214,7 +214,7 @@ require_once 'includes/header.php';
                 <label for="edit_content" class="form-label">متن اطلاعیه *</label>
                 <textarea id="edit_content" name="content" rows="4" required class="form-input"></textarea>
             </div>
-            <label class="flex items-center gap-3 cursor-pointer" style="background:#f8fafc;border:1px solid #e9eef5;border-radius:12px;padding:12px 14px;">
+            <label class="flex items-center gap-3 cursor-pointer" style="background:var(--soft-gray,#f8fafc);border:1px solid var(--soft-line,#e9eef5);border-radius:12px;padding:12px 14px;">
                 <input type="checkbox" name="is_pinned" value="1" class="rounded">
                 <span class="text-sm font-medium text-gray-700">پین شود (نمایش در ابتدای لیست)</span>
             </label>
