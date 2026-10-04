@@ -202,6 +202,11 @@ $pages = [
     'profile.php' => [],
     'profile_edit.php' => [],
     'change_password.php' => [],
+    'search.php' => ['building_id' => $bid],
+    'search.php?q=101' => ['building_id' => $bid],
+    'receipt.php' => [],
+    'backups.php' => [],
+    'help.php' => [],
 ];
 
 $failed = [];
