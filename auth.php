@@ -73,9 +73,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $otp = callAPI('POST', '/auth/send-otp', ['phone' => $phone]);
                     if (!empty($otp['success'])) {
                         $step = $_SESSION['auth_step'] = 'otp';
-                        $info_message = 'کد تأیید به شماره ' . fa_digits($phone) . ' پیامک شد.';
                         $debug_code = $otp['data']['debug_code'] ?? null;
                         $_SESSION['auth_retry_after'] = time() + (int) ($otp['data']['retry_after'] ?? 60);
+                        if (empty($otp['data']['sms_delivered'])) {
+                            $error_message = 'کد تأیید ساخته شد اما پیامک ارسال نشد! تنظیمات پیامک سرور (فایل .env و لاگ‌ها) را بررسی کنید.';
+                        } else {
+                            $info_message = 'کد تأیید به شماره ' . fa_digits($phone) . ' پیامک شد.';
+                        }
                     } elseif (($otp['http_code'] ?? 0) === 429) {
                         // کد قبلی هنوز معتبر است
                         $step = $_SESSION['auth_step'] = 'otp';
@@ -127,9 +131,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $otp = callAPI('POST', '/auth/send-otp', ['phone' => $phone]);
             $step = $_SESSION['auth_step'] = 'otp';
             if (!empty($otp['success'])) {
-                $info_message = 'کد تأیید مجدداً ارسال شد.';
                 $debug_code = $otp['data']['debug_code'] ?? null;
                 $_SESSION['auth_retry_after'] = time() + (int) ($otp['data']['retry_after'] ?? 60);
+                if (empty($otp['data']['sms_delivered'])) {
+                    $error_message = 'کد تأیید ساخته شد اما پیامک ارسال نشد! تنظیمات پیامک سرور (فایل .env و لاگ‌ها) را بررسی کنید.';
+                } else {
+                    $info_message = 'کد تأیید مجدداً ارسال شد.';
+                }
             } else {
                 $error_message = $otp['message'] ?? 'ارسال مجدد ناموفق بود.';
                 $_SESSION['auth_retry_after'] = time() + (int) ($otp['data']['retry_after'] ?? 60);

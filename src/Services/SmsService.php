@@ -24,6 +24,9 @@ final class SmsService
     private int $bodyId;
     private int $reminderBodyId;
 
+    /** شرح آخرین نتیجهٔ ارسال — برای ابزار تشخیص */
+    private string $lastDetail = '';
+
     public function __construct()
     {
         // از طریق AppConfig خوانده می‌شود تا مقادیر فایل .env هم بارگذاری شوند
@@ -43,12 +46,13 @@ final class SmsService
     /**
      * ارسال پیامک پترن (متن + آرگومان‌ها) به یک شماره.
      *
-     * @param string   $to     شماره مقصد (فرمت 09xxxxxxxxx)
-     * @param string   $text   متن اصلی پیامک
-     * @param array    $args   آرگومان‌های پترن (متناظر با arg1 و arg2 و ...)
-     * @param int|null $bodyId شناسه پترن (اگر نال باشد، پترن پیش‌فرض استفاده می‌شود)
+     * @param string   $to       شماره مقصد (فرمت 09xxxxxxxxx)
+     * @param string   $text     متن اصلی پیامک
+     * @param array    $args     آرگومان‌های پترن (متناظر با arg1 و arg2 و ...)
+     * @param int|null $bodyId   شناسه پترن (اگر نال باشد، پترن پیش‌فرض استفاده می‌شود)
+     * @param bool     $immediate اگر درست باشد پیامک در صف نمی‌رود و همان لحظه ارسال می‌شود (مثل کد ورود)
      */
-    public function sendByBaseNumber(string $to, string $text, array $args = [], ?int $bodyId = null): bool
+    public function sendByBaseNumber(string $to, string $text, array $args = [], ?int $bodyId = null, bool $immediate = false): bool
     {
         if (!$this->isEnabled()) {
             Logger::warning('SmsService', 'پیامک غیرفعال است؛ متغیرهای محیطی MELIPAYAMAK_* تنظیم نشده‌اند', ['to' => $to]);
@@ -61,8 +65,9 @@ final class SmsService
         }
 
         // حالت صف: ارسال به کار پس‌زمینه سپرده می‌شود تا درخواست کاربر
-        // منتظر سامانه پیامک نماند (فعال‌سازی با QUEUE_DRIVER=database)
-        if ($this->queueEnabled()) {
+        // منتظر سامانه پیامک نماند (فعال‌سازی با QUEUE_DRIVER=database).
+        // پیام‌های فوری مثل کد ورود از صف رد نمی‌شوند چون کاربر منتظر همان لحظه است.
+        if (!$immediate && $this->queueEnabled()) {
             $jobId = JobQueue::enqueue('sms', [
                 'to' => $to,
                 'text' => $text,
@@ -101,16 +106,36 @@ final class SmsService
             Logger::warning('SmsService', 'پیامک غیرفعال است؛ ارسال مستقیم رد شد', ['to' => $to]);
             return false;
         }
-        if (!class_exists(\SoapClient::class)) {
-            Logger::warning('SmsService', 'افزونه soap نصب نیست؛ ارسال پیامک انجام نشد', ['to' => $to]);
-            return false;
+
+        // تلاش اول: SOAP (روش کلاسیک پنل)
+        $soapResult = $this->sendViaSoap($to, $text, $args, $bodyId);
+        if ($soapResult === true) {
+            return true;
         }
 
+        // تلاش دوم: وب‌سرویس REST ملی‌پیامک (وقتی SOAP در دسترس نیست یا خطا داد)
+        $restResult = $this->sendViaRest($to, $text, $args, $bodyId);
+        if ($restResult === true) {
+            Logger::info('SmsService', 'پیامک از مسیر REST ارسال شد', ['to' => $to]);
+            return true;
+        }
+
+        Logger::error('SmsService', 'پیامک از هیچ‌یک از مسیرهای SOAP/REST ارسال نشد', ['to' => $to]);
+        return false;
+    }
+
+    /** ارسال با SOAP — نتیجه: true موفق | false ناموفق | نال یعنی اصلاً قابل اجرا نبود */
+    private function sendViaSoap(string $to, string $text, array $args, ?int $bodyId): ?bool
+    {
+        if (!class_exists(\SoapClient::class)) {
+            Logger::warning('SmsService', 'افزونهٔ soap نصب نیست؛ تلاش از مسیر REST');
+            return null;
+        }
         try {
             ini_set('soap.wsdl_cache_enabled', '0');
             /** @var \SoapClient $sms */
             $sms = new \SoapClient(
-                'http://api.payamak-panel.com/post/Send.asmx?wsdl',
+                'https://api.payamak-panel.com/post/Send.asmx?wsdl',
                 ['encoding' => 'UTF-8', 'connection_timeout' => 15]
             );
             $data = [
@@ -129,15 +154,109 @@ final class SmsService
                 // پاسخ موفق ملی‌پیامک معمولاً شناسه ارسال (عدد مثبت) است
                 return true;
             }
-            Logger::error('SmsService', 'ارسال پیامک ناموفق بود', [
+            $this->lastDetail = 'کد برگشتی پنل: ' . (is_scalar($result) ? (string) $result : gettype($result));
+            Logger::error('SmsService', 'ارسال پیامک با SOAP ناموفق بود', [
                 'to' => $to,
                 'provider_result' => is_scalar($result) ? (string) $result : gettype($result),
             ]);
-            return is_string($result) && $result !== '';
+            return false;
         } catch (\Throwable $e) {
-            Logger::error('SmsService', 'خطا در ارتباط با سامانه پیامک', ['to' => $to], $e);
+            $this->lastDetail = 'خطای ارتباط: ' . $e->getMessage();
+            Logger::error('SmsService', 'خطا در ارتباط SOAP با سامانهٔ پیامک', ['to' => $to], $e);
+            return null; // خطای ارتباطی → مسیر جایگزین امتحان شود
+        }
+    }
+
+    /**
+     * ارسال آزمایشی برای عیب‌یابی — جزئیات هر دو مسیر SOAP و REST را برمی‌گرداند.
+     *
+     * @return array{enabled:bool, soap_available:bool, curl_available:bool, sent:bool, soap:string, rest:string}
+     */
+    public function diagnose(string $to): array
+    {
+        $to = \App\Utilities\PhoneHelper::normalize($to);
+        $report = [
+            'enabled' => $this->isEnabled(),
+            'soap_available' => class_exists(\SoapClient::class),
+            'curl_available' => function_exists('curl_init'),
+            'sent' => false,
+            'soap' => '',
+            'rest' => '',
+        ];
+        if (!$report['enabled']) {
+            $report['soap'] = $report['rest'] = 'غیرفعال — متغیرهای MELIPAYAMAK_USERNAME / MELIPAYAMAK_PASSWORD / MELIPAYAMAK_BODY_ID در فایل .env تنظیم نشده‌اند.';
+            return $report;
+        }
+        if (!\App\Utilities\PhoneHelper::isValid($to)) {
+            $report['soap'] = $report['rest'] = 'شماره مقصد معتبر نیست.';
+            return $report;
+        }
+
+        $text = 'پیامک آزمایشی سامانهٔ مدیریت ساختمان — ' . date('Y/m/d H:i:s');
+
+        $soap = $this->sendViaSoap($to, $text, [], null);
+        $report['soap'] = $soap === null
+            ? 'در دسترس نبود: ' . $this->lastDetail
+            : ($soap ? 'ارسال موفق ✅' : 'خطا: ' . $this->lastDetail);
+        if ($soap === true) {
+            $report['sent'] = true;
+            $report['rest'] = 'نیازی به مسیر جایگزین نبود.';
+            return $report;
+        }
+
+        $rest = $this->sendViaRest($to, $text, [], null);
+        $report['rest'] = $rest ? 'ارسال موفق ✅' : 'خطا: ' . $this->lastDetail;
+        $report['sent'] = $rest;
+        return $report;
+    }
+
+    /** ارسال با وب‌سرویس REST ملی‌پیامک (بدون نیاز به افزونهٔ SOAP) */
+    private function sendViaRest(string $to, string $text, array $args, ?int $bodyId): bool
+    {
+        if (!function_exists('curl_init')) {
+            Logger::warning('SmsService', 'افزونهٔ curl هم در دسترس نیست؛ پیامک ارسال نشد', ['to' => $to]);
             return false;
         }
+        $payload = [
+            'username' => $this->username,
+            'password' => $this->password,
+            'to' => $to,
+            'bodyId' => $bodyId ?? $this->bodyId,
+            // در ارسال پترن، متن همان آرگومان‌های پترن است
+            'text' => !empty($args) ? array_values($args) : [$text],
+        ];
+        $ch = curl_init('https://rest.payamak-panel.com/api/SendSMS/SendByBaseNumber');
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 20,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json'],
+            CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
+        ]);
+        $body = curl_exec($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($body === false || $httpCode !== 200) {
+            $this->lastDetail = 'خطای ارتباط (http=' . $httpCode . ($curlError !== '' ? ', ' . $curlError : '') . ')';
+            Logger::error('SmsService', 'خطای ارتباط REST با سامانهٔ پیامک', [
+                'to' => $to, 'http_code' => $httpCode, 'curl_error' => $curlError,
+            ]);
+            return false;
+        }
+        $json = json_decode((string) $body, true);
+        // RetStatus=1 یعنی پذیرفته شد؛ مقدارهای دیگر کد خطا هستند
+        if ((int) ($json['RetStatus'] ?? 0) === 1) {
+            return true;
+        }
+        $this->lastDetail = 'پاسخ پنل: ' . ($json['StrRetStatus'] ?? (string) $body);
+        Logger::error('SmsService', 'ارسال پیامک با REST رد شد', [
+            'to' => $to,
+            'ret_status' => $json['RetStatus'] ?? null,
+            'provider_message' => $json['StrRetStatus'] ?? (string) $body,
+        ]);
+        return false;
     }
 
     /**
@@ -150,13 +269,15 @@ final class SmsService
     }
 
     /**
-     * پیامک کد یک‌بارمصرف ورود/ثبت‌نام.
+     * پیامک کد یک‌بارمصرف ورود/ثبت‌نام — ارسال فوری (خارج از صف) تا کاربر معطل نماند.
      */
     public function sendOtpSms(string $to, string $code): bool
     {
         $minutes = (int) ceil(\App\Services\OtpService::TTL_SECONDS / 60);
         $text = "کد ورود شما به سامانه مدیریت ساختمان: {$code}\nاعتبار: {$minutes} دقیقه. این کد را در اختیار کسی قرار ندهید.";
-        return $this->sendByBaseNumber($to, $text, [$code]);
+        // پترن اختصاصی کد ورود (در صورت تنظیم) نسبت به پترن عمومی اولویت دارد
+        $otpBodyId = (int) \App\Config\AppConfig::env('MELIPAYAMAK_OTP_BODY_ID', '0');
+        return $this->sendByBaseNumber($to, $text, [$code], $otpBodyId > 0 ? $otpBodyId : null, true);
     }
 
     /**

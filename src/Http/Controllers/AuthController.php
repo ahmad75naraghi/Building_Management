@@ -176,11 +176,15 @@ final class AuthController
                     'data' => ['retry_after' => $result['retry_after']],
                 ]);
             }
+            $smsDelivered = (bool) ($result['sms_delivered'] ?? false);
             return (new Response())->setJson([
                 'success' => true,
-                'message' => 'کد تأیید پیامک شد.',
+                'message' => $smsDelivered
+                    ? 'کد تأیید پیامک شد.'
+                    : 'کد تأیید ساخته شد اما پیامک ارسال نشد. تنظیمات پیامک سرور (MELIPAYAMAK_* در فایل .env) را بررسی کنید.',
                 'data' => [
                     'retry_after' => $result['retry_after'],
+                    'sms_delivered' => $smsDelivered,
                     'debug_code' => $result['debug_code'],
                 ],
             ]);
