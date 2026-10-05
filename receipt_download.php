@@ -21,7 +21,8 @@ function receipt_download_fail(string $message): never
     header('Content-Type: text/html; charset=UTF-8');
     echo '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8">'
         . '<title>فیش در دسترس نیست</title>'
-        . '<style>body{font-family:Tahoma,Vazirmatn,sans-serif;background:#f3f4f6;display:flex;'
+        . '<link rel="stylesheet" href="assets/css/fonts.css">'
+        . '<style>body{font-family:Vazirmatn,Tahoma,sans-serif;background:#f3f4f6;display:flex;'
         . 'align-items:center;justify-content:center;min-height:100vh;margin:0}'
         . '.box{background:#fff;border-radius:16px;padding:32px 40px;text-align:center;'
         . 'box-shadow:0 10px 30px rgba(0,0,0,.08)}'

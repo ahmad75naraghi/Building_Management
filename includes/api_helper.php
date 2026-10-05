@@ -75,6 +75,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && PHP_SAPI !== 'cli') {
         echo '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8">'
            . '<meta name="viewport" content="width=device-width, initial-scale=1">'
            . '<title>نشست منقضی شد</title>'
+           . '<link rel="stylesheet" href="assets/css/fonts.css">'
            . '<link rel="stylesheet" href="assets/css/style.css"></head><body>'
            . '<div style="max-width:420px;margin:15vh auto;padding:24px;text-align:center;'
            . 'font-family:Vazirmatn,Tahoma,sans-serif;line-height:2">'
