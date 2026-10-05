@@ -38,6 +38,9 @@ final class AuthController
         $userService = new UserService();
         try {
             $user = $userService->register($data);
+            \App\Core\Audit::log((int) $user->id, 'auth.register', 'user', (int) $user->id, null, [
+                'phone' => $user->phone,
+            ]);
             $token = JwtHelper::generate([
                 'sub' => $user->id,
                 'phone' => $user->phone,
@@ -103,6 +106,9 @@ final class AuthController
                 'phone' => $username,
                 'attempts_left' => max(0, $left),
             ]);
+            \App\Core\Audit::log(0, 'auth.login_failed', null, null, null, [
+                'phone' => $username,
+            ]);
             return (new Response())->setStatusCode(401)->setJson([
                 'success' => false,
                 'message' => 'شماره موبایل یا رمز عبور اشتباه است.',
@@ -111,6 +117,10 @@ final class AuthController
 
         // ورود موفق: سابقه تلاش‌ها پاک می‌شود
         $limiter->clear($rateKey);
+
+        \App\Core\Audit::log((int) $user->id, 'auth.login', 'user', (int) $user->id, null, [
+            'method' => 'password',
+        ]);
 
         $token = JwtHelper::generate([
             'sub' => $user->id,
@@ -166,11 +176,15 @@ final class AuthController
                     'data' => ['retry_after' => $result['retry_after']],
                 ]);
             }
+            $smsDelivered = (bool) ($result['sms_delivered'] ?? false);
             return (new Response())->setJson([
                 'success' => true,
-                'message' => 'کد تأیید پیامک شد.',
+                'message' => $smsDelivered
+                    ? 'کد تأیید پیامک شد.'
+                    : 'کد تأیید ساخته شد اما پیامک ارسال نشد. تنظیمات پیامک سرور (MELIPAYAMAK_* در فایل .env) را بررسی کنید.',
                 'data' => [
                     'retry_after' => $result['retry_after'],
+                    'sms_delivered' => $smsDelivered,
                     'debug_code' => $result['debug_code'],
                 ],
             ]);
@@ -303,6 +317,9 @@ final class AuthController
         }
     }
 
+    /** دورهٔ مهلت تمدید: توکن تا این مدت پس از انقضا همچنان قابل تمدید است */
+    private const REFRESH_GRACE_SECONDS = 7 * 24 * 3600;
+
     public function refresh(Request $request): Response
     {
         $data = $request->getJsonBody() ?? [];
@@ -315,7 +332,18 @@ final class AuthController
         }
 
         try {
-            $payload = JwtHelper::verify($token);
+            try {
+                $payload = JwtHelper::verify($token);
+            } catch (\Firebase\JWT\ExpiredException $e) {
+                // توکن منقضی‌شده فقط در «دورهٔ مهلت» قابل تمدید است؛
+                // امضا و بقیهٔ ادعاها همچنان به‌طور کامل اعتبارسنجی می‌شوند.
+                \Firebase\JWT\JWT::$leeway = self::REFRESH_GRACE_SECONDS;
+                try {
+                    $payload = JwtHelper::verify($token);
+                } finally {
+                    \Firebase\JWT\JWT::$leeway = 0;
+                }
+            }
             $newToken = JwtHelper::generate([
                 'sub' => $payload['sub'] ?? null,
                 'email' => $payload['email'] ?? null,
@@ -336,6 +364,7 @@ final class AuthController
 
     public function logout(Request $request): Response
     {
+        \App\Core\Audit::log((int) ($request->getAttribute('user_id') ?? 0), 'auth.logout', 'user', (int) ($request->getAttribute('user_id') ?? 0), null, []);
         return (new Response())->setJson([
             'success' => true,
             'message' => 'Logged out successfully. Client should discard token.',

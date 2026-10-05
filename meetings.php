@@ -117,6 +117,7 @@ $status_chips = [
 ];
 
 $page_title = 'جلسات';
+$page_hint = 'جلسات ساختمان را زمان‌بندی کنید و بعد از جلسه، صورت‌جلسه بگذارید.';
 $header_sub = $building_name ?: 'جلسات ساختمان';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';
@@ -138,8 +139,11 @@ require_once 'includes/header.php';
 
     <?php if (empty($meetings)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">🤝</div>
+            <div class="empty-icon">🤝</div>
             جلسه‌ای ثبت نشده است.
+            <?php if ($is_manager): ?>
+                <button type="button" class="empty-action" data-modal-open="add-meeting">🤝 برنامه‌ریزی اولین جلسه</button>
+            <?php endif; ?>
         </div>
     <?php else: ?>
         <div class="space-y-3">
@@ -167,7 +171,7 @@ require_once 'includes/header.php';
 
                     <?php if ($m_date !== '' || $m_loc !== ''): ?>
                         <p class="text-xs text-gray-400 mt-2">
-                            📅 <?= fa_digits($m_date) ?>
+                            📅 <?= fa_datetime($m_date) ?>
                             <?php if ($m_loc !== ''): ?> • 📍 <?= htmlspecialchars($m_loc) ?><?php endif; ?>
                         </p>
                     <?php endif; ?>

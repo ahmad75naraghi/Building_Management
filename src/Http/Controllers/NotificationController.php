@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Core\Request;
 use App\Core\Response;
+use App\Utilities\PaginationHelper;
 use App\Services\NotificationService;
 
 final class NotificationController
@@ -25,10 +26,16 @@ final class NotificationController
                 'success' => false, 'message' => 'Authentication required',
             ]);
         }
-        $notifications = $this->service->getUserNotifications((int) $userId, 20);
+        $notifications = array_map(fn($n) => $n->toArray(), $this->service->getUserNotifications((int) $userId, 20));
+        if (PaginationHelper::requested($request)) {
+            $paged = PaginationHelper::paginate($notifications, PaginationHelper::fromQuery($request));
+            return (new Response())->setJson([
+                'success' => true, 'data' => $paged['items'], 'pagination' => $paged['pagination'],
+            ]);
+        }
         return (new Response())->setJson([
             'success' => true,
-            'data' => array_map(fn($n) => $n->toArray(), $notifications),
+            'data' => $notifications,
         ]);
     }
 
@@ -45,6 +52,23 @@ final class NotificationController
         return (new Response())->setJson([
             'success' => $updated,
             'message' => $updated ? 'Marked as read' : 'Failed to mark as read',
+        ]);
+    }
+
+    /** خواندن همهٔ اعلان‌ها با یک کلیک */
+    public function markAllAsRead(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        if (!$userId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication required',
+            ]);
+        }
+        $count = $this->service->markAllAsRead((int) $userId);
+        return (new Response())->setJson([
+            'success' => true,
+            'message' => 'همهٔ اعلان‌ها خوانده شدند.',
+            'data' => ['marked' => $count],
         ]);
     }
 

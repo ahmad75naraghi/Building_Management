@@ -43,6 +43,11 @@ final class Request
 
     public function getPathInfo(): string
     {
+        // نسخه‌بندی API: مسیرهای /api/v1/… معادل /api/… پردازش می‌شوند
+        // تا کلاینت‌های آینده (اپ موبایل بومی) بتوانند نسخهٔ خود را ثابت کنند
+        if (str_starts_with($this->uri, '/api/v1/')) {
+            return '/api/' . substr($this->uri, strlen('/api/v1/'));
+        }
         return $this->uri;
     }
 
@@ -54,6 +59,16 @@ final class Request
     public function getPostParam(string $key, ?string $default = null): ?string
     {
         return $this->post[$key] ?? $default;
+    }
+
+    public function getCookieParam(string $key, mixed $default = null): mixed
+    {
+        return $this->cookies[$key] ?? $default;
+    }
+
+    public function getServerParam(string $key, mixed $default = null): mixed
+    {
+        return $this->server[$key] ?? $default;
     }
 
     public function getJsonBody(): ?array

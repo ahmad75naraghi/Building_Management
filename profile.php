@@ -14,8 +14,53 @@ $user_name = $me_response['data']['name'] ?? ($_SESSION['user_name'] ?? 'کار�
 $user_email = $me_response['data']['email'] ?? '';
 $user_phone = $me_response['data']['phone'] ?? '';
 $first_letter = mb_substr($user_name, 0, 1, 'UTF-8');
+$my_user_id = (int) ($_SESSION['user_id'] ?? ($me_response['data']['id'] ?? 0));
+
+// آیا این حساب اجازهٔ مدیریت پشتیبان‌ها را دارد؟ (شماره‌های مجاز در تنظیمات محیطی)
+$backup_admin = false;
+try {
+    $backup_probe_user = new \App\Models\User();
+    $backup_probe_user->id = $my_user_id;
+    $backup_probe_user->phone = (string) $user_phone;
+    $backup_admin = (new \App\Services\BackupService())->isAdmin($backup_probe_user);
+} catch (\Throwable $e) {
+    $backup_admin = false;
+}
+
+// ساختمان‌های من: نقش + واحدهای مرتبط کاربر در هر ساختمان
+$my_buildings = [];
+$buildings_response = callAPI('GET', '/buildings');
+if (!empty($buildings_response['success']) && is_array($buildings_response['data'] ?? null)) {
+    foreach ($buildings_response['data'] as $bld) {
+        $bid = (int) ($bld['id'] ?? 0);
+        if ($bid <= 0) {
+            continue;
+        }
+        $entry = [
+            'id' => $bid,
+            'name' => (string) ($bld['name'] ?? 'ساختمان'),
+            'role' => (string) ($bld['my_role'] ?? 'resident'),
+            'units' => [],
+        ];
+        $units_response = callAPI('GET', '/buildings/' . $bid . '/units');
+        if (!empty($units_response['success'])) {
+            foreach ($units_response['data']['units'] ?? [] as $u) {
+                $is_owner = (int) ($u['owner_user_id'] ?? 0) === $my_user_id;
+                $is_tenant = (int) ($u['tenant_user_id'] ?? 0) === $my_user_id;
+                if ($is_owner || $is_tenant) {
+                    $entry['units'][] = [
+                        'number' => (string) ($u['unit_number'] ?? ''),
+                        'relation' => $is_owner ? 'مالک' : 'مستأجر',
+                    ];
+                }
+            }
+        }
+        $my_buildings[] = $entry;
+    }
+}
 
 $page_title = 'پروفایل من';
+$page_hint = 'تنظیمات حساب کاربری، امنیت و تنظیمات اپ.';
 $header_sub = $user_phone ?: ($user_email ?: 'حساب کاربری');
 $back_url = 'index.php';
 $nav_active = 'profile';
@@ -46,6 +91,40 @@ require_once 'includes/header.php';
             </div>
         </section>
 
+        <!-- ساختمان‌های من: نقش و واحدهای مرتبط -->
+        <section class="quick-access-section" style="margin-top: 20px;">
+            <div class="section-header-row">
+                <span class="section-title">ساختمان‌های من</span>
+                <a href="index.php" class="widget-view-all-link">لیست ساختمان‌ها</a>
+            </div>
+
+            <?php if (empty($my_buildings)): ?>
+                <div class="empty-state">
+                    <div class="empty-icon">🏢</div>
+                    هنوز عضو ساختمانی نیستید.
+                    <a class="empty-action" href="building_add.php">🏢 ثبت ساختمان جدید</a>
+                </div>
+            <?php else: ?>
+                <?php foreach ($my_buildings as $mb): ?>
+                    <a href="dashboard.php?building_id=<?= $mb['id'] ?>" class="info-row">
+                        <div class="info-row-right">
+                            <div class="info-row-icon" style="background: #eff6ff; color: #3b82f6;">🏢</div>
+                            <span class="info-row-label">
+                                <?= htmlspecialchars($mb['name']) ?>
+                                <span style="display:block; font-size:10px; color:var(--text-gray); font-weight:600; margin-top:2px;">
+                                    نقش: <?= htmlspecialchars(member_role_label($mb['role'])) ?>
+                                    <?php if (!empty($mb['units'])): ?>
+                                        · <?php foreach ($mb['units'] as $i => $un): ?><?= $i > 0 ? '، ' : '' ?>واحد <?= fa_digits(htmlspecialchars($un['number'])) ?> (<?= htmlspecialchars($un['relation']) ?>)<?php endforeach; ?>
+                                    <?php endif; ?>
+                                </span>
+                            </span>
+                        </div>
+                        <span class="info-chevron">❯</span>
+                    </a>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </section>
+
         <!-- بخش اطلاعات حساب -->
         <section class="quick-access-section" style="margin-top: 20px;">
             <div class="section-header-row">
@@ -53,7 +132,7 @@ require_once 'includes/header.php';
             </div>
             <a href="profile_edit.php" class="info-row">
                 <div class="info-row-right">
-                    <div class="info-row-icon" style="background: #eef2ff; color: #6366f1;">
+                    <div class="info-row-icon" style="background: var(--soft-indigo,#eef2ff); color: var(--indigo-ink,#6366f1);">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM12 14a7 7 0 0 0-7 7h14a7 7 0 0 0-7-7z" />
                         </svg>
@@ -81,6 +160,61 @@ require_once 'includes/header.php';
             <div class="section-header-row">
                 <span class="section-title">تنظیمات و پشتیبانی</span>
             </div>
+            <!-- اعلان فوری وب (پوش مرورگر) -->
+            <div class="info-row" id="push-toggle-btn" style="cursor:pointer;" title="فعال یا غیرفعال‌کردن اعلان فوری روی این دستگاه">
+                <div class="info-row-right">
+                    <div class="info-row-icon" style="background: var(--soft-indigo,#eef2ff); color: var(--indigo-ink,#6366f1);">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                            <path d="M2 8c0-2.2.7-4.3 2-6" />
+                            <path d="M22 8a10 10 0 0 0-2-6" />
+                        </svg>
+                    </div>
+                    <span class="info-row-label">اعلان فوری روی گوشی</span>
+                </div>
+                <span class="push-state-badge" id="push-toggle-state">…</span>
+            </div>
+            <a href="help.php" class="info-row">
+                <div class="info-row-right">
+                    <div class="info-row-icon" style="background: var(--soft-indigo,#eef2ff); color: var(--indigo-ink,#6366f1);">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg>
+                    </div>
+                    <span class="info-row-label">راهنمای استفاده از سامانه</span>
+                </div>
+                <span class="info-row-val" style="color:var(--text-gray);">آموزش گام‌به‌گام</span>
+            </a>
+            <button type="button" class="info-row" style="width:100%; text-align:right; cursor:pointer; font:inherit;" onclick="if (window.location.pathname.indexOf('dashboard.php') !== -1 &amp;&amp; window.bmsStartTour) { window.bmsStartTour(true); } else { showToast('تور راهنما در صفحهٔ اصلی اجرا می‌شود؛ به داشبورد بروید.', 'info'); }">
+                <div class="info-row-right">
+                    <div class="info-row-icon" style="background:#ecfdf5; color:#10b981;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <polygon points="10 8 16 12 10 16 10 8" />
+                        </svg>
+                    </div>
+                    <span class="info-row-label">نمایش دوبارهٔ تور راهنما</span>
+                </div>
+                <span class="info-row-val" style="color:var(--text-gray);">معرفی بخش‌ها</span>
+            </button>
+            <?php if ($backup_admin): ?>
+            <a href="backups.php" class="info-row">
+                <div class="info-row-right">
+                    <div class="info-row-icon" style="background:#eff6ff; color:#3b82f6;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <ellipse cx="12" cy="5" rx="9" ry="3" />
+                            <path d="M3 5v14a9 3 0 0 0 18 0V5" />
+                            <path d="M3 12a9 3 0 0 0 18 0" />
+                        </svg>
+                    </div>
+                    <span class="info-row-label">پشتیبان‌گیری دیتابیس</span>
+                </div>
+                <span class="info-row-val" style="color:var(--text-gray);">مدیر سیستم</span>
+            </a>
+            <?php endif; ?>
             <a href="change_password.php" class="info-row">
                 <div class="info-row-right">
                     <div class="info-row-icon" style="background: #fefce8; color: #eab308;">
@@ -110,4 +244,5 @@ require_once 'includes/header.php';
 
         <p style="text-align: center; font-size: 11px; color: var(--text-gray); margin: 24px 0 8px;">نسخه ۱.۰.۰</p>
 
+<script src="assets/js/push.js"></script>
 <?php require_once 'includes/footer.php'; ?>

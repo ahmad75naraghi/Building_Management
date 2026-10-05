@@ -81,6 +81,37 @@ TestLog::run('شارژ نفری، مبلغ ثابت را نادیده می‌گ�
     TestLog::assertSame('فقط نرخ نفری اعمال شد', 100000.0, $r['total']);
 });
 
+// ------------------------------------------------------------ شارژ ترکیبی (ثابت + نفری)
+
+TestLog::run('شارژ ترکیبی: ثابت + نفری برای هر واحد', function () use ($svc, $manager) {
+    // هر واحد = ۲۰۰٬۰۰۰ ثابت + (نفرات × ۵۰٬۰۰۰)
+    $b = make_building($manager, ['charge_mode' => 'combined', 'monthly_charge' => 200000, 'charge_per_person' => 50000]);
+    make_unit($b, '1', ['residents_count' => 2]);
+    make_unit($b, '2', ['residents_count' => 4]);
+
+    $r = $svc->calculateMonthlyCharges($b);
+    TestLog::assertSame('حالت', 'combined', $r['mode']);
+    TestLog::assertSame('واحد ۲ نفره', 300000.0, $r['units'][0]['amount']); // 200k + 2*50k
+    TestLog::assertSame('واحد ۴ نفره', 400000.0, $r['units'][1]['amount']); // 200k + 4*50k
+    TestLog::assertSame('جمع کل', 700000.0, $r['total']);
+});
+
+TestLog::run('شارژ ترکیبی: واحد بدون ساکن فقط ثابت را می‌پردازد', function () use ($svc, $manager) {
+    $b = make_building($manager, ['charge_mode' => 'combined', 'monthly_charge' => 150000, 'charge_per_person' => 40000]);
+    make_unit($b, '1', ['residents_count' => 0]);
+
+    $r = $svc->calculateMonthlyCharges($b);
+    TestLog::assertSame('فقط مبلغ ثابت', 150000.0, $r['units'][0]['amount']);
+    TestLog::assertSame('جمع کل', 150000.0, $r['total']);
+});
+
+TestLog::run('شارژ ترکیبی بدون تنظیم، صفر است', function () use ($svc, $manager) {
+    $b = make_building($manager, ['charge_mode' => 'combined', 'monthly_charge' => 0, 'charge_per_person' => 0]);
+    make_unit($b, '1', ['residents_count' => 3]);
+    $r = $svc->calculateMonthlyCharges($b);
+    TestLog::assertSame('جمع صفر', 0.0, $r['total']);
+});
+
 // ------------------------------------------------------------ شارژ دلخواه
 
 TestLog::run('شارژ دلخواه: مبلغ اختصاصی هر واحد', function () use ($svc, $manager) {

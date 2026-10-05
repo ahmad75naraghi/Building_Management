@@ -46,6 +46,15 @@ final class UnitService
     }
 
     /**
+     * مقدار متنی اختیاری را تمیز می‌کند: فاصله‌های اضافی حذف و رشته خالی به نال تبدیل می‌شود.
+     */
+    private function cleanOptionalText($value): ?string
+    {
+        $text = trim((string) $value);
+        return $text === '' ? null : $text;
+    }
+
+    /**
      * اعتبارسنجی مالک/مستاجر: هرکدام اگر داده شود باید عضو فعال همان ساختمان باشد.
      *
      * @return array{owner_user_id: ?int, tenant_user_id: ?int, owner_resident: bool}
@@ -196,11 +205,13 @@ final class UnitService
         $unit->residents_count = isset($data['residents_count']) ? max(0, (int) $data['residents_count']) : 0;
         $unit->custom_charge = isset($data['custom_charge']) && $data['custom_charge'] !== '' && $data['custom_charge'] !== null
             ? max(0, (float) $data['custom_charge']) : null;
+        $unit->parking_no = $this->cleanOptionalText($data['parking_no'] ?? null);
+        $unit->storage_no = $this->cleanOptionalText($data['storage_no'] ?? null);
 
         $db = Database::getConnection();
         $stmt = $db->prepare(
-            "INSERT INTO units (building_id, block_id, floor_id, unit_number, area, type, owner_user_id, tenant_user_id, owner_resident, residents_count, custom_charge)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO units (building_id, block_id, floor_id, unit_number, area, type, owner_user_id, tenant_user_id, owner_resident, residents_count, custom_charge, parking_no, storage_no)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
         $stmt->execute([
             $unit->building_id,
@@ -214,9 +225,14 @@ final class UnitService
             (int) $unit->owner_resident,
             $unit->residents_count,
             $unit->custom_charge,
+            $unit->parking_no,
+            $unit->storage_no,
         ]);
         $unit->id = (int) $db->lastInsertId();
         $this->computeOccupancy($unit);
+        \App\Core\Audit::log($userId, 'unit.create', 'unit', $unit->id, $buildingId, [
+            'unit_number' => $unit->unit_number,
+        ]);
         return $unit;
     }
 
@@ -242,7 +258,7 @@ final class UnitService
             "UPDATE units SET
                 unit_number = ?, area = ?, type = ?, block_id = ?, floor_id = ?,
                 owner_user_id = ?, tenant_user_id = ?, owner_resident = ?,
-                residents_count = ?, custom_charge = ?
+                residents_count = ?, custom_charge = ?, parking_no = ?, storage_no = ?
              WHERE id = ?"
         );
         $stmt->execute([
@@ -257,9 +273,12 @@ final class UnitService
             isset($data['residents_count']) ? max(0, (int) $data['residents_count']) : 0,
             isset($data['custom_charge']) && $data['custom_charge'] !== '' && $data['custom_charge'] !== null
                 ? max(0, (float) $data['custom_charge']) : null,
+            $this->cleanOptionalText($data['parking_no'] ?? null),
+            $this->cleanOptionalText($data['storage_no'] ?? null),
             $unitId,
         ]);
 
+        \App\Core\Audit::log($userId, 'unit.update', 'unit', $unitId, $buildingId, []);
         return $this->getUnitById($unitId, $userId);
     }
 
@@ -274,7 +293,11 @@ final class UnitService
         }
         $db = Database::getConnection();
         $stmt = $db->prepare("DELETE FROM units WHERE id = ?");
-        return $stmt->execute([$unitId]);
+        $deleted = $stmt->execute([$unitId]);
+        if ($deleted) {
+            \App\Core\Audit::log($userId, 'unit.delete', 'unit', $unitId, $buildingId, []);
+        }
+        return $deleted;
     }
 
     // ------------------------------------------------------------------
@@ -295,6 +318,8 @@ final class UnitService
         $u->residents_count = isset($row['residents_count']) ? (int) $row['residents_count'] : 0;
         $u->custom_charge = isset($row['custom_charge']) && $row['custom_charge'] !== null
             ? (float) $row['custom_charge'] : null;
+        $u->parking_no = isset($row['parking_no']) && $row['parking_no'] !== null ? (string) $row['parking_no'] : null;
+        $u->storage_no = isset($row['storage_no']) && $row['storage_no'] !== null ? (string) $row['storage_no'] : null;
         $u->created_at = $row['created_at'] ?? null;
         $u->owner_name = $row['owner_name'] ?? null;
         $u->owner_email = $row['owner_email'] ?? null;

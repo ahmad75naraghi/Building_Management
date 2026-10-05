@@ -101,9 +101,14 @@ final class OtpService
             self::at($now + self::TTL_SECONDS),
         ]);
 
+        $smsDelivered = false;
         try {
-            (new SmsService())->sendOtpSms($phone, $code);
-            Logger::info('OtpService', 'کد یک‌بارمصرف ارسال شد', ['phone' => $phone, 'purpose' => $purpose]);
+            $smsDelivered = (new SmsService())->sendOtpSms($phone, $code);
+            if ($smsDelivered) {
+                Logger::info('OtpService', 'کد یک‌بارمصرف ارسال شد', ['phone' => $phone, 'purpose' => $purpose]);
+            } else {
+                Logger::warning('OtpService', 'کد ساخته شد اما پیامک ارسال نشد (پنل غیرفعال یا خطای ارسال)', ['phone' => $phone]);
+            }
         } catch (\Throwable $e) {
             // نبود پنل پیامک نباید جریان ورود را قطع کند، ولی باید دیده شود
             Logger::error('OtpService', 'ارسال پیامک کد ناموفق بود', ['phone' => $phone], $e);
@@ -112,6 +117,8 @@ final class OtpService
         return [
             'sent' => true,
             'retry_after' => self::RESEND_COOLDOWN,
+            // آیا پیامک واقعاً تحویل سامانه پیامک شد؟
+            'sms_delivered' => $smsDelivered,
             // فقط در محیط توسعه برای تست بدون پیامک برگردانده می‌شود
             'debug_code' => $this->isDebugMode() ? $code : null,
         ];

@@ -17,6 +17,157 @@ $reopen_modal = '';
 $ctx = building_role_context($building_id);
 $is_manager = $ctx['is_manager'];
 
+/**
+ * ایمپورت واحدها از فایل CSV — ستون‌ها: شماره واحد (لازم)، بلوک، طبقه، تعداد سکنه.
+ * بلوک/طبقهٔ ناآشنا به‌صورت خودکار ساخته می‌شود. خروجی: ['ok'=>bool, 'message'=>string]
+ */
+if (!function_exists('bms_import_units_csv')) {
+    function bms_import_units_csv(int $building_id, string $tmp_path): array
+    {
+        $fh = @fopen($tmp_path, 'r');
+        if (!$fh) {
+            return ['ok' => false, 'message' => 'فایل آپلودشده قابل خواندن نیست.'];
+        }
+
+        // حذف BOM احتمالی اکسل
+        $first = fgets($fh);
+        if ($first !== false && str_starts_with($first, "\xEF\xBB\xBF")) {
+            $first = substr($first, 3);
+        }
+        $rows = [];
+        if ($first !== false) {
+            $rows[] = str_getcsv($first, ',', '"', '');
+        }
+        while (($row = fgetcsv($fh, 0, ',', '"', '')) !== false) {
+            $rows[] = $row;
+        }
+        fclose($fh);
+
+        $rows = array_values(array_filter($rows, static fn($r) => trim(implode('', (array) $r)) !== ''));
+        if (!$rows) {
+            return ['ok' => false, 'message' => 'فایل خالی است.'];
+        }
+
+        // تشخیص ردیف عنوان و نگاشت ستون‌ها
+        $map = ['unit' => 0, 'block' => 1, 'floor' => 2, 'residents' => 3];
+        $header = array_map(static fn($c) => mb_strtolower(trim((string) $c)), $rows[0]);
+        foreach ($header as $i => $cell) {
+            if (str_contains($cell, 'واحد') || str_contains($cell, 'unit')) $map['unit'] = $i;
+            if (str_contains($cell, 'بلوک') || str_contains($cell, 'block')) $map['block'] = $i;
+            if (str_contains($cell, 'طبقه') || str_contains($cell, 'floor')) $map['floor'] = $i;
+            if (str_contains($cell, 'سکنه') || str_contains($cell, 'نفر') || str_contains($cell, 'resident')) $map['residents'] = $i;
+        }
+        $has_header = str_contains((string) ($header[$map['unit']] ?? ''), 'واحد')
+            || str_contains((string) ($header[$map['unit']] ?? ''), 'unit');
+        $data_rows = $has_header ? array_slice($rows, 1) : $rows;
+        if (!$data_rows) {
+            return ['ok' => false, 'message' => 'فایل فقط ردیف عنوان دارد.'];
+        }
+        if (count($data_rows) > 500) {
+            return ['ok' => false, 'message' => 'حداکثر ۵۰۰ واحد در هر فایل مجاز است.'];
+        }
+
+        $col = static fn(array $row, string $key): string =>
+            trim((string) ($row[$map[$key]] ?? ''));
+
+        // نقشهٔ نام→شناسهٔ بلوک‌ها و طبقات موجود
+        $block_map = [];
+        $r = callAPI('GET', '/buildings/' . $building_id . '/blocks');
+        foreach (($r['data']['blocks'] ?? []) as $b) {
+            $block_map[trim((string) ($b['name'] ?? ''))] = (int) $b['id'];
+        }
+        $floor_map = [];
+        $r = callAPI('GET', '/buildings/' . $building_id . '/floors');
+        foreach (($r['data']['floors'] ?? []) as $f) {
+            $floor_map[trim((string) ($f['name'] ?? ''))] = (int) $f['id'];
+        }
+
+        $created = 0;
+        $skipped = 0;
+        $errors = [];
+        $seen = [];
+        foreach ($data_rows as $idx => $row) {
+            $line_no = $idx + ($has_header ? 2 : 1);
+            $unit_number = en_digits($col($row, 'unit'));
+            if ($unit_number === '') {
+                $skipped++;
+                continue;
+            }
+            if (isset($seen[$unit_number])) {
+                $errors[] = "ردیف $line_no: واحد «$unit_number» در فایل تکراری است.";
+                $skipped++;
+                continue;
+            }
+            $seen[$unit_number] = true;
+
+            $block_id = null;
+            $block_name = $col($row, 'block');
+            if ($block_name !== '') {
+                if (!isset($block_map[$block_name])) {
+                    $cr = callAPI('POST', '/buildings/' . $building_id . '/blocks', ['name' => $block_name]);
+                    if (empty($cr['success'])) {
+                        $errors[] = "ردیف $line_no: ساخت بلوک «$block_name» ناموفق بود.";
+                    } else {
+                        $rf = callAPI('GET', '/buildings/' . $building_id . '/blocks');
+                        foreach (($rf['data']['blocks'] ?? []) as $b) {
+                            $block_map[trim((string) ($b['name'] ?? ''))] = (int) $b['id'];
+                        }
+                    }
+                }
+                $block_id = $block_map[$block_name] ?? null;
+            }
+
+            $floor_id = null;
+            $floor_name = $col($row, 'floor');
+            if ($floor_name !== '') {
+                if (!isset($floor_map[$floor_name])) {
+                    $floor_number = preg_match('/\d+/', en_digits($floor_name), $m) ? (int) $m[0] : null;
+                    $cr = callAPI('POST', '/buildings/' . $building_id . '/floors', [
+                        'name' => $floor_name,
+                        'floor_number' => $floor_number,
+                        'block_id' => $block_id,
+                    ]);
+                    if (empty($cr['success'])) {
+                        $errors[] = "ردیف $line_no: ساخت طبقهٔ «$floor_name» ناموفق بود.";
+                    } else {
+                        $rf = callAPI('GET', '/buildings/' . $building_id . '/floors');
+                        foreach (($rf['data']['floors'] ?? []) as $f) {
+                            $floor_map[trim((string) ($f['name'] ?? ''))] = (int) $f['id'];
+                        }
+                    }
+                }
+                $floor_id = $floor_map[$floor_name] ?? null;
+            }
+
+            $payload = [
+                'unit_number' => $unit_number,
+                'type' => 'residential',
+                'block_id' => $block_id,
+                'floor_id' => $floor_id,
+                'residents_count' => max(0, (int) en_digits($col($row, 'residents'))),
+            ];
+            $cr = callAPI('POST', '/buildings/' . $building_id . '/units', $payload);
+            if (!empty($cr['success'])) {
+                $created++;
+            } else {
+                $skipped++;
+                $errors[] = "ردیف $line_no (واحد $unit_number): " . ($cr['message'] ?? 'خطا در ثبت');
+            }
+        }
+
+        $message = $created . ' واحد با موفقیت ثبت شد';
+        if ($skipped > 0) {
+            $message .= "؛ $skipped ردیف رد شد";
+        }
+        $message .= '.';
+        if ($errors) {
+            $message .= ' جزئیات: ' . implode(' | ', array_slice($errors, 0, 5))
+                . (count($errors) > 5 ? ' | …' : '');
+        }
+        return ['ok' => $created > 0, 'message' => $message];
+    }
+}
+
 // دریافت بلوک‌ها، طبقات و اعضا (برای انتخاب در فرم)
 $blocks = [];
 $floors = [];
@@ -42,6 +193,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $building_id > 0) {
 
     if (!$is_manager) {
         $alert_message = 'فقط مدیر ساختمان می‌تواند واحدها را مدیریت کند.';
+    } elseif ($action === 'scaffold') {
+        $response = callAPI('POST', '/buildings/' . $building_id . '/scaffold', []);
+        if ((int) ($response['data']['units_created'] ?? 0) > 0) {
+            $alert_message = $response['message'] ?? 'واحدها به‌صورت خودکار ساخته شد.';
+            $alert_type = 'success';
+        } else {
+            $alert_message = $response['message'] ?? 'امکان ساخت خودکار واحدها وجود ندارد.';
+        }
+    } elseif ($action === 'import_units') {
+        if (empty($_FILES['units_csv']['tmp_name']) || ($_FILES['units_csv']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            $alert_message = 'یک فایل CSV انتخاب کنید.';
+            $reopen_modal = 'import-units';
+        } else {
+            $result = bms_import_units_csv($building_id, (string) $_FILES['units_csv']['tmp_name']);
+            $alert_message = $result['message'];
+            $alert_type = $result['ok'] ? 'success' : 'error';
+            if (!$result['ok']) {
+                $reopen_modal = 'import-units';
+            }
+        }
+    } elseif ($action === 'demo_seed') {
+        $response = callAPI('POST', '/buildings/' . $building_id . '/demo-seed', []);
+        $alert_message = $response['message'] ?? 'خطا در ساخت دادهٔ نمونه.';
+        $alert_type = !empty($response['success']) ? 'success' : 'error';
     } elseif ($action === 'delete') {
         $unit_id = (int) ($_POST['unit_id'] ?? 0);
         if ($unit_id > 0) {
@@ -71,6 +246,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $building_id > 0) {
                 'owner_resident' => !empty($_POST['owner_resident']) ? 1 : 0,
                 'residents_count' => max(0, (int) en_digits($_POST['residents_count'] ?? '0')),
                 'custom_charge' => $custom_charge_raw !== '' ? (float) $custom_charge_raw : null,
+                'parking_no' => trim($_POST['parking_no'] ?? '') !== '' ? trim($_POST['parking_no']) : null,
+                'storage_no' => trim($_POST['storage_no'] ?? '') !== '' ? trim($_POST['storage_no']) : null,
             ];
 
             if ($action === 'update') {
@@ -142,6 +319,7 @@ $occupancy_chips = [
 ];
 
 $page_title = 'مدیریت واحدها';
+$page_hint = 'واحد‌ها مقصدِ تقسیم هزینه‌اند. واحد بسازید و مالک/ساکن هر واحد را مشخص کنید.';
 $header_sub = $building_name ?: 'ساختار مجتمع';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';
@@ -152,9 +330,16 @@ require_once 'includes/header.php';
 <main class="p-5">
 
     <?php if ($is_manager): ?>
-        <?php modal_open_button('add-unit', 'افزودن واحد جدید'); ?>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <?php modal_open_button('add-unit', 'افزودن واحد جدید'); ?>
+            <button type="button" class="btn btn-secondary" data-modal-open="import-units" style="flex:1;">📥 ایمپورت واحدها از فایل</button>
+        </div>
 
-        <?php if ($charge_mode === 'per_person'): ?>
+        <?php if ($charge_mode === 'combined'): ?>
+            <div class="hint-card" style="margin-top:12px;">
+                💰 شارژ این ساختمان <strong>ترکیبی (ثابت + نفری)</strong> است؛ برای هر واحد تعداد ساکنین را وارد کنید تا سهم نفری محاسبه شود.
+            </div>
+        <?php elseif ($charge_mode === 'per_person'): ?>
             <div class="hint-card" style="margin-top:12px;">
                 👥 شارژ این ساختمان <strong>بر اساس تعداد نفرات</strong> محاسبه می‌شود؛ برای هر واحد تعداد ساکنین را وارد کنید.
             </div>
@@ -175,11 +360,29 @@ require_once 'includes/header.php';
 
     <?php if (empty($units)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">🏠</div>
+            <div class="empty-icon">🏠</div>
             هنوز واحدی ثبت نشده است.
+            <div style="display:flex; flex-direction:column; gap:8px; align-items:center; margin-top:8px;">
+                <?php if ((int) ($building['total_units'] ?? 0) > 0): ?>
+                    <form method="post" class="empty-action" style="width:100%;">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="form_action" value="scaffold">
+                        <button type="submit" class="btn btn-primary" style="width:100%; margin-top:4px;">✨ ساخت خودکار واحدها از مشخصات ساختمان (<?= fa_digits((int) $building['total_units']) ?> واحد)</button>
+                    </form>
+                <?php endif; ?>
+                <button type="button" class="empty-action btn btn-secondary" data-modal-open="add-unit">➕ افزودن دستی واحد</button>
+                <button type="button" class="empty-action btn btn-secondary" data-modal-open="demo-seed" style="border-style:dashed;">🎬 پر کردن با دادهٔ نمونه (برای آشنایی)</button>
+            </div>
         </div>
     <?php else: ?>
-        <div class="space-y-3">
+                <div class="list-filter-bar">
+            <input type="search" class="form-input" data-list-search="units-list" placeholder="🔍 جستجوی شماره واحد، مالک یا ساکن…" style="flex:1;">
+            <span class="list-count-chip" data-list-count="units-list"></span>
+            <?php if ($is_manager): ?>
+                <a class="btn-chip" href="list_export.php?type=units&building_id=<?= (int) $building_id ?>" title="خروجی اکسل واحدها">📥 اکسل</a>
+            <?php endif; ?>
+        </div>
+        <div class="space-y-3" data-list-items="units-list">
             <?php foreach ($units as $unit): ?>
                 <?php
                 $u_id = (int) ($unit['id'] ?? 0);
@@ -212,9 +415,16 @@ require_once 'includes/header.php';
                         <?php if ($residents > 0): ?>
                             <span class="chip chip-green"><?= fa_digits($residents) ?> نفر ساکن</span>
                         <?php endif; ?>
+                        <?php if (!empty($unit['parking_no'])): ?>
+                            <span class="chip chip-gray">🚗 پارکینگ: <?= fa_digits(htmlspecialchars($unit['parking_no'])) ?></span>
+                        <?php endif; ?>
+                        <?php if (!empty($unit['storage_no'])): ?>
+                            <span class="chip chip-gray">📦 انباری: <?= fa_digits(htmlspecialchars($unit['storage_no'])) ?></span>
+                        <?php endif; ?>
                         <?php if ($charge_mode === 'custom' && isset($unit['custom_charge']) && $unit['custom_charge'] !== null): ?>
                             <span class="chip chip-green">شارژ: <?= fa_number($unit['custom_charge']) ?></span>
                         <?php endif; ?>
+                        <a href="dashboard.php?building_id=<?= $building_id ?>&unit=<?= $u_id ?>" class="chip chip-gray" style="text-decoration:none;">🏢 نمایش در نما</a>
                     </div>
 
                     <?php if ($is_manager): ?>
@@ -231,7 +441,9 @@ require_once 'includes/header.php';
                                     data-set-tenant_user_id="<?= (int) ($unit['tenant_user_id'] ?? 0) ?>"
                                     data-set-owner_resident="<?= !empty($unit['owner_resident']) ? '1' : '0' ?>"
                                     data-set-residents_count="<?= $residents ?>"
-                                    data-set-custom_charge="<?= htmlspecialchars((string) ($unit['custom_charge'] ?? '')) ?>">
+                                    data-set-custom_charge="<?= htmlspecialchars((string) ($unit['custom_charge'] ?? '')) ?>"
+                                    data-set-parking_no="<?= htmlspecialchars($unit['parking_no'] ?? '') ?>"
+                                    data-set-storage_no="<?= htmlspecialchars($unit['storage_no'] ?? '') ?>">
                                 ویرایش
                             </button>
                             <form method="POST" action="?building_id=<?= $building_id ?>" data-confirm="واحد حذف شود؟ این عمل قابل بازگشت نیست." style="display:inline;">
@@ -245,6 +457,7 @@ require_once 'includes/header.php';
                 </div>
             <?php endforeach; ?>
         </div>
+        <div data-list-pager="units-list"></div>
     <?php endif; ?>
 
 </main>
@@ -267,6 +480,35 @@ require_once 'includes/header.php';
             <input type="hidden" name="unit_id" value="">
             <?php include 'includes/_unit_form_fields.php'; ?>
             <button type="submit" class="btn-primary">ذخیره تغییرات</button>
+        </form>
+    <?php modal_end(); ?>
+
+    <?php modal_start('demo-seed', 'دادهٔ نمونه', 'ساختمان را با اطلاعات آزمایشی پر کنید'); ?>
+        <form method="POST" action="?building_id=<?= $building_id ?>" class="space-y-4" data-confirm-sheet data-sheet-title="ساخت دادهٔ نمونه" data-confirm="۴ ساکن نمونه، ۲ هزینهٔ صادرشده، پرداخت تأییدشده، اعلان و تیکت نمونه ساخته می‌شود تا بخش‌های سامانه را امتحان کنید. بعداً می‌توانید همه را حذف کنید. ادامه می‌دهید؟" data-loading>
+            <?= csrf_field() ?>
+            <input type="hidden" name="form_action" value="demo_seed">
+            <div class="hint-card">
+                🎬 مناسب برای آشنایی با سامانه: ساکنین، هزینه‌ها، پرداخت‌ها و تیکت‌های نمونه ساخته می‌شوند.
+                اطلاعات شما دست‌نخورده می‌ماند و در صورت خالی‌بودن، ابتدا واحدها ساخته می‌شوند.
+            </div>
+            <button type="submit" class="btn-primary">🎬 ساخت دادهٔ نمونه</button>
+        </form>
+    <?php modal_end(); ?>
+
+    <?php modal_start('import-units', 'ایمپورت واحدها از فایل', 'ثبت دسته‌جمعی واحدها با CSV'); ?>
+        <form method="POST" action="?building_id=<?= $building_id ?>" enctype="multipart/form-data" class="space-y-4" data-loading>
+            <?= csrf_field() ?>
+            <input type="hidden" name="form_action" value="import_units">
+            <div class="hint-card">
+                📄 فایل CSV با ستون‌های: <strong>شماره واحد</strong> (لازم)، بلوک، طبقه، تعداد سکنه.
+                بلوک و طبقهٔ ناآشنا به‌صورت خودکار ساخته می‌شوند. حداکثر ۵۰۰ واحد در هر فایل.
+            </div>
+            <div>
+                <label class="form-label" for="units-csv-file">انتخاب فایل CSV</label>
+                <input type="file" id="units-csv-file" name="units_csv" accept=".csv,text/csv" required class="form-input">
+            </div>
+            <a href="واحدها-الگو-ورود.csv" download style="font-size:0.8rem; color:var(--gold-primary);">⬇️ دانلود فایل الگو</a>
+            <button type="submit" class="btn-primary">📥 شروع ایمپورت</button>
         </form>
     <?php modal_end(); ?>
 
@@ -294,6 +536,19 @@ require_once 'includes/header.php';
             sync();
         });
     </script>
+
+    <?php $focus_unit_id = (int) ($_GET['focus'] ?? 0); ?>
+    <?php if ($focus_unit_id > 0): ?>
+        <script>
+            /* باز شدن خودکار پاپ‌آپ ویرایش برای واحد مشخص‌شده از طریق لینک (?focus=ID) */
+            window.addEventListener('load', function () {
+                var btn = document.querySelector('[data-modal-open="edit-unit"][data-set-unit_id="<?= $focus_unit_id ?>"]');
+                if (btn) {
+                    btn.click();
+                }
+            });
+        </script>
+    <?php endif; ?>
 
 <?php endif; ?>
 

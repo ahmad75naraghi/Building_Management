@@ -7,6 +7,12 @@ namespace App\Config;
 final class Routes
 {
     public static array $routes = [
+        // Web Push (اعلان فوری مرورگر)
+        'GET /api/push/public-key' => ['App\Http\Controllers\PushController', 'publicKey'],
+        'GET /api/push/status' => ['App\Http\Controllers\PushController', 'status'],
+        'POST /api/push/subscribe' => ['App\Http\Controllers\PushController', 'subscribe'],
+        'POST /api/push/unsubscribe' => ['App\Http\Controllers\PushController', 'unsubscribe'],
+
         // Auth
         'POST /api/auth/register' => ['App\Http\Controllers\AuthController', 'register'],
         'POST /api/auth/login' => ['App\Http\Controllers\AuthController', 'login'],
@@ -31,6 +37,9 @@ final class Routes
         // Building Hierarchy (Dynamic)
         'GET /api/buildings/{building_id}/hierarchy/settings' => ['App\Http\Controllers\BuildingController', 'hierarchySettings'],
         'PUT /api/buildings/{building_id}/hierarchy/settings' => ['App\Http\Controllers\BuildingController', 'updateHierarchySettings'],
+        'POST /api/buildings/{building_id}/scaffold' => ['App\Http\Controllers\BuildingController', 'scaffold'],
+        'POST /api/buildings/{building_id}/demo-seed' => ['App\Http\Controllers\BuildingController', 'demoSeed'],
+        'POST /api/buildings/{building_id}/monthly-statements' => ['App\Http\Controllers\BuildingController', 'sendMonthlyStatements'],
 
         // Blocks
         'POST /api/buildings/{building_id}/blocks' => ['App\Http\Controllers\BuildingController', 'storeBlock'],
@@ -49,6 +58,7 @@ final class Routes
         'GET /api/buildings/{building_id}/units' => ['App\Http\Controllers\BuildingController', 'indexUnits'],
         'PUT /api/units/{id}' => ['App\Http\Controllers\BuildingController', 'updateUnit'],
         'DELETE /api/units/{id}' => ['App\Http\Controllers\BuildingController', 'destroyUnit'],
+        'POST /api/buildings/{building_id}/bulk-users' => ['App\Http\Controllers\BuildingController', 'bulkCreateUsers'],
 
         // Common Areas
         'POST /api/buildings/{building_id}/common-areas' => ['App\Http\Controllers\BuildingController', 'storeCommonArea'],
@@ -60,19 +70,24 @@ final class Routes
         'POST /api/buildings/{building_id}/invitations' => ['App\Http\Controllers\BuildingController', 'createInvitation'],
         'GET /api/buildings/{building_id}/invitations' => ['App\Http\Controllers\BuildingController', 'indexInvitations'],
         'GET /api/buildings/{building_id}/members' => ['App\Http\Controllers\BuildingController', 'members'],
+        'GET /api/buildings/{building_id}/dashboard' => ['App\Http\Controllers\BuildingController', 'dashboardData'],
         'POST /api/invitations/accept' => ['App\Http\Controllers\BuildingController', 'acceptInvitation'],
         'POST /api/invitations/{id}/resend' => ['App\Http\Controllers\BuildingController', 'resendInvitation'],
+        'DELETE /api/invitations/{id}' => ['App\Http\Controllers\BuildingController', 'revokeInvitation'],
         'GET /api/invitations/info' => ['App\Http\Controllers\BuildingController', 'invitationInfo'],
 
         // Phase 4: Tickets & Notifications
         'GET /api/tickets' => ['App\Http\Controllers\TicketController', 'index'],
         'POST /api/tickets' => ['App\Http\Controllers\TicketController', 'store'],
         'GET /api/tickets/{id}' => ['App\Http\Controllers\TicketController', 'show'],
+        'PUT /api/tickets/{id}' => ['App\Http\Controllers\TicketController', 'update'],
+        'DELETE /api/tickets/{id}' => ['App\Http\Controllers\TicketController', 'destroy'],
         'PUT /api/tickets/{id}/status' => ['App\Http\Controllers\TicketController', 'updateStatus'],
         'POST /api/tickets/{ticket_id}/comments' => ['App\Http\Controllers\TicketController', 'addComment'],
         'GET /api/tickets/{id}/comments' => ['App\Http\Controllers\TicketController', 'comments'],
         'GET /api/notifications' => ['App\Http\Controllers\NotificationController', 'index'],
         'POST /api/notifications/{id}/read' => ['App\Http\Controllers\NotificationController', 'markAsRead'],
+        'POST /api/notifications/read-all' => ['App\Http\Controllers\NotificationController', 'markAllAsRead'],
         'POST /api/notifications' => ['App\Http\Controllers\NotificationController', 'store'],
 
         // Costs & Payments (Phase 3)
@@ -81,13 +96,33 @@ final class Routes
         'POST /api/costs' => ['App\Http\Controllers\CostController', 'store'],
         'POST /api/costs/monthly-charge' => ['App\Http\Controllers\CostController', 'monthlyCharge'],
         'GET /api/costs/charge-preview' => ['App\Http\Controllers\CostController', 'chargePreview'],
+        'POST /api/costs/{id}/issue' => ['App\Http\Controllers\CostController', 'issue'],
         'PUT /api/costs/{id}' => ['App\Http\Controllers\CostController', 'update'],
         'DELETE /api/costs/{id}' => ['App\Http\Controllers\CostController', 'destroy'],
         'GET /api/payments' => ['App\Http\Controllers\CostController', 'indexPayments'],
+        'GET /api/payments/{payment_id}' => ['App\Http\Controllers\CostController', 'showPayment'],
         'POST /api/payments/submit' => ['App\Http\Controllers\CostController', 'submitPayment'],
         'POST /api/payments/{payment_id}/upload-receipt' => ['App\Http\Controllers\CostController', 'uploadReceipt'],
         'POST /api/payments/{payment_id}/confirm' => ['App\Http\Controllers\CostController', 'confirmPayment'],
+        'POST /api/payments/{payment_id}/reject' => ['App\Http\Controllers\CostController', 'rejectPayment'],
+        'POST /api/payments/bulk-confirm' => ['App\Http\Controllers\CostController', 'bulkConfirmPayments'],
+        'POST /api/payments/bulk-reject' => ['App\Http\Controllers\CostController', 'bulkRejectPayments'],
+        'GET /api/buildings/{building_id}/unit-balances' => ['App\Http\Controllers\CostController', 'unitBalances'],
+        'GET /api/buildings/{building_id}/ledger' => ['App\Http\Controllers\CostController', 'ledger'],
+        'GET /api/buildings/{building_id}/monthly-report' => ['App\Http\Controllers\CostController', 'monthlyReport'],
+        'POST /api/buildings/{building_id}/direct-payments' => ['App\Http\Controllers\CostController', 'directPayment'],
+        'POST /api/buildings/{building_id}/unit-charges' => ['App\Http\Controllers\CostController', 'unitCharge'],
+        'POST /api/buildings/{building_id}/recurring-generate' => ['App\Http\Controllers\CostController', 'recurringGenerate'],
+        'GET /api/messages/conversations' => ['App\Http\Controllers\MessageController', 'conversations'],
+        'GET /api/messages/thread/{peer_id}' => ['App\Http\Controllers\MessageController', 'thread'],
+        'GET /api/messages/unread-count' => ['App\Http\Controllers\MessageController', 'unreadCount'],
+        'POST /api/messages' => ['App\Http\Controllers\MessageController', 'store'],
+        'DELETE /api/messages/{id}' => ['App\Http\Controllers\MessageController', 'destroy'],
+        'GET /api/audit-logs' => ['App\Http\Controllers\AuditController', 'index'],
         'POST /api/penalty-settings' => ['App\Http\Controllers\CostController', 'createPenaltySetting'],
+        'GET /api/penalty-settings' => ['App\Http\Controllers\CostController', 'indexPenaltySettings'],
+        'PUT /api/penalty-settings/{id}' => ['App\Http\Controllers\CostController', 'updatePenaltySetting'],
+        'DELETE /api/penalty-settings/{id}' => ['App\Http\Controllers\CostController', 'destroyPenaltySetting'],
 
         // Phase 6+: Extra Professional Modules
         'GET /api/bookings' => ['App\Http\Controllers\ExtraModulesController', 'indexBookings'],
@@ -102,6 +137,8 @@ final class Routes
         'POST /api/visitors' => ['App\Http\Controllers\ExtraModulesController', 'storeVisitor'],
         'GET /api/documents' => ['App\Http\Controllers\ExtraModulesController', 'indexDocuments'],
         'POST /api/documents' => ['App\Http\Controllers\ExtraModulesController', 'storeDocument'],
+        'GET /api/documents/{id}' => ['App\Http\Controllers\ExtraModulesController', 'showDocument'],
+        'POST /api/documents/{id}/replace-file' => ['App\Http\Controllers\ExtraModulesController', 'replaceDocumentFile'],
         'GET /api/consumption' => ['App\Http\Controllers\ExtraModulesController', 'indexConsumption'],
         'POST /api/consumption' => ['App\Http\Controllers\ExtraModulesController', 'storeConsumption'],
         'GET /api/emergency-contacts' => ['App\Http\Controllers\ExtraModulesController', 'indexEmergencyContacts'],

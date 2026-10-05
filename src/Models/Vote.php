@@ -20,7 +20,7 @@ final class Vote
     public array $options = [];
 
     /** @var array{total_votes:int, options:array<int, array{option_id:int, option_text:string, votes_count:int, percentage:float}>} */
-    public array $results = [];
+    public array $results = ['total_votes' => 0, 'options' => []];
 
     public bool $user_has_voted = false;
     public ?int $my_option_id = null;

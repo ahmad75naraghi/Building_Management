@@ -8,6 +8,7 @@ use App\Http\Middleware\AuthMiddleware;
 use App\Http\Middleware\RateLimitMiddleware;
 use App\Http\Middleware\CorsMiddleware;
 use App\Http\Middleware\CacheMiddleware;
+use App\Http\Middleware\RequestLogMiddleware;
 
 final class Kernel
 {
@@ -18,6 +19,7 @@ final class Kernel
         CorsMiddleware::class,
         AuthMiddleware::class,
         CacheMiddleware::class,
+        RequestLogMiddleware::class,
     ];
 
     public function __construct()
@@ -42,7 +44,7 @@ final class Kernel
         try {
             // Apply global middleware pipeline
             $pipeline = new MiddlewarePipeline($this->middleware);
-            $handler = function (Request $req) use ($request, $response) {
+            $handler = function (Request $req) use ($response) {
                 
                 $match = $this->router->match($req);
                 

@@ -45,6 +45,31 @@ final class NotificationRepository
         return $stmt->execute([$id]);
     }
 
+    /** خوانده‌شدن همهٔ اعلان‌های یک کاربر؛ تعداد به‌روزشده‌ها برمی‌گردد */
+    public function markAllRead(int $userId): int
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "UPDATE notifications SET is_read = 1, read_at = CURRENT_TIMESTAMP
+             WHERE user_id = ? AND is_read = 0"
+        );
+        $stmt->execute([$userId]);
+        return $stmt->rowCount();
+    }
+
+    /** شناسهٔ همهٔ اعضای فعال یک ساختمان (برای پخش اعلان سراسری) */
+    public function activeMemberIds(int $buildingId): array
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "SELECT user_id FROM building_members
+             WHERE building_id = ? AND status = 'active'
+             ORDER BY id"
+        );
+        $stmt->execute([$buildingId]);
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
     private function mapRow(array $row): Notification
     {
         $n = new Notification();

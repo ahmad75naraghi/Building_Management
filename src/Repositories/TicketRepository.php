@@ -78,6 +78,31 @@ final class TicketRepository
         return $stmt->execute([$status, $assignedTo, $id]);
     }
 
+    /** ویرایش فیلدهای محتوایی تیکت (عنوان، شرح، دسته، اولویت) */
+    public function update(Ticket $ticket): bool
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "UPDATE tickets SET title = ?, description = ?, category = ?, priority = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+        );
+        return $stmt->execute([
+            $ticket->title,
+            $ticket->description,
+            $ticket->category,
+            $ticket->priority,
+            $ticket->id,
+        ]);
+    }
+
+    /** حذف فیزیکی تیکت — کامنت‌ها با ON DELETE CASCADE حذف می‌شوند */
+    public function delete(int $id): bool
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare("DELETE FROM tickets WHERE id = ?");
+        $stmt->execute([$id]);
+        return $stmt->rowCount() > 0;
+    }
+
     private function mapRow(array $row): Ticket
     {
         $t = new Ticket();
@@ -85,12 +110,12 @@ final class TicketRepository
         $t->building_id = (int) $row['building_id'];
         $t->user_id = (int) $row['user_id'];
         $t->unit_id = $row['unit_id'] ? (int) $row['unit_id'] : null;
-        $t->category = $row['category'];
+        $t->category = $row['category'] ?? 'technical';
         $t->is_anonymous = (bool) $row['is_anonymous'];
         $t->title = $row['title'];
-        $t->description = $row['description'];
-        $t->status = $row['status'];
-        $t->priority = $row['priority'];
+        $t->description = $row['description'] ?? null;
+        $t->status = $row['status'] ?? 'open';
+        $t->priority = $row['priority'] ?? 'normal';
         $t->assigned_to = $row['assigned_to'] ? (int) $row['assigned_to'] : null;
         $t->resolved_at = $row['resolved_at'];
         $t->created_at = $row['created_at'];

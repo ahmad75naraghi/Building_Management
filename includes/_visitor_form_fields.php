@@ -10,7 +10,7 @@
 <div class="grid grid-cols-2 gap-3">
     <div>
         <label class="form-label">تاریخ مراجعه</label>
-        <input type="date" name="visit_date" class="form-input">
+        <input type="date" name="visit_date" data-jalali-date class="form-input">
     </div>
     <div>
         <label class="form-label">ساعت ورود</label>

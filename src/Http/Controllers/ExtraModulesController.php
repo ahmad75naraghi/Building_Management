@@ -161,9 +161,130 @@ final class ExtraModulesController
     // Documents
     // ------------------------------------------------------------------
 
+    /**
+     * ثبت سند: با فایل (multipart) یا فقط لینک خارجی (JSON).
+     * در هر دو حالت فقط مدیر ساختمان مجاز است (در لایه سرویس اعمال می‌شود).
+     */
     public function storeDocument(Request $request): Response
     {
-        return $this->storeEntity($request, 'createDocument', 'Document uploaded');
+        $userId = $this->userIdOrReject($request);
+        if (!$userId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false,
+                'message' => 'Authentication required',
+            ]);
+        }
+
+        $file = $request->getFile('file');
+        try {
+            if ($file !== null) {
+                // آپلود فایل واقعی سند
+                if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                    return (new Response())->setStatusCode(400)->setJson([
+                        'success' => false,
+                        'message' => 'File upload failed (error code ' . (int) $file['error'] . ')',
+                    ]);
+                }
+                $content = file_get_contents((string) $file['tmp_name']);
+                if ($content === false) {
+                    return (new Response())->setStatusCode(400)->setJson([
+                        'success' => false,
+                        'message' => 'Failed to read uploaded file',
+                    ]);
+                }
+                $meta = [
+                    'building_id' => $request->getPostParam('building_id'),
+                    'title' => $request->getPostParam('title'),
+                    'document_type' => $request->getPostParam('document_type', 'other'),
+                    'is_visible_to_members' => $request->getPostParam('is_visible_to_members', '1'),
+                ];
+                $document = $this->service->uploadDocument($meta, $userId, $content, (string) ($file['name'] ?? ''));
+            } else {
+                // سند مبتنی بر لینک خارجی (مسیر قدیمی/ساده)
+                $data = $request->getJsonBody() ?? [];
+                $document = $this->service->createDocument($data, $userId);
+            }
+
+            return (new Response())->setStatusCode(201)->setJson([
+                'success' => true,
+                'message' => 'Document uploaded',
+                'data' => $document->toArray(),
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /** نمایش یک سند با کنترل رویت (مدیر: همه / عضو: فقط قابل رویت‌ها) */
+    public function showDocument(Request $request): Response
+    {
+        $userId = $this->userIdOrReject($request);
+        if (!$userId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication required',
+            ]);
+        }
+        $id = (int) ($request->getAttribute('id') ?? 0);
+        if ($id <= 0) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => 'id is required',
+            ]);
+        }
+        try {
+            $document = $this->service->getDocumentForUser($id, $userId);
+            return (new Response())->setJson([
+                'success' => true,
+                'data' => $document->toArray(),
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(404)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /** تعویض فایل یک سند (فقط مدیر؛ فایل قبلی حذف می‌شود) */
+    public function replaceDocumentFile(Request $request): Response
+    {
+        $userId = $this->userIdOrReject($request);
+        if (!$userId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication required',
+            ]);
+        }
+        $id = (int) ($request->getAttribute('id') ?? 0);
+        if ($id <= 0) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => 'id is required',
+            ]);
+        }
+        $file = $request->getFile('file');
+        if ($file === null || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => 'File is required',
+            ]);
+        }
+        $content = file_get_contents((string) $file['tmp_name']);
+        if ($content === false) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => 'Failed to read uploaded file',
+            ]);
+        }
+        try {
+            $document = $this->service->replaceDocumentFile($id, $userId, $content, (string) ($file['name'] ?? ''));
+            return (new Response())->setJson([
+                'success' => true,
+                'message' => 'Document file replaced',
+                'data' => $document->toArray(),
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function indexDocuments(Request $request): Response

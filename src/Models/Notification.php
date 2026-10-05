@@ -27,6 +27,7 @@ final class Notification
             'notification_type' => $this->notification_type,
             'title' => $this->title,
             'message' => $this->message,
+            'data' => $this->data,
             'is_read' => $this->is_read,
             'created_at' => $this->created_at,
         ];

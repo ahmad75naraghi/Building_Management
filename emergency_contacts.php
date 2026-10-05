@@ -129,6 +129,7 @@ if ($building_id > 0) {
 }
 
 $page_title = 'مخاطبین اضطراری';
+$page_hint = 'شماره‌های ضروری که ساکنین در مواقع اضطراری می‌بینند.';
 $header_sub = $building_name ?: 'شماره‌های مهم';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';
@@ -174,8 +175,11 @@ require_once 'includes/header.php';
 
     <?php if (empty($contacts)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">🆘</div>
+            <div class="empty-icon">🆘</div>
             مخاطبی ثبت نشده است.
+            <?php if ($is_manager): ?>
+                <button type="button" class="empty-action" data-modal-open="add-contact">➕ افزودن مخاطب اضطراری</button>
+            <?php endif; ?>
         </div>
     <?php else: ?>
         <div class="space-y-3">

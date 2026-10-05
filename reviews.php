@@ -99,6 +99,7 @@ if (!empty($reviews)) {
 }
 
 $page_title = 'نظرات و امتیازها';
+$page_hint = 'امتیاز و نظرات ساکنین دربارهٔ مدیریت ساختمان.';
 $header_sub = $building_name ?: 'بازخورد ساکنین';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';
@@ -125,8 +126,9 @@ require_once 'includes/header.php';
 
     <?php if (empty($reviews)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">⭐</div>
+            <div class="empty-icon">⭐</div>
             نظری ثبت نشده است.<br>اولین نظر را شما ثبت کنید.
+            <button type="button" class="empty-action" data-modal-open="add-review">⭐ ثبت اولین نظر</button>
         </div>
     <?php else: ?>
         <div class="space-y-3">
@@ -141,7 +143,9 @@ require_once 'includes/header.php';
                 <div class="card p-4">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-amber-400 text-lg tracking-wider" dir="ltr"><?= review_stars($rv_rating) ?></span>
-                        <span class="text-[11px] text-gray-400"><?= fa_time_ago($review['created_at'] ?? '') ?></span>
+                        <span class="text-[11px] text-gray-400">
+                            👤 <?= htmlspecialchars($review['user_name'] ?? 'ساکن ساختمان') ?> • <?= fa_time_ago($review['created_at'] ?? '') ?>
+                        </span>
                     </div>
 
                     <?php if ($rv_cat > 0 && isset($category_labels[$rv_cat])): ?>

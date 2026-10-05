@@ -19,6 +19,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['notification_id'])) {
     }
 }
 
+// خواندن همهٔ اعلان‌ها با یک کلیک
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($_POST['form_action'] ?? '') === 'mark_all_read')) {
+    $response = callAPI('POST', '/notifications/read-all');
+    if (isset($response['success']) && $response['success'] === true) {
+        $marked = (int) ($response['data']['marked'] ?? 0);
+        $alert_message = $marked > 0
+            ? 'همهٔ اعلان‌ها (' . fa_digits($marked) . ' مورد) خوانده شدند.'
+            : 'اعلان خوانده‌نشده‌ای وجود نداشت.';
+    }
+}
+
 // دریافت لیست اعلانات
 $notifications = [];
 $list_response = callAPI('GET', '/notifications');
@@ -26,26 +37,150 @@ if (isset($list_response['success']) && $list_response['success'] === true) {
     $notifications = $list_response['data'] ?? [];
 }
 
+// فیلتر اعلان‌ها: همه / مالی / عمومی
+$financial_types = ['payment'];
+$notif_is_financial = static fn(array $n): bool => in_array(
+    (string) ($n['notification_type'] ?? 'general'),
+    $financial_types,
+    true
+);
+$filter = (string) ($_GET['filter'] ?? 'all');
+if (!in_array($filter, ['all', 'financial', 'general'], true)) {
+    $filter = 'all';
+}
+$filter_counts = ['all' => count($notifications), 'financial' => 0, 'general' => 0];
+foreach ($notifications as $n_item) {
+    if ($notif_is_financial($n_item)) {
+        $filter_counts['financial']++;
+    } else {
+        $filter_counts['general']++;
+    }
+}
+$filtered_notifications = array_values(array_filter(
+    $notifications,
+    static fn(array $n): bool => $filter === 'all'
+        || ($filter === 'financial') === $notif_is_financial($n)
+));
+
+/** لینک عمیق هر اعلان به صفحهٔ مرتبط (از روی محمولهٔ داده یا نوع اعلان) */
+if (!function_exists('notification_deep_link')) {
+function notification_deep_link(array $n): string
+{
+    $data = is_array($n['data'] ?? null) ? $n['data'] : [];
+    if (!empty($data['cost_id'])) {
+        return 'costs.php';
+    }
+    if (!empty($data['ticket_id'])) {
+        return 'ticket_view.php?id=' . (int) $data['ticket_id'];
+    }
+    if (!empty($data['booking_id'])) {
+        return 'bookings.php';
+    }
+    if (!empty($data['maintenance_id'])) {
+        return 'maintenance.php';
+    }
+    if (!empty($data['meeting_id'])) {
+        return 'meetings.php';
+    }
+    if (!empty($data['vote_id'])) {
+        return 'votes.php';
+    }
+    if (!empty($data['invitation_id'])) {
+        return 'members.php';
+    }
+    if (!empty($data['from'])) {
+        return 'messages.php?with=' . (int) $data['from'];
+    }
+    $by_type = [
+        'payment' => 'costs.php',
+        'ticket' => 'tickets.php',
+        'booking' => 'bookings.php',
+        'maintenance' => 'maintenance.php',
+        'meeting' => 'meetings.php',
+        'announcement' => 'announcements.php',
+        'vote' => 'votes.php',
+        'message' => 'messages.php',
+        'invitation' => 'members.php',
+        'reminder' => 'costs.php',
+    ];
+    return $by_type[(string) ($n['notification_type'] ?? '')] ?? '';
+}
+} // !function_exists
+
 $page_title = 'اعلانات من';
+$page_hint = 'اعلان‌های شما: پرداخت‌ها، تیکت‌ها، جلسات و پیام‌ها. با لمس هر اعلان به صفحهٔ مرتبط می‌روید.';
 $header_sub = 'پیام‌ها و رویدادها';
 $back_url = 'index.php';
-$active_nav = 'home';
+$active_nav = 'messages';
 require_once 'includes/page_head.php';
 ?>
 
 <main class="p-5">
 
     <!-- لیست اعلانات -->
-    <h2 class="section-title">همه اعلانات</h2>
+    <div class="section-header-row" style="margin: 0 0 12px;">
+        <h2 class="section-title">همه اعلانات</h2>
+        <?php
+        $unread_count = 0;
+        foreach ($notifications as $n) {
+            if (empty($n['is_read'])) {
+                $unread_count++;
+            }
+        }
+        ?>
+        <?php if ($unread_count > 0): ?>
+            <form method="POST" action="">
+                <?= csrf_field() ?>
+                <input type="hidden" name="form_action" value="mark_all_read">
+                <button type="submit" class="btn-chip btn-chip-neutral" title="خواندن همهٔ اعلان‌ها">✅ خواندن همه</button>
+            </form>
+        <?php endif; ?>
+    </div>
 
-    <?php if (empty($notifications)): ?>
+    <!-- فیلتر نوع اعلان‌ها -->
+    <?php
+    $filter_tabs = [
+        'all' => 'همه',
+        'financial' => '💰 مالی',
+        'general' => '📋 عمومی',
+    ];
+    ?>
+    <div class="flex items-center gap-2 mb-3 flex-wrap">
+        <?php foreach ($filter_tabs as $f_key => $f_label): ?>
+            <?php $active = $filter === $f_key; ?>
+            <a href="notifications.php<?= $f_key === 'all' ? '' : '?filter=' . $f_key ?>"
+               class="btn-chip <?= $active ? 'btn-chip-gold' : 'btn-chip-neutral' ?>"
+               style="<?= $active ? '' : 'opacity:.75;' ?>font-size:12px;">
+                <?= $f_label ?>
+                <span style="opacity:.7;font-size:11px;">(<?= fa_digits($filter_counts[$f_key]) ?>)</span>
+            </a>
+        <?php endforeach; ?>
+    </div>
+
+    <?php if (empty($filtered_notifications)): ?>
         <div class="card empty-state">
-            <div class="text-4xl mb-3">🔔</div>
-            اعلانی برای شما ثبت نشده است.
+            <div class="empty-icon">🔔</div>
+            <?= $filter === 'all'
+                ? 'اعلانی برای شما ثبت نشده است.'
+                : 'اعلانی در این بخش وجود ندارد.' ?>
+            <?php if ($filter === 'all'): ?>
+                <a class="empty-action" href="index.php">🏠 بازگشت به داشبورد</a>
+            <?php else: ?>
+                <a class="empty-action" href="notifications.php">نمایش همهٔ اعلان‌ها</a>
+            <?php endif; ?>
         </div>
     <?php else: ?>
         <div class="space-y-3">
-            <?php foreach ($notifications as $notification): ?>
+            <?php $current_day = null; ?>
+            <?php foreach ($filtered_notifications as $notification): ?>
+                <?php
+                // گروه‌بندی روزانه: هنگام تغییر روز، جداکنندهٔ «امروز/دیروز/تاریخ» بگذار
+                $n_day = date('Y-m-d', strtotime((string) ($notification['created_at'] ?? 'now')));
+                if ($n_day !== $current_day):
+                    $current_day = $n_day;
+                ?>
+                    <div class="list-day-divider"><?= htmlspecialchars(fa_day_label($notification['created_at'] ?? 'now')) ?></div>
+                <?php endif; ?>
                 <div class="card p-4 <?= empty($notification['is_read']) ? 'border-r-4 border-r-blue-600 bg-blue-50/40' : '' ?>">
                     <div class="flex items-start justify-between gap-3">
                         <div class="flex items-center gap-3 flex-1 min-w-0">
@@ -61,17 +196,28 @@ require_once 'includes/page_head.php';
                                 <?php endif; ?>
                             </div>
                         </div>
-                        <span class="text-[11px] text-gray-400 flex-shrink-0"><?= fa_time_ago($notification['created_at'] ?? '') ?></span>
+                        <span class="text-[11px] text-gray-400 flex-shrink-0"><?= fa_smart_time($notification['created_at'] ?? '') ?></span>
                     </div>
-                    <?php if (empty($notification['is_read'])): ?>
-                        <form method="POST" action="" class="mt-3">
-                            <?= csrf_field() ?>
-                            <input type="hidden" name="form_action" value="mark_read">
-                            <input type="hidden" name="notification_id" value="<?= (int) $notification['id'] ?>">
-                            <button type="submit" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-bold py-2.5 rounded-xl transition-all">
-                                علامت‌گذاری به‌عنوان خوانده‌شده
-                            </button>
-                        </form>
+                    <?php
+                    $deep_link = notification_deep_link($notification);
+                    if ($deep_link !== '' || empty($notification['is_read'])): ?>
+                        <div class="flex gap-2 mt-3">
+                            <?php if ($deep_link !== ''): ?>
+                                <a href="<?= htmlspecialchars($deep_link, ENT_QUOTES) ?>" class="btn-secondary" style="flex:1;text-decoration:none;">
+                                    مشاهدهٔ جزئیات
+                                </a>
+                            <?php endif; ?>
+                            <?php if (empty($notification['is_read'])): ?>
+                                <form method="POST" action="" class="flex-1">
+                                    <?= csrf_field() ?>
+                                    <input type="hidden" name="form_action" value="mark_read">
+                                    <input type="hidden" name="notification_id" value="<?= (int) $notification['id'] ?>">
+                                    <button type="submit" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-bold py-2.5 rounded-xl transition-all">
+                                        خوانده شد
+                                    </button>
+                                </form>
+                            <?php endif; ?>
+                        </div>
                     <?php endif; ?>
                 </div>
             <?php endforeach; ?>

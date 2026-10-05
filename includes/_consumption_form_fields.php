@@ -26,7 +26,7 @@
 </div>
 <div>
     <label class="form-label">تاریخ قرائت</label>
-    <input type="date" name="reading_date" class="form-input">
+    <input type="date" name="reading_date" data-jalali-date class="form-input">
 </div>
 <div>
     <label class="form-label">یادداشت (اختیاری)</label>

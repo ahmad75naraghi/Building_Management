@@ -27,6 +27,18 @@ final class NotificationService
         $id = $this->repo->create($notification);
         $notification->id = $id;
 
+        // اعلان فوری مرورگر (مکمل اعلان درون‌برنامه‌ای؛ در صورت فعال‌بودن وب‌پوش)
+        // خطا هرگز نباید جریان اصلی را متوقف کند.
+        try {
+            PushService::notifyUser(
+                $notification->user_id,
+                $notification->title,
+                (string) ($notification->message ?? '')
+            );
+        } catch (\Throwable $e) {
+            \App\Core\Logger::warning('push', 'خطای وب‌پوش: ' . $e->getMessage());
+        }
+
         // Queue for async processing (using Redis as a simple queue)
         CacheHelper::set("notification:queue:{$id}", [
             'notification_id' => $id,
@@ -46,5 +58,60 @@ final class NotificationService
     public function markAsRead(int $notificationId): bool
     {
         return $this->repo->markAsRead($notificationId);
+    }
+
+    /** خوانده‌شدن همهٔ اعلان‌های کاربر؛ تعداد اعلان‌های به‌روزشده برمی‌گردد */
+    public function markAllAsRead(int $userId): int
+    {
+        return $this->repo->markAllRead($userId);
+    }
+
+    /**
+     * ارسال اعلان به همهٔ اعضای فعال یک ساختمان (پخش سراسری).
+     *
+     * برای اطلاعیه‌ها، رأی‌گیری‌ها و رویدادهای عمومی ساختمان. خطا در ارسال به
+     * یک کاربر نباید کل پخش را متوقف کند؛ هر کاربر جداگانه تلاش می‌شود.
+     *
+     * @param int      $buildingId      شناسهٔ ساختمان
+     * @param string   $notificationType نوع اعلان (مثلاً announcement / vote)
+     * @param string   $title           عنوان اعلان
+     * @param string   $message         متن اعلان
+     * @param array    $data            دادهٔ اضافی (JSON) برای لینک عمیق
+     * @param int[]    $excludeUserIds  کاربرانی که اعلان نمی‌گیرند (مثلاً ایجادکننده یا مدیران)
+     * @return int تعداد اعلان‌های ارسال‌شده
+     */
+    public function broadcastToBuilding(
+        int $buildingId,
+        string $notificationType,
+        string $title,
+        string $message = '',
+        array $data = [],
+        array $excludeUserIds = []
+    ): int {
+        $memberIds = $this->repo->activeMemberIds($buildingId);
+        $exclude = array_map('intval', $excludeUserIds);
+        $sent = 0;
+        foreach ($memberIds as $userId) {
+            if (in_array((int) $userId, $exclude, true)) {
+                continue;
+            }
+            try {
+                $this->createNotification([
+                    'user_id' => (int) $userId,
+                    'building_id' => $buildingId,
+                    'notification_type' => $notificationType,
+                    'title' => $title,
+                    'message' => $message,
+                    'data' => $data ?: null,
+                ]);
+                $sent++;
+            } catch (\Throwable $e) {
+                \App\Core\Logger::error('NotificationService', 'پخش اعلان برای یک کاربر ناموفق بود', [
+                    'building_id' => $buildingId,
+                    'user_id' => $userId,
+                ], $e);
+            }
+        }
+        return $sent;
     }
 }

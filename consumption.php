@@ -112,6 +112,7 @@ foreach ($units as $u) {
 }
 
 $page_title = 'مصرف انرژی';
+$page_hint = 'ثبت قرائت کنتورهای آب، برق و گاز در هر دوره.';
 $header_sub = $building_name ?: 'قرائت کنتور';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';
@@ -133,8 +134,9 @@ require_once 'includes/header.php';
 
     <?php if (empty($readings)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">⚡</div>
+            <div class="empty-icon">⚡</div>
             قرائتی ثبت نشده است.
+            <button type="button" class="empty-action" data-modal-open="add-reading">📝 ثبت اولین قرائت</button>
         </div>
     <?php else: ?>
         <div class="space-y-3">
@@ -160,7 +162,7 @@ require_once 'includes/header.php';
                             </h3>
                             <p class="text-sm text-gray-500 mt-1">
                                 مقدار: <?= fa_number($r_value) ?>
-                                <?php if ($r_date !== ''): ?> • <?= fa_digits($r_date) ?><?php endif; ?>
+                                <?php if ($r_date !== ''): ?> • <?= fa_date($r_date) ?><?php endif; ?>
                             </p>
                         </div>
                     </div>

@@ -37,6 +37,49 @@ final class PenaltySettingRepository
         return array_map(fn($r) => $this->mapRow($r), $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
+    public function findByBuildingId(int $buildingId): array
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare("SELECT * FROM penalty_settings WHERE building_id = ? ORDER BY created_at DESC");
+        $stmt->execute([$buildingId]);
+        return array_map(fn($r) => $this->mapRow($r), $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    public function findById(int $id): ?PenaltySetting
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare("SELECT * FROM penalty_settings WHERE id = ?");
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? $this->mapRow($row) : null;
+    }
+
+    public function update(PenaltySetting $setting): bool
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "UPDATE penalty_settings
+             SET penalty_type = ?, penalty_value = ?, delay_days = ?, applies_to = ?, is_active = ?
+             WHERE id = ?"
+        );
+        return $stmt->execute([
+            $setting->penalty_type,
+            $setting->penalty_value,
+            $setting->delay_days,
+            $setting->applies_to,
+            (int) $setting->is_active,
+            $setting->id,
+        ]);
+    }
+
+    public function delete(int $id): bool
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare("DELETE FROM penalty_settings WHERE id = ?");
+        $stmt->execute([$id]);
+        return $stmt->rowCount() > 0;
+    }
+
     private function mapRow(array $row): PenaltySetting
     {
         $s = new PenaltySetting();

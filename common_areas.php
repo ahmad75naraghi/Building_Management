@@ -82,6 +82,7 @@ if ($building_id > 0) {
 }
 
 $page_title = 'مدیریت مشاعات';
+$page_hint = 'مشاعات (سالن، پیک‌نیک، ورزشی…) را تعریف کنید تا ساکنین بتوانند رزرو کنند.';
 $header_sub = $building_name ?: 'ساختار مجتمع';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';
@@ -103,8 +104,9 @@ require_once 'includes/header.php';
 
     <?php if (empty($common_areas)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">🎯</div>
+            <div class="empty-icon">🎯</div>
             هنوز مشاعی ثبت نشده است.
+            <button type="button" class="empty-action" data-modal-open="add-area">➕ افزودن اولین مشاع</button>
         </div>
     <?php else: ?>
         <div class="space-y-3">

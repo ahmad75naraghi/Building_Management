@@ -57,7 +57,9 @@ TestLog::run('guard خطا را می‌بلعد', function () {
 
 TestLog::run('خروجی قابل سریال‌سازی JSON است', function () {
     Logger::reset();
-    Logger::info('t', 'شیء', ['obj' => new stdClass(), 'res' => STDERR, 'deep' => 1]);
+    // در برخی محیط‌ها (مثل وب‌اسمبلی) ثابت STDERR تعریف نشده؛ معادل امن می‌سازیم
+    $res = defined('STDERR') ? STDERR : fopen('php://memory', 'r');
+    Logger::info('t', 'شیء', ['obj' => new stdClass(), 'res' => $res, 'deep' => 1]);
     $json = json_encode(Logger::records()[0], JSON_UNESCAPED_UNICODE);
     TestLog::assertTrue('JSON ساخته شد', is_string($json) && $json !== '');
 });

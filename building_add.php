@@ -81,6 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $page_title = 'ثبت ساختمان';
+$page_hint = 'ساختمان جدید بسازید؛ نام، آدرس و تعداد طبقات/واحدها کافی است — واحد‌ها خودکار ساخته می‌شوند.';
 $header_sub = 'ایجاد مجتمع جدید';
 $back_url = 'index.php';
 $nav_active = 'none';
@@ -145,7 +146,7 @@ require_once 'includes/header.php';
                             <div id="blocks_list" class="space-y-2">
                                 <div class="flex items-center gap-2">
                                     <input type="text" name="blocks[]" class="form-input flex-1" placeholder="نام بلوک (مثال: بلوک A)">
-                                    <button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-lg leading-none px-2">×</button>
+                                    <button type="button" onclick="this.parentElement.remove()" aria-label="حذف این مورد" class="text-red-500 text-lg leading-none px-2">×</button>
                                 </div>
                             </div>
                             <button type="button" onclick="addBlockRow()" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-3 py-2 rounded-lg transition-colors">
@@ -184,7 +185,7 @@ require_once 'includes/header.php';
                         <div id="ca_list" class="space-y-2">
                             <div class="flex items-center gap-2">
                                 <input type="text" name="common_areas[]" class="form-input flex-1" placeholder="نام مشاع (مثال: سالن اجتماعات)">
-                                <button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-lg leading-none px-2">×</button>
+                                <button type="button" onclick="this.parentElement.remove()" aria-label="حذف این مورد" class="text-red-500 text-lg leading-none px-2">×</button>
                             </div>
                         </div>
                         <button type="button" onclick="addCaRow()" class="mt-2 text-xs bg-violet-50 hover:bg-violet-100 text-violet-700 font-bold px-3 py-2 rounded-lg transition-colors">
@@ -201,7 +202,7 @@ require_once 'includes/header.php';
                         </label>
                         <div class="mt-3">
                             <label for="monthly_charge" class="form-label">مبلغ شارژ ثابت هر ماه (تومان)</label>
-                            <input type="number" id="monthly_charge" name="monthly_charge" min="0" step="1000" class="form-input" placeholder="مثال: 500000">
+                            <input type="number" id="monthly_charge" name="monthly_charge" min="0" step="1" class="form-input" placeholder="مثال: 500000">
                             <p class="text-[11px] text-gray-500 mt-1">هر ماه به‌صورت خودکار به بدهکاری واحدها اضافه می‌شود.</p>
                         </div>
                     </div>
@@ -223,7 +224,7 @@ require_once 'includes/header.php';
                 var div = document.createElement('div');
                 div.className = 'flex items-center gap-2';
                 div.innerHTML = '<input type="text" name="blocks[]" class="form-input flex-1" placeholder="نام بلوک">'
-                    + '<button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-lg leading-none px-2">×</button>';
+                    + '<button type="button" onclick="this.parentElement.remove()" aria-label="حذف این مورد" class="text-red-500 text-lg leading-none px-2">×</button>';
                 wrap.appendChild(div);
             }
             function addCaRow() {
@@ -231,7 +232,7 @@ require_once 'includes/header.php';
                 var div = document.createElement('div');
                 div.className = 'flex items-center gap-2';
                 div.innerHTML = '<input type="text" name="common_areas[]" class="form-input flex-1" placeholder="نام مشاع">'
-                    + '<button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-lg leading-none px-2">×</button>';
+                    + '<button type="button" onclick="this.parentElement.remove()" aria-label="حذف این مورد" class="text-red-500 text-lg leading-none px-2">×</button>';
                 wrap.appendChild(div);
             }
         </script>

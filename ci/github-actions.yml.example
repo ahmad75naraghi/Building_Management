@@ -37,6 +37,9 @@ jobs:
             -not -path './node_modules/*' \
             -print0 | xargs -0 -n1 -P4 php -l > /dev/null
 
+      - name: تحلیل استاتیک (PHPStan)
+        run: composer analyse
+
       - name: تست‌های یکپارچه
         run: php tests/Integration/run.php
 

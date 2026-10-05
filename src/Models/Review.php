@@ -13,6 +13,8 @@ final class Review
     public int $rating = 5;
     public ?string $review_text = null;
     public ?string $created_at = null;
+    /** نام نویسندهٔ نظر (از join کاربران) */
+    public ?string $user_name = null;
 
     public function toArray(): array
     {
@@ -24,6 +26,7 @@ final class Review
             'rating' => $this->rating,
             'review_text' => $this->review_text,
             'created_at' => $this->created_at,
+            'user_name' => $this->user_name,
         ];
     }
 }

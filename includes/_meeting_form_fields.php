@@ -10,7 +10,7 @@
 <div class="grid grid-cols-2 gap-3">
     <div>
         <label class="form-label">تاریخ جلسه</label>
-        <input type="date" name="meeting_date" class="form-input">
+        <input type="date" name="meeting_date" data-jalali-date class="form-input">
     </div>
     <div>
         <label class="form-label">محل برگزاری</label>

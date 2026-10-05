@@ -18,8 +18,9 @@ git push
 روی هر push و هر Pull Request:
 
 1. **بررسی نحوی** همه فایل‌های PHP با `php -l`
-2. **اجرای تست‌ها** با `php tests/Integration/run.php`
-3. **بررسی آمادگی تولید** با `php scripts/healthcheck.php --ci`
+2. **تحلیل استاتیک** هسته با `composer analyse` (PHPStan سطح ۵ — تنظیم در `phpstan.neon`)
+3. **اجرای تست‌ها** با `php tests/Integration/run.php` (شامل همگام‌سنجی `docs/openapi.json` با روت‌ها)
+4. **بررسی آمادگی تولید** با `php scripts/healthcheck.php --ci`
 
 اگر هر کدام شکست بخورد، بیلد قرمز می‌شود.
 

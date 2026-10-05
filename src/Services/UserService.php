@@ -55,10 +55,16 @@ final class UserService
         try {
             (new SmsService())->sendWelcomeSms($phone, $name);
         } catch (\Throwable $e) {
-            Logger::error('UserService', 'ارسال پیامک خوش‌آمدگویی ناموفق بود', ['user_id' => $userId], $e);
+            Logger::error('UserService', 'ارسال پیامک خوش‌آمدگویی ناموفق بود', ['user_id' => $id], $e);
         }
 
         return $user;
+    }
+
+    /** دسترسی عمومی به جستجوی کاربر با موبایل (برای سرویس‌هایی مثل ساخت دادهٔ نمونه) */
+    public function findByPhonePublic(string $phone): ?User
+    {
+        return $this->repo->findByPhone($phone);
     }
 
     /**

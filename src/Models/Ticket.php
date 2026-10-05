@@ -13,7 +13,7 @@ final class Ticket
     public string $category = 'technical';
     public bool $is_anonymous = false;
     public string $title;
-    public string $description;
+    public ?string $description = null;
     public string $status = 'open';
     public string $priority = 'normal';
     public ?int $assigned_to = null;

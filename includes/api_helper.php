@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use App\Core\Logger;
+use App\Utilities\JalaliHelper;
 
 // هیچ خطایی نباید بی‌صدا بماند: هشدارها، استثناهای مدیریت‌نشده و خطاهای مرگبار لاگ می‌شوند
 Logger::install();
@@ -74,6 +75,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && PHP_SAPI !== 'cli') {
         echo '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8">'
            . '<meta name="viewport" content="width=device-width, initial-scale=1">'
            . '<title>نشست منقضی شد</title>'
+           . '<link rel="stylesheet" href="assets/css/fonts.css">'
            . '<link rel="stylesheet" href="assets/css/style.css"></head><body>'
            . '<div style="max-width:420px;margin:15vh auto;padding:24px;text-align:center;'
            . 'font-family:Vazirmatn,Tahoma,sans-serif;line-height:2">'
@@ -103,7 +105,7 @@ define('API_BASE_URL', $apiBaseUrl);
  */
 if (!empty($_SESSION['auth_pending']) && !empty($_SESSION['token'])) {
     $current = basename((string) ($_SERVER['SCRIPT_NAME'] ?? ''));
-    if (!in_array($current, ['auth.php', 'logout.php', 'login.php', 'register.php'], true)) {
+    if (!in_array($current, ['auth.php', 'logout.php'], true)) {
         header('Location: auth.php');
         exit;
     }
@@ -128,7 +130,128 @@ function api_apply_ssl_options($curl)
     curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, $insecure ? 0 : true);
 }
 
+/**
+ * پیام کاربری دقیق برای خطاهای ارتباط با API.
+ *
+ * @param int $curlErrno خطای cURL (صفر = بدون خطای ترنسپورت؛ پاسخ غیر-JSON)
+ * @param int $httpStatus کد HTTP دریافتی (۰ = اصلاً پاسخی نیامد)
+ */
+function api_transport_error_message(int $curlErrno, int $httpStatus): string
+{
+    // 28 = CURLE_OPERATION_TIMEDOUT
+    if ($curlErrno === 28) {
+        return 'پاسخ سرور بیش از حد مجاز طول کشید. لطفاً لحظاتی دیگر دوباره تلاش کنید.';
+    }
+    if ($curlErrno !== 0) {
+        return 'ارتباط با سرور برقرار نشد. لطفاً اتصال اینترنت و در دسترس بودن سرویس را بررسی کنید.';
+    }
+    // پاسخی آمده ولی JSON نبوده (مثلاً صفحهٔ خطای ۵۰۰ یا درگاه معکوس)
+    if ($httpStatus >= 500) {
+        return 'سرور در حال حاضر قادر به پاسخ‌گویی نیست (خطای ' . $httpStatus . '). لطفاً دوباره تلاش کنید.';
+    }
+    if ($httpStatus === 0) {
+        return 'ارتباط با سرور برقرار نشد. لطفاً دوباره تلاش کنید.';
+    }
+    return 'پاسخ سرور نامعتبر بود (کد ' . $httpStatus . '). لطفاً دوباره تلاش کنید.';
+}
+
+/** زمان انقضای توکن فعلی (از پی‌لود، بدون اعتبارسنجی امضا) — برای تصمیم تمدید پیشاپیش */
+function bms_token_exp(string $token): int
+{
+    $parts = explode('.', $token);
+    if (count($parts) !== 3) {
+        return 0;
+    }
+    $payload = json_decode(base64_decode(strtr($parts[1], '-_', '+/')), true);
+    return is_array($payload) ? (int) ($payload['exp'] ?? 0) : 0;
+}
+
+/**
+ * تمدید توکن نشست با همان توکن فعلی (با دورهٔ مهلت سمت سرور).
+ * در موفقیت، $_SESSION['token'] به‌روز می‌شود و true برمی‌گردد.
+ */
+function bms_refresh_session_token(): bool
+{
+    static $in_flight = false;
+    if ($in_flight) {
+        return false; // جلوگیری از حلقهٔ بازگشتی
+    }
+    $token = (string) ($_SESSION['token'] ?? '');
+    if ($token === '') {
+        return false;
+    }
+    $in_flight = true;
+    try {
+        $res = callAPI_dispatch('POST', '/auth/refresh', ['token' => $token]);
+        if (!empty($res['success']) && !empty($res['token'])) {
+            $_SESSION['token'] = (string) $res['token'];
+            return true;
+        }
+    } finally {
+        $in_flight = false;
+    }
+    return false;
+}
+
+/**
+ * تمدید پیشاپیش: اگر کمتر از ۵ دقیقه به انقضای توکن مانده، قبل از
+ * ارسال درخواست اصلی تمدید کن تا کاربر وسط کار با ۴۰۱ مواجه نشود.
+ */
+function bms_ensure_fresh_token(string $endpoint): void
+{
+    if (str_starts_with($endpoint, '/auth/')) {
+        return;
+    }
+    $token = (string) ($_SESSION['token'] ?? '');
+    if ($token === '') {
+        return;
+    }
+    $exp = bms_token_exp($token);
+    if ($exp > 0 && ($exp - time()) < 300) {
+        bms_refresh_session_token();
+    }
+}
+
 function callAPI($method, $endpoint, $data = false) {
+    // کش scoped به درخواست: GETهای صرفاً خواندنی که در یک صفحه چندبار
+    // تکرار می‌شوند، فقط یک‌بار دیسپچ می‌شوند (کاهش رفت‌وآمد کرنل/شبکه).
+    // فهرست سفید: داده‌هایی که در طول یک درخواست تغییر نمی‌کنند.
+    static $__get_cache = [];
+    $normalized = '/' . ltrim((string) $endpoint, '/');
+    $cache_key = null;
+    if (strtoupper((string) $method) === 'GET'
+        && preg_match('#^/(auth/me|buildings/\d+/members|buildings/\d+/units|messages/unread-count)$#', $normalized)) {
+        $cache_key = $normalized . '|' . md5(json_encode($data ?: []));
+        if (array_key_exists($cache_key, $__get_cache)) {
+            return $__get_cache[$cache_key];
+        }
+    }
+
+    bms_ensure_fresh_token($normalized);
+
+    $response = callAPI_dispatch($method, $endpoint, $data);
+
+    // تلاش مجدد پس از تمدید: توکن حین کار منقضی شد (مثلاً بازگشت طولانی کاربر)
+    if ((int) ($response['http_code'] ?? 0) === 401 && !str_starts_with($normalized, '/auth/')) {
+        if (bms_refresh_session_token()) {
+            $response = callAPI_dispatch($method, $endpoint, $data);
+        }
+    }
+
+    if ($cache_key !== null) {
+        $__get_cache[$cache_key] = $response;
+    }
+    return $response;
+}
+
+/** دیسپچ واقعی درخواست (داخلی در حالت تست، وگرنه curl) */
+function callAPI_dispatch($method, $endpoint, $data = false) {
+    // حالت تست/‏E2E: به‌جای HTTP، درخواست در همان فرایند از مسیر واقعی
+    // کرنل (میدل‌ورها → روتر → کنترلر → سرویس) عبور می‌کند.
+    if (defined('API_INTERNAL_DISPATCH') && API_INTERNAL_DISPATCH === true) {
+        return api_internal_dispatch($method, $endpoint, $data);
+    }
+
     $curl = curl_init();
     
     $endpoint = ltrim($endpoint, '/');
@@ -166,11 +289,14 @@ function callAPI($method, $endpoint, $data = false) {
     curl_setopt($curl, CURLOPT_URL, $url);
     curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-    
+    // مهلت مشخص: اتصال ۱۰ ثانیه و پاسخ حداکثر ۹۰ ثانیه (موتور دوره‌ای ممکن است طول بکشد)
+    curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 10);
+    curl_setopt($curl, CURLOPT_TIMEOUT, 90);
+
     // بررسی گواهی SSL به‌صورت پیش‌فرض فعال است.
     // فقط برای توسعه محلی با گواهی خودامضا می‌توان API_INSECURE_SSL=1 گذاشت.
     api_apply_ssl_options($curl);
-    
+
     $started = microtime(true);
     $result = curl_exec($curl);
     $http_status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
@@ -186,7 +312,7 @@ function callAPI($method, $endpoint, $data = false) {
         'duration_ms' => $took,
     ];
 
-    // خطای شبکه/ترنسپورت: اصلاً به سرور نرسیدیم
+    // خطای شبکه/ترنسپورت: اصلاً به سرور نرسیدیم یا مهلت تمام شد
     if ($curl_errno !== 0) {
         Logger::error('callAPI', 'ارتباط شبکه‌ای با API برقرار نشد', $log_ctx + [
             'curl_errno' => $curl_errno,
@@ -194,7 +320,7 @@ function callAPI($method, $endpoint, $data = false) {
         ]);
         return [
             'success' => false,
-            'message' => 'ارتباط با API برقرار نشد.',
+            'message' => api_transport_error_message($curl_errno, $http_status),
             'raw_error' => htmlspecialchars(substr($curl_error, 0, 250)),
             'http_code' => $http_status,
         ];
@@ -210,7 +336,7 @@ function callAPI($method, $endpoint, $data = false) {
         ]);
         return [
             'success' => false,
-            'message' => 'ارتباط با API برقرار نشد.',
+            'message' => api_transport_error_message(0, $http_status),
             'raw_error' => htmlspecialchars(substr($result_string, 0, 250)),
             'http_code' => $http_status
         ];
@@ -234,14 +360,125 @@ function callAPI($method, $endpoint, $data = false) {
 }
 
 /**
+ * دیسپچ داخلی درخواست در همان فرایند (فقط برای تست‌های یکپارچه و E2E).
+ * همهٔ مراحل واقعی را طی می‌کند: میدل‌ورها (احراز هویت، نرخ، کش) → روتر → کنترلر → سرویس.
+ *
+ * @return array پاسخ جی‌سان + کد وضعیت
+ */
+/** ساخت (یا بازیابی) کرنل مشترک برای دیسپچ داخلی */
+function api_internal_kernel(): \App\Core\Kernel
+{
+    static $kernel = null;
+    if ($kernel === null) {
+        // کرنل برای مسیریابی به این دو فایل نیاز دارد (در حالت عادی توسط public/index.php لود می‌شوند)
+        require_once dirname(__DIR__) . '/config/app.php';
+        require_once dirname(__DIR__) . '/config/routes.php';
+        $kernel = new \App\Core\Kernel();
+    }
+    return $kernel;
+}
+
+function api_internal_dispatch($method, $endpoint, $data = false): array
+{
+    $kernel = api_internal_kernel();
+
+    $method = strtoupper((string) $method);
+    $uri = '/api/' . ltrim((string) $endpoint, '/');
+    $body = null;
+    if ($method === 'GET' && $data) {
+        $uri .= '?' . http_build_query($data);
+    } elseif ($data) {
+        $body = json_encode($data, JSON_UNESCAPED_UNICODE);
+    }
+
+    $headers = [
+        'content-type' => 'application/json',
+        'accept' => 'application/json',
+    ];
+    if (!empty($_SESSION['token'])) {
+        $headers['authorization'] = 'Bearer ' . $_SESSION['token'];
+    }
+
+    $request = new \App\Core\Request();
+    $ref = new ReflectionClass($request);
+    // شبیه‌سازی دقیق معنای HTTP: پارامترهای کوئری همیشه رشته می‌رسند.
+    // بدون این تبدیل، مقدار عددی (مثلاً building_id از صفحه‌ها) در
+    // حالت داخلی به Request تزریق می‌شد و خطای نوع می‌ساخت.
+    $query = [];
+    if ($method === 'GET' && is_array($data)) {
+        foreach ($data as $qk => $qv) {
+            if (is_bool($qv)) {
+                $query[$qk] = $qv ? '1' : '0';
+            } elseif (is_scalar($qv) || $qv === null) {
+                $query[$qk] = $qv === null ? '' : (string) $qv;
+            }
+        }
+    }
+
+    foreach ([
+        'method' => $method,
+        'uri' => $uri,
+        'query' => $query,
+        'post' => ($method !== 'GET' && is_array($data)) ? $data : [],
+        'headers' => $headers,
+        'body' => $body,
+    ] as $prop => $value) {
+        $p = $ref->getProperty($prop);
+        $p->setAccessible(true);
+        $p->setValue($request, $value);
+    }
+
+    try {
+        $response = $kernel->handle($request);
+        $status = $response->getStatusCode();
+        $decoded = json_decode((string) $response->getContent(), true);
+        if (!is_array($decoded)) {
+            $decoded = ['success' => false, 'message' => 'پاسخ داخلی قابل تفسیر نبود.'];
+        }
+        $decoded['http_code'] = $status;
+        return $decoded;
+    } catch (\Throwable $e) {
+        return [
+            'success' => false,
+            'message' => 'خطای داخلی: ' . $e->getMessage(),
+            'http_code' => 500,
+        ];
+    }
+}
+
+/**
  * ارسال درخواست POST با فرم چندبخشی (آپلود فایل).
  *
  * @param string $endpoint
  * @param array<string, string> $fields فیلدهای متنی فرم
  * @param array<string, string> $files   نگاشت نام فیلد به مسیر فایل روی سرور (tmp_name)
  */
+/**
+ * نرمال‌سازی مشخصهٔ فایل برای آپلود.
+ * ورودی می‌تواند رشته (مسیر) یا آرایهٔ ['path' => ..., 'name' => نام اصلی] باشد.
+ *
+ * @return array{0: ?string, 1: ?string} [مسیر فایل، نام اصلی]
+ */
+function api_upload_spec($spec): array
+{
+    if (is_string($spec)) {
+        return [$spec, null];
+    }
+    if (is_array($spec)) {
+        $path = isset($spec['path']) && is_string($spec['path']) ? $spec['path'] : null;
+        $name = isset($spec['name']) && is_string($spec['name']) && $spec['name'] !== '' ? $spec['name'] : null;
+        return [$path, $name];
+    }
+    return [null, null];
+}
+
 function callAPIUpload($endpoint, $fields = [], $files = [])
 {
+    // حالت تست/E2E: آپلود چندبخشی هم از مسیر واقعی کرنل عبور می‌کند
+    if (defined('API_INTERNAL_DISPATCH') && API_INTERNAL_DISPATCH === true) {
+        return api_internal_dispatch_upload($endpoint, $fields, $files);
+    }
+
     $curl = curl_init();
 
     $endpoint = ltrim($endpoint, '/');
@@ -256,10 +493,11 @@ function callAPIUpload($endpoint, $fields = [], $files = [])
     }
 
     $postFields = $fields;
-    foreach ($files as $field => $filePath) {
-        if (is_string($filePath) && is_file($filePath)) {
+    foreach ($files as $field => $fileSpec) {
+        [$filePath, $originalName] = api_upload_spec($fileSpec);
+        if ($filePath !== null && is_file($filePath)) {
             $mime = function_exists('mime_content_type') ? mime_content_type($filePath) : 'application/octet-stream';
-            $postFields[$field] = new CURLFile($filePath, (string) $mime, basename($filePath));
+            $postFields[$field] = new CURLFile($filePath, (string) $mime, $originalName ?? basename($filePath));
         }
     }
 
@@ -268,6 +506,8 @@ function callAPIUpload($endpoint, $fields = [], $files = [])
     curl_setopt($curl, CURLOPT_POSTFIELDS, $postFields);
     curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 10);
+    curl_setopt($curl, CURLOPT_TIMEOUT, 90);
 
     // بررسی گواهی SSL به‌صورت پیش‌فرض فعال است.
     // فقط برای توسعه محلی با گواهی خودامضا می‌توان API_INSECURE_SSL=1 گذاشت.
@@ -275,18 +515,86 @@ function callAPIUpload($endpoint, $fields = [], $files = [])
 
     $result = curl_exec($curl);
     $http_status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    $curl_errno = curl_errno($curl);
     curl_close($curl);
 
     $response = json_decode(is_string($result) ? $result : '', true);
     if (!is_array($response)) {
         return [
             'success' => false,
-            'message' => 'ارتباط با API برقرار نشد.',
+            'message' => api_transport_error_message($curl_errno, $http_status),
             'http_code' => $http_status,
         ];
     }
     $response['http_code'] = $http_status;
     return $response;
+}
+
+/**
+ * دیسپچ داخلی درخواست چندبخشی (آپلود فایل) برای حالت تست.
+ * فایل‌ها با ساختار استاندارد $_شبیه‌سازی و از مسیر واقعی کرنل عبور می‌کنند.
+ *
+ * @param array<string, string> $files نگاشت نام فیلد به مسیر فایل روی دیسک
+ */
+function api_internal_dispatch_upload($endpoint, array $fields = [], array $files = []): array
+{
+    $kernel = api_internal_kernel();
+
+    $filesSuper = [];
+    foreach ($files as $field => $fileSpec) {
+        [$filePath, $originalName] = api_upload_spec($fileSpec);
+        if ($filePath !== null && is_file($filePath)) {
+            $mime = function_exists('mime_content_type') ? (mime_content_type($filePath) ?: 'application/octet-stream') : 'application/octet-stream';
+            $filesSuper[$field] = [
+                'name' => $originalName ?? basename($filePath),
+                'type' => $mime,
+                'tmp_name' => $filePath,
+                'error' => UPLOAD_ERR_OK,
+                'size' => filesize($filePath),
+            ];
+        }
+    }
+
+    $headers = [
+        'content-type' => 'multipart/form-data',
+        'accept' => 'application/json',
+    ];
+    if (!empty($_SESSION['token'])) {
+        $headers['authorization'] = 'Bearer ' . $_SESSION['token'];
+    }
+
+    $request = new \App\Core\Request();
+    $ref = new ReflectionClass($request);
+    foreach ([
+        'method' => 'POST',
+        'uri' => '/api/' . ltrim((string) $endpoint, '/'),
+        'query' => [],
+        'post' => $fields,
+        'headers' => $headers,
+        'body' => null,
+        'files' => $filesSuper,
+    ] as $prop => $value) {
+        $p = $ref->getProperty($prop);
+        $p->setAccessible(true);
+        $p->setValue($request, $value);
+    }
+
+    try {
+        $response = $kernel->handle($request);
+        $status = $response->getStatusCode();
+        $decoded = json_decode((string) $response->getContent(), true);
+        if (!is_array($decoded)) {
+            $decoded = ['success' => false, 'message' => 'پاسخ داخلی قابل تفسیر نبود.'];
+        }
+        $decoded['http_code'] = $status;
+        return $decoded;
+    } catch (\Throwable $e) {
+        return [
+            'success' => false,
+            'message' => 'خطای داخلی: ' . $e->getMessage(),
+            'http_code' => 500,
+        ];
+    }
 }
 
 // ---------- توابع کمکی نمایش اعداد و زمان فارسی ----------
@@ -342,6 +650,144 @@ function fa_time_ago($datetime)
         return 'دیروز';
     }
     return fa_digits((int) floor($diff / 86400)) . ' روز پیش';
+}
+
+/**
+ * نمایش زمان هوشمند و فشرده برای فهرست‌ها:
+ * امروز → «امروز ۱۴:۳۰» — دیروز → «دیروز» — تا یک هفته → «۳ روز پیش»
+ * قدیمی‌تر → تاریخ شمسی (با سال در صورت تغییر سال)
+ */
+function fa_smart_time($datetime)
+{
+    $ts = strtotime((string) $datetime);
+    if ($ts === false) {
+        return '';
+    }
+    $today = strtotime('today');
+    if ($ts >= $today) {
+        return 'امروز ' . fa_digits(date('H:i', $ts));
+    }
+    if ($ts >= $today - 86400) {
+        return 'دیروز';
+    }
+    $days = (int) floor(($today - $ts) / 86400);
+    if ($days <= 6) {
+        return fa_digits($days) . ' روز پیش';
+    }
+    $year = jdate('Y', $ts);
+    if ($year !== jdate('Y')) {
+        return fa_digits(JalaliHelper::format('j F Y', $ts));
+    }
+    return fa_digits(JalaliHelper::format('j F', $ts));
+}
+
+/**
+ * برچسب گروه‌بندی روزانه برای فهرست‌ها: امروز / دیروز / «۱۵ شهریور ۱۴۰۵»
+ * خروجی برای یک روز معین همیشه یکسان است تا بتوان مرز گروه‌ها را تشخیص داد.
+ */
+function fa_day_label($datetime)
+{
+    $ts = strtotime((string) $datetime);
+    if ($ts === false) {
+        return '';
+    }
+    $today = strtotime('today');
+    $startOfDay = $today;
+    if ($ts >= $startOfDay) {
+        return 'امروز';
+    }
+    if ($ts >= $startOfDay - 86400) {
+        return 'دیروز';
+    }
+    return fa_digits(JalaliHelper::format('j F Y', $ts));
+}
+
+// ---------- تقویم جلالی (شمسی) ----------
+// پیاده‌سازی اصلی در کلاس مشترک \App\Utilities\JalaliHelper است
+// تا اسکریپت‌های سمت سرور (مثل یادآوری‌ها) و فرانت‌اند هر دو یک منطق داشته باشند.
+
+/** تبدیل میلادی به جلالی — خروجی: [سال، ماه، روز] */
+function gregorian_to_jalali(int $gy, int $gm, int $gd): array
+{
+    return JalaliHelper::toJalali($gy, $gm, $gd);
+}
+
+/** تبدیل جلالی به میلادی — خروجی: [سال، ماه، روز] */
+function jalali_to_gregorian(int $jy, int $jm, int $jd): array
+{
+    return JalaliHelper::toGregorian($jy, $jm, $jd);
+}
+
+/** تعداد روزهای ماه جلالی (اسفند: ۲۹ یا ۳۰) */
+function jalali_month_length(int $jy, int $jm): int
+{
+    return JalaliHelper::monthLength($jy, $jm);
+}
+
+/** نام ماه جلالی (۱ تا ۱۲) */
+function jalali_month_name(int $jm): string
+{
+    return JalaliHelper::MONTH_NAMES[$jm] ?? '';
+}
+
+/** قالب‌بندی تاریخ جلالی — توکن‌ها: Y, m, d, j, F, l */
+function jdate(string $format, ?int $timestamp = null): string
+{
+    return JalaliHelper::format($format, $timestamp ?? time());
+}
+
+/** شاخص روز هفته شنبه‌محور: شنبه=۰ ... جمعه=۶ */
+function jalali_weekday_index(int $timestamp): int
+{
+    return JalaliHelper::weekDayIndex($timestamp);
+}
+
+/**
+ * نمایش تاریخ شمسی یک مقدار تاریخ/زمان: «۱۵ شهریور ۱۴۰۵»
+ * ورودی تهی یا نامعتبر رشته خالی برمی‌گرداند.
+ */
+function fa_date($datetime)
+{
+    $ts = strtotime((string) $datetime);
+    if ($ts === false) {
+        return '';
+    }
+    return fa_digits(JalaliHelper::format('j F Y', $ts));
+}
+
+/**
+ * نمایش تاریخ + ساعت شمسی: «۱۵ شهریور ۱۴۰۵، ساعت ۱۸:۳۰»
+ * اگر مقدار ورودی ساعت نداشته باشد (فقط تاریخ)، بخش ساعت حذف می‌شود.
+ */
+function fa_datetime($datetime)
+{
+    $raw = (string) $datetime;
+    $ts = strtotime($raw);
+    if ($ts === false) {
+        return '';
+    }
+    $has_time = preg_match('/[:T]|\d{4}-\d{2}-\d{2} \d/', $raw) === 1;
+    $date = fa_digits(JalaliHelper::format('j F Y', $ts));
+    return $has_time ? $date . '، ساعت ' . fa_digits(date('H:i', $ts)) : $date;
+}
+
+/**
+ * برچسب فاصله روزی نسبت به امروز: امروز / فردا / پس‌فردا / ۳ روز دیگر
+ * ورودی: تاریخ رویداد (هر فرمت قابل‌فهم با strtotime).
+ */
+function fa_days_until($datetime)
+{
+    $ts = strtotime((string) $datetime);
+    if ($ts === false) {
+        return '';
+    }
+    $days = (int) floor((strtotime(date('Y-m-d', $ts)) - strtotime(date('Y-m-d'))) / 86400);
+    return match (true) {
+        $days <= 0 => 'امروز',
+        $days === 1 => 'فردا',
+        $days === 2 => 'پس‌فردا',
+        default => fa_digits($days) . ' روز دیگر',
+    };
 }
 
 // ---------- نقشه وضعیت‌ها و دسته‌بندی‌ها ----------
@@ -472,17 +918,19 @@ function building_default_images()
 }
 
 /**
- * آدرس کاور ساختمان: عکس پیش‌فرض انتخاب‌شده، وگرنه لوگوی سفارشی، وگرنه b1.
+ * آدرس کاور ساختمان: تصویر سفارشی آپلودشده (اولویت اول)، وگرنه عکس پیش‌فرض
+ * انتخاب‌شده، وگرنه b1. تصویر سفارشی از مسیر محافظت‌شدهٔ building_image.php
+ * ارائه می‌شود (دسترسی مستقیم وب به پوشهٔ ذخیره‌سازی وجود ندارد).
  */
 function building_cover($building)
 {
+    if (!empty($building['custom_logo_path']) && !empty($building['id'])) {
+        return 'building_image.php?id=' . (int) $building['id'];
+    }
     $images = building_default_images();
     $key = $building['default_image'] ?? '';
     if (!empty($key) && isset($images[$key]) && is_file(__DIR__ . '/../' . $images[$key])) {
         return $images[$key];
-    }
-    if (!empty($building['custom_logo_path'])) {
-        return $building['custom_logo_path'];
     }
     return $images['b1'];
 }
@@ -647,6 +1095,53 @@ function occupancy_label($unit)
         'no_owner' => 'بدون مالک',
     ];
     return $map[$status] ?? 'نامشخص';
+}
+
+/**
+ * برچسب فارسی اقدام‌های لاگ ممیزی (مشترک بین صفحهٔ لاگ و خروجی اکسل).
+ */
+function audit_action_label(string $action): string
+{
+    $labels = [
+        'auth.login' => '🔑 ورود موفق',
+        'auth.login_failed' => '⛔ تلاش ورود ناموفق',
+        'auth.logout' => '🚪 خروج',
+        'auth.register' => '🆕 ثبت‌نام',
+        'building.create' => '🏢 ایجاد ساختمان',
+        'building.update' => '🏢 ویرایش ساختمان',
+        'building.delete' => '🗑️ حذف ساختمان',
+        'unit.create' => '🏠 ایجاد واحد',
+        'unit.update' => '🏠 ویرایش واحد',
+        'unit.delete' => '🗑️ حذف واحد',
+        'cost.create' => '💰 ثبت هزینه',
+        'cost.update' => '💰 ویرایش هزینه',
+        'cost.delete' => '🗑️ حذف هزینه',
+        'cost.issue' => '📨 صدور هزینه برای مخاطبان',
+        'payment.submit' => '💳 ثبت پرداخت',
+        'payment.receipt' => '🧾 آپلود رسید پرداخت',
+        'payment.confirm' => '✅ تأیید پرداخت',
+        'payment.reject' => '❌ رد پرداخت',
+        'penalty_setting.create' => '⚙️ ثبت تنظیم جریمه',
+        'penalty_setting.update' => '⚙️ ویرایش تنظیم جریمه',
+        'penalty_setting.delete' => '⚙️ حذف تنظیم جریمه',
+        'ticket.create' => '🎫 ثبت تیکت',
+        'ticket.update' => '🎫 ویرایش تیکت',
+        'ticket.delete' => '🗑️ حذف تیکت',
+        'ticket.comment' => '💬 دیدگاه روی تیکت',
+        'document.create' => '📄 ثبت سند',
+        'document.replace_file' => '🔄 تعویض فایل سند',
+        'message.send' => '💬 ارسال پیام خصوصی',
+        'message.delete' => '🗑️ حذف پیام خصوصی',
+    ];
+    if (isset($labels[$action])) {
+        return $labels[$action];
+    }
+    foreach ($labels as $key => $label) {
+        if (str_starts_with($action, $key)) {
+            return $label;
+        }
+    }
+    return '🔸 ' . $action;
 }
 
 ?>

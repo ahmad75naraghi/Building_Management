@@ -88,6 +88,7 @@ if ($building_id > 0) {
 }
 
 $page_title = 'اطلاعیه‌ها';
+$page_hint = 'اطلاعیهٔ عمومی برای همهٔ ساکنین؛ اطلاعیه‌های مهم را سنجاق کنید.';
 $header_sub = $building_name ?: 'اعلان‌های ساختمان';
 $back_url = 'dashboard.php?building_id=' . $building_id;
 $nav_active = 'none';
@@ -111,11 +112,18 @@ require_once 'includes/header.php';
 
     <?php if (empty($announcements)): ?>
         <div class="empty-state">
-            <div style="font-size: 34px; margin-bottom: 8px;">📢</div>
+            <div class="empty-icon">📢</div>
             هنوز اطلاعیه‌ای ثبت نشده است.
+            <?php if ($is_manager): ?>
+                <button type="button" class="empty-action" data-modal-open="add-announcement">📢 ثبت اولین اطلاعیه</button>
+            <?php endif; ?>
         </div>
     <?php else: ?>
-        <div class="space-y-3">
+                <div class="list-filter-bar">
+            <input type="search" class="form-input" data-list-search="announcements-list" placeholder="🔍 جستجوی عنوان یا متن اطلاعیه…" style="flex:1;">
+            <span class="list-count-chip" data-list-count="announcements-list"></span>
+        </div>
+        <div class="space-y-3" data-list-items="announcements-list">
             <?php foreach ($announcements as $announcement): ?>
                 <?php
                 $a_id = (int) ($announcement['id'] ?? 0);
@@ -167,6 +175,7 @@ require_once 'includes/header.php';
                 </div>
             <?php endforeach; ?>
         </div>
+        <div data-list-pager="announcements-list"></div>
     <?php endif; ?>
 
 </main>
@@ -185,7 +194,7 @@ require_once 'includes/header.php';
                 <label for="add_content" class="form-label">متن اطلاعیه *</label>
                 <textarea id="add_content" name="content" rows="4" required class="form-input" placeholder="متن کامل اطلاعیه را بنویسید..."></textarea>
             </div>
-            <label class="flex items-center gap-3 cursor-pointer" style="background:#f8fafc;border:1px solid #e9eef5;border-radius:12px;padding:12px 14px;">
+            <label class="flex items-center gap-3 cursor-pointer" style="background:var(--soft-gray,#f8fafc);border:1px solid var(--soft-line,#e9eef5);border-radius:12px;padding:12px 14px;">
                 <input type="checkbox" name="is_pinned" value="1" class="rounded">
                 <span class="text-sm font-medium text-gray-700">پین شود (نمایش در ابتدای لیست)</span>
             </label>
@@ -206,7 +215,7 @@ require_once 'includes/header.php';
                 <label for="edit_content" class="form-label">متن اطلاعیه *</label>
                 <textarea id="edit_content" name="content" rows="4" required class="form-input"></textarea>
             </div>
-            <label class="flex items-center gap-3 cursor-pointer" style="background:#f8fafc;border:1px solid #e9eef5;border-radius:12px;padding:12px 14px;">
+            <label class="flex items-center gap-3 cursor-pointer" style="background:var(--soft-gray,#f8fafc);border:1px solid var(--soft-line,#e9eef5);border-radius:12px;padding:12px 14px;">
                 <input type="checkbox" name="is_pinned" value="1" class="rounded">
                 <span class="text-sm font-medium text-gray-700">پین شود (نمایش در ابتدای لیست)</span>
             </label>

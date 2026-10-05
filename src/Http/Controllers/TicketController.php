@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Core\Request;
 use App\Core\Response;
+use App\Utilities\PaginationHelper;
 use App\Services\TicketService;
 
 final class TicketController
@@ -50,9 +51,16 @@ final class TicketController
         } else {
             $tickets = $this->service->listByUser((int) $userId);
         }
+        $tickets = array_map(fn($t) => $t->toArray(), $tickets);
+        if (PaginationHelper::requested($request)) {
+            $paged = PaginationHelper::paginate($tickets, PaginationHelper::fromQuery($request));
+            return (new Response())->setJson([
+                'success' => true, 'data' => $paged['items'], 'pagination' => $paged['pagination'],
+            ]);
+        }
         return (new Response())->setJson([
             'success' => true,
-            'data' => array_map(fn($t) => $t->toArray(), $tickets),
+            'data' => $tickets,
         ]);
     }
 
@@ -71,6 +79,84 @@ final class TicketController
         ]);
     }
 
+    public function update(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        if (!$userId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication required',
+            ]);
+        }
+        $id = (int) ($request->getAttribute('id') ?? 0);
+        if ($id <= 0) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => 'Ticket id is required',
+            ]);
+        }
+        if ($this->service->getTicketById($id) === null) {
+            return (new Response())->setStatusCode(404)->setJson([
+                'success' => false, 'message' => 'Ticket not found',
+            ]);
+        }
+        $data = $request->getJsonBody() ?? [];
+        try {
+            $ticket = $this->service->updateTicket($id, $data, (int) $userId);
+            return (new Response())->setJson([
+                'success' => true,
+                'message' => 'Ticket updated',
+                'data' => $ticket->toArray(),
+            ]);
+        } catch (\App\Exceptions\ValidationException $e) {
+            return (new Response())->setStatusCode(422)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        } catch (\App\Exceptions\AuthException $e) {
+            return (new Response())->setStatusCode(403)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function destroy(Request $request): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        if (!$userId) {
+            return (new Response())->setStatusCode(401)->setJson([
+                'success' => false, 'message' => 'Authentication required',
+            ]);
+        }
+        $id = (int) ($request->getAttribute('id') ?? 0);
+        if ($id <= 0) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => 'Ticket id is required',
+            ]);
+        }
+        if ($this->service->getTicketById($id) === null) {
+            return (new Response())->setStatusCode(404)->setJson([
+                'success' => false, 'message' => 'Ticket not found',
+            ]);
+        }
+        try {
+            $deleted = $this->service->deleteTicket($id, (int) $userId);
+            return (new Response())->setJson([
+                'success' => $deleted,
+                'message' => $deleted ? 'Ticket deleted' : 'Failed to delete ticket',
+            ]);
+        } catch (\App\Exceptions\AuthException $e) {
+            return (new Response())->setStatusCode(403)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        } catch (\Exception $e) {
+            return (new Response())->setStatusCode(400)->setJson([
+                'success' => false, 'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
     public function updateStatus(Request $request): Response
     {
         $userId = $request->getAttribute('user_id');
@@ -81,7 +167,12 @@ final class TicketController
         }
         $id = (int) ($request->getAttribute('id') ?? 0);
         $data = $request->getJsonBody() ?? [];
-        $updated = $this->service->updateStatus($id, $data['status'] ?? 'open', isset($data['assigned_to']) ? (int) $data['assigned_to'] : null);
+        $updated = $this->service->updateStatus(
+            $id,
+            $data['status'] ?? 'open',
+            isset($data['assigned_to']) ? (int) $data['assigned_to'] : null,
+            (int) $userId
+        );
         return (new Response())->setJson([
             'success' => $updated,
             'message' => $updated ? 'Status updated' : 'Failed to update status',
